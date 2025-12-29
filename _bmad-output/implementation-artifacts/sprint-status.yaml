@@ -1,0 +1,153 @@
+# Sprint Status Tracking - gavel-ai
+# Generated: 2025-12-28
+# Project: gavel-ai
+# Tracking System: file-system
+# Story Location: /Users/dan/dev/code/projects/python/gavel-ai/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for code review
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - SM typically creates next story ONLY after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then Dev runs code-review (fresh context, ideally different LLM)
+# - Milestones can be marked with `gavel oneshot milestone --run <run-id>`
+
+generated: "2025-12-28T00:00:00Z"
+project: "gavel-ai"
+tracking_system: "file-system"
+story_location: "/Users/dan/dev/code/projects/python/gavel-ai/_bmad-output/implementation-artifacts"
+
+development_status:
+  # ============================================================================
+  # EPIC 1: Project Foundation & Setup
+  # Goal: Establish project structure, build infrastructure, testing foundation
+  # ============================================================================
+  epic-1: in-progress
+  1-1-initialize-project-structure: review
+  1-2-initialize-pyproject-toml-and-dependencies: review
+  1-3-set-up-pre-commit-hooks: review
+  1-4-set-up-pytest-configuration-and-basic-test-structure: review
+  1-5-create-central-logging-configuration: review
+  1-6-initialize-opentelemetry-setup: review
+  epic-1-retrospective: optional
+
+  # ============================================================================
+  # EPIC 2: CLI & Configuration Management
+  # Goal: Build CLI framework and configuration system
+  # ============================================================================
+  epic-2: in-progress
+  2-1-build-typer-cli-entry-point-and-base-command-structure: review
+  2-2-implement-gavel-oneshot-create-scaffolding: review
+  2-3-implement-config-loading-and-validation: review
+  2-4-implement-agents-configuration-schema: review
+  2-5-implement-scenarios-configuration: review
+  2-6-implement-judge-configuration-schema: review
+  epic-2-retrospective: optional
+
+  # ============================================================================
+  # EPIC 3: OneShot Execution Pipeline
+  # Goal: Build core execution engine for scenario processing
+  # ============================================================================
+  epic-3: in-progress
+  3-1-create-processor-base-classes-and-interface: ready-for-dev
+  3-2-implement-promptinputprocessor: backlog
+  3-3-implement-closedboxinputprocessor: backlog
+  3-4-implement-scenarioprocessor-for-conversational-workflows: backlog
+  3-5-implement-executor-orchestration-and-concurrency: backlog
+  3-6-implement-provider-abstraction-with-pydantic-ai-integration: backlog
+  3-7-implement-timeout-and-retry-logic: backlog
+  epic-3-retrospective: optional
+
+  # ============================================================================
+  # EPIC 4: Judging & Result Evaluation
+  # Goal: Build judging system that evaluates outputs and produces scores
+  # ============================================================================
+  epic-4: backlog
+  4-1-create-judge-base-class-and-interface: backlog
+  4-2-integrate-deepeval-judges: backlog
+  4-3-implement-custom-geval-judge-support: backlog
+  4-4-implement-judge-registry-and-factory: backlog
+  4-5-implement-sequential-judge-execution: backlog
+  4-6-implement-result-storage-results-jsonl: backlog
+  4-7-implement-re-judging-capability: backlog
+  epic-4-retrospective: optional
+
+  # ============================================================================
+  # EPIC 5: Reporting & Analysis
+  # Goal: Generate human-readable reports for evaluation results
+  # ============================================================================
+  epic-5: backlog
+  5-1-implement-reporter-base-class-and-interface: backlog
+  5-2-implement-jinja2-based-report-generation: backlog
+  5-3-implement-oneshot-report-format: backlog
+  5-4-implement-conversational-report-format: backlog
+  5-5-implement-autotune-progression-report: backlog
+  epic-5-retrospective: optional
+
+  # ============================================================================
+  # EPIC 6: Run Management & Artifact Storage
+  # Goal: Store runs with complete artifacts and enable history tracking
+  # ============================================================================
+  epic-6: backlog
+  6-1-create-run-and-config-abstract-base-classes: backlog
+  6-2-implement-localfilesystemrun-storage: backlog
+  6-3-implement-manifest-run-metadata: backlog
+  6-4-implement-run-history-tracking: backlog
+  6-5-implement-milestone-marking: backlog
+  6-6-implement-run-cleanup: backlog
+  6-7-implement-run-archive-and-export: backlog
+  6-8-implement-runcontext-programmatic-api: backlog
+  epic-6-retrospective: optional
+
+  # ============================================================================
+  # EPIC 7: Observability & Quality
+  # Goal: Comprehensive observability, error handling, and quality gates
+  # ============================================================================
+  epic-7: backlog
+  7-1-implement-telemetry-collection-and-storage: backlog
+  7-2-implement-run-metadata-telemetry: backlog
+  7-3-implement-error-categorization-and-handling: backlog
+  7-4-implement-debug-mode: backlog
+  7-5-implement-health-checks-and-diagnostics: backlog
+  7-6-implement-pre-execution-validation: backlog
+  7-7-implement-structured-logging-to-gavel-log: backlog
+  7-8-implement-ci-cd-integration-support: backlog
+  epic-7-retrospective: optional
+
+# ============================================================================
+# SUMMARY STATISTICS
+# ============================================================================
+# Total Epics: 7
+# Total Stories: 47
+# Total Retrospectives: 7
+# Grand Total Items: 61
+
+summary:
+  epics_total: 7
+  stories_total: 47
+  retrospectives_total: 7
+  items_total: 61
+  status_breakdown:
+    backlog: 54
+    ready-for-dev: 0
+    in-progress: 0
+    review: 6
+    done: 0
+    optional: 7

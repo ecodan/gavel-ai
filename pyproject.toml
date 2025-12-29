@@ -8,7 +8,18 @@ version = "0.1.0"
 description = "Open-source, provider-agnostic AI evaluation framework"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+authors = [{name = "gavel-ai team"}]
+dependencies = [
+    "pydantic-ai>=1.39.0",
+    "typer>=0.9.0",
+    "deepeval>=0.21.0",
+    "jinja2>=3.0.0",
+    "pydantic>=2.0.0",
+    "opentelemetry-api>=1.0.0",
+    "rich>=13.0.0",
+    "pyyaml>=6.0",
+    "toml>=0.10.0",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -16,8 +27,12 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.0",
     "pytest>=7.0",
+    "pytest-asyncio>=0.21.0",
     "pre-commit>=3.0",
 ]
+
+[project.scripts]
+gavel = "gavel_ai.cli.main:app"
 
 [tool.black]
 line-length = 100
@@ -80,3 +95,24 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "tests.*"
 ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)s] <%(filename)s:%(lineno)s> %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+log_level = "DEBUG"
+log_format = "%(asctime)s [%(levelname)s] <%(filename)s:%(lineno)s> %(message)s"
+log_date_format = "%Y-%m-%d %H:%M:%S"
+addopts = "--verbose --strict-markers"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow running tests",
+    "asyncio: Async tests",
+]
