@@ -79,14 +79,14 @@ development_status:
   # EPIC 4: Judging & Result Evaluation
   # Goal: Build judging system that evaluates outputs and produces scores
   # ============================================================================
-  epic-4: backlog
-  4-1-create-judge-base-class-and-interface: backlog
-  4-2-integrate-deepeval-judges: backlog
-  4-3-implement-custom-geval-judge-support: backlog
-  4-4-implement-judge-registry-and-factory: backlog
-  4-5-implement-sequential-judge-execution: backlog
-  4-6-implement-result-storage-results-jsonl: backlog
-  4-7-implement-re-judging-capability: backlog
+  epic-4: done
+  4-1-create-judge-base-class-and-interface: done
+  4-2-integrate-deepeval-judges: done
+  4-3-implement-custom-geval-judge-support: done
+  4-4-implement-judge-registry-and-factory: done
+  4-5-implement-sequential-judge-execution: done
+  4-6-implement-result-storage-results-jsonl: done
+  4-7-implement-re-judging-capability: done
   epic-4-retrospective: optional
 
   # ============================================================================
