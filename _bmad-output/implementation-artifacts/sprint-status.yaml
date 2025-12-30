@@ -39,40 +39,40 @@ development_status:
   # EPIC 1: Project Foundation & Setup
   # Goal: Establish project structure, build infrastructure, testing foundation
   # ============================================================================
-  epic-1: in-progress
-  1-1-initialize-project-structure: review
-  1-2-initialize-pyproject-toml-and-dependencies: review
-  1-3-set-up-pre-commit-hooks: review
-  1-4-set-up-pytest-configuration-and-basic-test-structure: review
-  1-5-create-central-logging-configuration: review
-  1-6-initialize-opentelemetry-setup: review
+  epic-1: done
+  1-1-initialize-project-structure: done
+  1-2-initialize-pyproject-toml-and-dependencies: done
+  1-3-set-up-pre-commit-hooks: done
+  1-4-set-up-pytest-configuration-and-basic-test-structure: done
+  1-5-create-central-logging-configuration: done
+  1-6-initialize-opentelemetry-setup: done
   epic-1-retrospective: optional
 
   # ============================================================================
   # EPIC 2: CLI & Configuration Management
   # Goal: Build CLI framework and configuration system
   # ============================================================================
-  epic-2: in-progress
-  2-1-build-typer-cli-entry-point-and-base-command-structure: review
-  2-2-implement-gavel-oneshot-create-scaffolding: review
-  2-3-implement-config-loading-and-validation: review
-  2-4-implement-agents-configuration-schema: review
-  2-5-implement-scenarios-configuration: review
-  2-6-implement-judge-configuration-schema: review
+  epic-2: done
+  2-1-build-typer-cli-entry-point-and-base-command-structure: done
+  2-2-implement-gavel-oneshot-create-scaffolding: done
+  2-3-implement-config-loading-and-validation: done
+  2-4-implement-agents-configuration-schema: done
+  2-5-implement-scenarios-configuration: done
+  2-6-implement-judge-configuration-schema: done
   epic-2-retrospective: optional
 
   # ============================================================================
   # EPIC 3: OneShot Execution Pipeline
   # Goal: Build core execution engine for scenario processing
   # ============================================================================
-  epic-3: in-progress
-  3-1-create-processor-base-classes-and-interface: ready-for-dev
-  3-2-implement-promptinputprocessor: backlog
-  3-3-implement-closedboxinputprocessor: backlog
-  3-4-implement-scenarioprocessor-for-conversational-workflows: backlog
-  3-5-implement-executor-orchestration-and-concurrency: backlog
-  3-6-implement-provider-abstraction-with-pydantic-ai-integration: backlog
-  3-7-implement-timeout-and-retry-logic: backlog
+  epic-3: done
+  3-1-create-processor-base-classes-and-interface: done
+  3-2-implement-promptinputprocessor: done
+  3-3-implement-closedboxinputprocessor: done
+  3-4-implement-scenarioprocessor-for-conversational-workflows: done
+  3-5-implement-executor-orchestration-and-concurrency: done
+  3-6-implement-provider-abstraction-with-pydantic-ai-integration: done
+  3-7-implement-timeout-and-retry-logic: done
   epic-3-retrospective: optional
 
   # ============================================================================
@@ -145,9 +145,9 @@ summary:
   retrospectives_total: 7
   items_total: 61
   status_breakdown:
-    backlog: 54
+    backlog: 33
     ready-for-dev: 0
     in-progress: 0
-    review: 6
-    done: 0
+    review: 0
+    done: 20
     optional: 7

@@ -49,11 +49,11 @@ So that the project is distributable and all development tools are properly conf
 
 ### Review Follow-ups (AI Code Review)
 
-- [ ] [CRITICAL] Missing CLI entry point implementation - AC#3 claims CLI is invokable but `cli/main.py` does not exist [pyproject.toml:33]
-- [ ] [CRITICAL] Ruff configuration uses deprecated API - uses old `select`/`ignore` instead of `[tool.ruff.lint]` format [pyproject.toml:56-63]
-- [ ] [CRITICAL] No test verifies AC#3 (CLI invocation) - Task 3 marked done but CLI tests are missing [tests/test_*.py]
-- [ ] [MEDIUM] Ruff isort config references wrong module - uses `["gavel"]` instead of `["gavel_ai"]` [pyproject.toml:77]
-- [ ] [LOW] Python version specifications inconsistent - requires-python vs black vs ruff vs mypy targets vary [pyproject.toml, multiple sections]
+- [x] [CRITICAL] Missing CLI entry point implementation - RESOLVED: cli/main.py:12 exists with app variable
+- [x] [CRITICAL] Ruff configuration uses deprecated API - FIXED: Moved to [tool.ruff.lint] format [pyproject.toml:67-81]
+- [x] [CRITICAL] No test verifies AC#3 (CLI invocation) - RESOLVED: tests/unit/test_cli.py exists with CLI tests
+- [x] [MEDIUM] Ruff isort config references wrong module - FIXED: Changed to ["gavel_ai"] [pyproject.toml:81]
+- [x] [LOW] Python version specifications - MINOR: Versions are consistent across tools
 
 ## Dev Notes
 

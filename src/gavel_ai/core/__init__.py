@@ -8,5 +8,31 @@ used throughout the application.
 
 """
 
-# Export public API (will be populated as implementations are added)
-__all__ = []
+from gavel_ai.core.exceptions import GavelError, JudgeError, ProcessorError
+from gavel_ai.core.models import (
+    EvaluationResult,
+    Input,
+    JudgeConfig,
+    JudgeEvaluation,
+    JudgeResult,
+    ProcessorConfig,
+    ProcessorResult,
+    Scenario,
+)
+from gavel_ai.core.result_storage import ResultStorage
+
+# Export public API
+__all__ = [
+    "Input",
+    "ProcessorConfig",
+    "ProcessorResult",
+    "Scenario",
+    "JudgeConfig",
+    "JudgeResult",
+    "JudgeEvaluation",
+    "EvaluationResult",
+    "ResultStorage",
+    "GavelError",
+    "ProcessorError",
+    "JudgeError",
+]

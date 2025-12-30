@@ -13,6 +13,7 @@ import logging
 import tempfile
 from pathlib import Path
 from typing import Any, Dict
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -154,6 +155,62 @@ def mock_ollama_provider() -> Dict[str, Any]:
         "model": "llama2",
         "base_url": "http://localhost:11434",
     }
+
+
+@pytest.fixture
+def mock_deepeval_metrics():
+    """
+    Mock all DeepEval metrics to avoid API key requirements in tests.
+
+    Returns a dict of mocked metric instances that can be configured per test.
+    """
+    with patch("gavel_ai.judges.deepeval_judge.AnswerRelevancyMetric") as mock_relevancy, \
+         patch("gavel_ai.judges.deepeval_judge.ContextualRelevancyMetric") as mock_contextual, \
+         patch("gavel_ai.judges.deepeval_judge.FaithfulnessMetric") as mock_faithfulness, \
+         patch("gavel_ai.judges.deepeval_judge.HallucinationMetric") as mock_hallucination, \
+         patch("gavel_ai.judges.deepeval_judge.GEval") as mock_geval:
+
+        # Create mock instances that will be returned
+        mock_relevancy_instance = MagicMock()
+        mock_contextual_instance = MagicMock()
+        mock_faithfulness_instance = MagicMock()
+        mock_hallucination_instance = MagicMock()
+        mock_geval_instance = MagicMock()
+
+        # Configure the class mocks to return the instances
+        mock_relevancy.return_value = mock_relevancy_instance
+        mock_contextual.return_value = mock_contextual_instance
+        mock_faithfulness.return_value = mock_faithfulness_instance
+        mock_hallucination.return_value = mock_hallucination_instance
+        mock_geval.return_value = mock_geval_instance
+
+        # Import and patch the JUDGE_TYPE_MAP to use our mocks
+        from gavel_ai.judges.deepeval_judge import DeepEvalJudge
+
+        original_map = DeepEvalJudge.JUDGE_TYPE_MAP.copy()
+        DeepEvalJudge.JUDGE_TYPE_MAP = {
+            "deepeval.answer_relevancy": mock_relevancy,
+            "deepeval.contextual_relevancy": mock_contextual,
+            "deepeval.faithfulness": mock_faithfulness,
+            "deepeval.hallucination": mock_hallucination,
+            "deepeval.geval": mock_geval,
+        }
+
+        yield {
+            "AnswerRelevancyMetric": mock_relevancy,
+            "ContextualRelevancyMetric": mock_contextual,
+            "FaithfulnessMetric": mock_faithfulness,
+            "HallucinationMetric": mock_hallucination,
+            "GEval": mock_geval,
+            "relevancy_instance": mock_relevancy_instance,
+            "contextual_instance": mock_contextual_instance,
+            "faithfulness_instance": mock_faithfulness_instance,
+            "hallucination_instance": mock_hallucination_instance,
+            "geval_instance": mock_geval_instance,
+        }
+
+        # Restore original map
+        DeepEvalJudge.JUDGE_TYPE_MAP = original_map
 
 
 # Markers for test categorization

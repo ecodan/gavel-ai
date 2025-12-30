@@ -55,6 +55,16 @@ extend-exclude = '''
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+exclude = [
+    ".git",
+    ".venv",
+    "build",
+    "dist",
+    ".eggs",
+    "*.egg-info",
+]
+
+[tool.ruff.lint]
 select = [
     "E",    # pycodestyle errors
     "W",    # pycodestyle warnings
@@ -66,17 +76,9 @@ select = [
 ignore = [
     "E501",  # line too long (black handles this)
 ]
-exclude = [
-    ".git",
-    ".venv",
-    "build",
-    "dist",
-    ".eggs",
-    "*.egg-info",
-]
 
-[tool.ruff.isort]
-known-first-party = ["gavel"]
+[tool.ruff.lint.isort]
+known-first-party = ["gavel_ai"]
 
 [tool.mypy]
 python_version = "3.10"
