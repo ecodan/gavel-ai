@@ -33,3 +33,35 @@ class JudgeError(GavelError):
     """Judge configuration or execution errors."""
 
     pass
+
+
+class ReporterError(GavelError):
+    """
+    Reporter generation errors (template loading, rendering, etc.).
+
+    Use this exception when report generation fails due to:
+    - Template file not found
+    - Template rendering errors
+    - Invalid context data
+    - Output format errors
+
+    Follow format: "<ErrorType>: <What happened> - <Recovery step>"
+    """
+
+    pass
+
+
+class StorageError(GavelError):
+    """
+    Storage operation errors (save, load, file I/O, etc.).
+
+    Use this exception when storage operations fail due to:
+    - Directory creation failures
+    - File read/write errors
+    - Permission errors
+    - Run not found errors
+
+    Follow format: "<ErrorType>: <What happened> - <Recovery step>"
+    """
+
+    pass

@@ -1,5 +1,5 @@
 """
-Core data models for gavel-ai processors and judges.
+Core data models for gavel-ai processors, judges, and reporters.
 
 Defines Pydantic models for:
 - Input: Input data for processing
@@ -8,9 +8,12 @@ Defines Pydantic models for:
 - Scenario: Test scenario with expected behavior
 - JudgeConfig: Configuration for judge instances
 - JudgeResult: Results from judge evaluation
+- ReporterConfig: Configuration for reporter instances
+- Manifest: Run manifest with metadata for reproducibility
 """
 
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -157,4 +160,82 @@ class EvaluationResult(BaseModel):
     timestamp: str = Field(..., description="ISO 8601 timestamp")
     metadata: Dict[str, Any] = Field(
         default_factory=dict, description="Additional metadata"
+    )
+
+
+class ArtifactRef(BaseModel):
+    """
+    Reference to a run artifact with metadata.
+
+    Used by Run.artifacts property to describe available artifacts.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    path: str = Field(..., description="Relative or absolute path to artifact")
+    type: str = Field(..., description="Artifact type (json, jsonl, html, log, etc.)")
+    size: int = Field(..., description="Size in bytes")
+
+
+class Manifest(BaseModel):
+    """
+    Run manifest with metadata for reproducibility and tracking.
+
+    Per FR-3.2 and FR-8.5: Captures run metadata including deterministic
+    config hash for reproducibility verification.
+
+    Per Story 6.5: Includes milestone marking to preserve important runs.
+
+    Stored as manifest.json in run directory.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    timestamp: datetime = Field(..., description="Run start time (ISO 8601)")
+    config_hash: str = Field(
+        ..., description="SHA-256 hash of all configs for reproducibility"
+    )
+    scenario_count: int = Field(..., description="Number of scenarios executed")
+    variant_count: int = Field(..., description="Number of variants tested")
+    judge_versions: List[Dict[str, str]] = Field(
+        ..., description="List of judge versions used"
+    )
+    status: Literal["completed", "failed", "partial"] = Field(
+        ..., description="Run completion status"
+    )
+    duration: float = Field(..., description="Total run time in seconds")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Custom metadata key/value pairs"
+    )
+    is_milestone: bool = Field(
+        default=False, description="Whether this run is marked as a milestone"
+    )
+    milestone_comment: Optional[str] = Field(
+        None, description="Comment explaining why this is a milestone"
+    )
+    milestone_timestamp: Optional[datetime] = Field(
+        None, description="When this run was marked as a milestone"
+    )
+
+
+class ReporterConfig(BaseModel):
+    """
+    Configuration model for reporter instances.
+
+    Uses extra='ignore' for forward compatibility - unknown fields are silently ignored.
+
+    Per Architecture Decision 8: Contains template path, output format, and custom
+    variables for report generation.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    template_path: str = Field(
+        ..., description="Path to template directory or file"
+    )
+    output_format: str = Field(
+        ..., description="Output format: html, markdown, or json"
+    )
+    custom_vars: Optional[Dict[str, Any]] = Field(
+        None, description="Custom variables for template rendering"
     )

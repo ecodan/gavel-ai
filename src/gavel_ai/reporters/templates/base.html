@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            color: #7f8c8d;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .metadata {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        ul {
+            margin: 10px 0 10px 20px;
+        }
+
+        li {
+            margin: 5px 0;
+        }
+
+        .section {
+            margin: 20px 0;
+        }
+
+        details {
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+        }
+
+        summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: #2c3e50;
+            padding: 5px;
+        }
+
+        summary:hover {
+            background-color: #ecf0f1;
+        }
+
+        pre {
+            background-color: #f4f4f4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        code {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.9em;
+        }
+
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #7f8c8d;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>{{ title }}</h1>
+            <p class="metadata">
+                <strong>Generated:</strong> {{ metadata.timestamp }}<br>
+                <strong>Config Hash:</strong> {{ metadata.config_hash }}
+            </p>
+        </header>
+
+        <section id="overview" class="section">
+            <h2>Overview</h2>
+            <ul>
+                <li><strong>Evaluation Type:</strong> {{ overview.eval_type }}</li>
+                <li><strong>Variants Tested:</strong> {{ overview.variant_count }}</li>
+                <li><strong>Scenarios:</strong> {{ overview.scenario_count }}</li>
+            </ul>
+        </section>
+
+        <section id="summary" class="section">
+            <h2>Summary</h2>
+            {% if summary %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Variant</th>
+                        <th>Avg Score</th>
+                        <th>Total Score</th>
+                        <th>Scenarios</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for variant in summary %}
+                    <tr>
+                        <td>{{ variant.variant_id }}</td>
+                        <td>{{ "%.2f"|format(variant.avg_score) }}</td>
+                        <td>{{ "%.2f"|format(variant.total_score) }}</td>
+                        <td>{{ variant.scenario_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>No summary data available.</p>
+            {% endif %}
+        </section>
+
+        <section id="results" class="section">
+            <h2>Detailed Results</h2>
+            {% if results %}
+                {% for result in results %}
+                <div class="result">
+                    <h3>Scenario: {{ result.scenario_id }}</h3>
+                    <details>
+                        <summary>Show Input</summary>
+                        <pre><code>{{ result.input | tojson(indent=2) }}</code></pre>
+                    </details>
+
+                    {% if result.variant_outputs %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Variant</th>
+                                <th>Output</th>
+                                <th>Scores</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for output in result.variant_outputs %}
+                            <tr>
+                                <td>{{ output.variant_id }}</td>
+                                <td>{{ output.output }}</td>
+                                <td>
+                                    {% for judge in output.judge_results %}
+                                    <div>
+                                        <strong>{{ judge.judge_id }}:</strong> {{ judge.score }}/10
+                                        {% if judge.reasoning %}
+                                        <details>
+                                            <summary>Reasoning</summary>
+                                            <p>{{ judge.reasoning }}</p>
+                                        </details>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+            <p>No detailed results available.</p>
+            {% endif %}
+        </section>
+
+        <section id="telemetry" class="section">
+            <h2>Execution Metrics</h2>
+            <ul>
+                <li><strong>Total Duration:</strong> {{ telemetry.total_duration_seconds }}s</li>
+                {% if telemetry.llm_calls %}
+                <li><strong>LLM Calls:</strong> {{ telemetry.llm_calls.total | default(0) }}</li>
+                {% if telemetry.llm_calls.tokens %}
+                <li><strong>Tokens:</strong> {{ telemetry.llm_calls.tokens.prompt_total | default(0) }} prompt, {{ telemetry.llm_calls.tokens.completion_total | default(0) }} completion</li>
+                {% endif %}
+                {% endif %}
+            </ul>
+        </section>
+
+        <footer>
+            <p>Report generated by gavel-ai</p>
+        </footer>
+    </div>
+</body>
+</html>

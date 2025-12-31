@@ -1,12 +1,7 @@
-"""
-Reporters module for gavel-ai.
+"""Reporter module for gavel-ai report generation."""
 
-Report generation and presentation.
+from gavel_ai.reporters.base import Reporter
+from gavel_ai.reporters.jinja_reporter import Jinja2Reporter
+from gavel_ai.reporters.oneshot_reporter import OneShotReporter
 
-This module provides the Reporter base class and Jinja2-based report generation for
-different output formats (OneShot, Conversational, Autotune).
-
-"""
-
-# Export public API (will be populated as implementations are added)
-__all__ = []
+__all__ = ["Reporter", "Jinja2Reporter", "OneShotReporter"]

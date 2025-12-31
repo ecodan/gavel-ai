@@ -93,10 +93,10 @@ development_status:
   # EPIC 5: Reporting & Analysis
   # Goal: Generate human-readable reports for evaluation results
   # ============================================================================
-  epic-5: backlog
-  5-1-implement-reporter-base-class-and-interface: backlog
-  5-2-implement-jinja2-based-report-generation: backlog
-  5-3-implement-oneshot-report-format: backlog
+  epic-5: done
+  5-1-implement-reporter-base-class-and-interface: done
+  5-2-implement-jinja2-based-report-generation: done
+  5-3-implement-oneshot-report-format: done
   5-4-implement-conversational-report-format: backlog
   5-5-implement-autotune-progression-report: backlog
   epic-5-retrospective: optional
@@ -104,16 +104,17 @@ development_status:
   # ============================================================================
   # EPIC 6: Run Management & Artifact Storage
   # Goal: Store runs with complete artifacts and enable history tracking
+  # NOTE: CLI commands deferred to Epic 7 - Epic 6 provides API foundation
   # ============================================================================
-  epic-6: backlog
-  6-1-create-run-and-config-abstract-base-classes: backlog
-  6-2-implement-localfilesystemrun-storage: backlog
-  6-3-implement-manifest-run-metadata: backlog
-  6-4-implement-run-history-tracking: backlog
-  6-5-implement-milestone-marking: backlog
-  6-6-implement-run-cleanup: backlog
-  6-7-implement-run-archive-and-export: backlog
-  6-8-implement-runcontext-programmatic-api: backlog
+  epic-6: done
+  6-1-create-run-and-config-abstract-base-classes: done
+  6-2-implement-localfilesystemrun-storage: done
+  6-3-implement-manifest-run-metadata: done
+  6-4-implement-run-history-tracking: done
+  6-5-implement-milestone-marking: done
+  6-6-implement-run-cleanup: done
+  6-7-implement-run-archive-and-export: done
+  6-8-implement-runcontext-programmatic-api: done
   epic-6-retrospective: optional
 
   # ============================================================================
@@ -145,9 +146,9 @@ summary:
   retrospectives_total: 7
   items_total: 61
   status_breakdown:
-    backlog: 33
+    backlog: 25
     ready-for-dev: 0
     in-progress: 0
     review: 0
-    done: 20
+    done: 29
     optional: 7

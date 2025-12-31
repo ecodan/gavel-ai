@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - OneShot Evaluation</title>
+    <style>
+        /* Base styles */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Header styles */
+        header h1 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 2em;
+        }
+
+        header p {
+            margin: 5px 0;
+            color: #7f8c8d;
+        }
+
+        /* Section styles */
+        section {
+            margin: 30px 0;
+        }
+
+        section h2 {
+            color: #34495e;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+
+        /* Winner section */
+        #winner {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        #winner p {
+            margin: 0;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #155724;
+        }
+
+        /* Table styles */
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        .summary-table th,
+        .summary-table td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+
+        .summary-table th {
+            background-color: #3498db;
+            color: white;
+            font-weight: 600;
+        }
+
+        .summary-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .summary-table tr.winner {
+            background-color: #d4edda;
+            font-weight: bold;
+        }
+
+        /* Details/Summary (expandable sections) */
+        details {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        summary {
+            cursor: pointer;
+            font-weight: bold;
+            padding: 8px;
+            user-select: none;
+        }
+
+        summary:hover {
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+
+        details[open] summary {
+            margin-bottom: 10px;
+        }
+
+        /* Scenario styles */
+        .scenario {
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+            background-color: #ffffff;
+        }
+
+        .scenario h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+
+        /* Judge reasoning */
+        .judge-reasoning {
+            background-color: #f1f3f5;
+            padding: 10px;
+            margin-top: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #6c757d;
+        }
+
+        .judge-reasoning summary {
+            font-weight: normal;
+            color: #495057;
+        }
+
+        .judge-reasoning p {
+            margin: 8px 0;
+            color: #6c757d;
+        }
+
+        /* Pre-formatted text */
+        pre {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* List styles */
+        ul {
+            line-height: 1.8;
+        }
+
+        ul li {
+            margin: 5px 0;
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            header h1 {
+                font-size: 1.5em;
+            }
+
+            .summary-table {
+                font-size: 0.9em;
+            }
+
+            .summary-table th,
+            .summary-table td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>{{ title }}</h1>
+            <p><strong>Generated:</strong> {{ metadata.timestamp }}</p>
+        </header>
+
+        <section id="overview">
+            <h2>Overview</h2>
+            <ul>
+                <li><strong>Variants Tested:</strong> {{ overview.variant_count }}</li>
+                <li><strong>Scenarios:</strong> {{ overview.scenario_count }}</li>
+                <li><strong>Judges:</strong>
+                    <ul>
+                    {% for judge in judges %}
+                        <li>{{ judge.judge_id }} ({{ judge.judge_name }})</li>
+                    {% endfor %}
+                    </ul>
+                </li>
+            </ul>
+        </section>
+
+        <section id="winner">
+            <h2>🏆 Winner</h2>
+            {% if winner.is_tie %}
+            <p>TIE: {{ winner.variant_id }} and others (Score: {{ winner.total_score }})</p>
+            {% else %}
+            <p>{{ winner.variant_id }} (Total Score: {{ winner.total_score }}, Avg: {{ winner.avg_score|round(2) }})</p>
+            {% endif %}
+        </section>
+
+        <section id="summary">
+            <h2>Summary</h2>
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>Variant</th>
+                        <th>Avg Score</th>
+                        <th>Total Score</th>
+                        <th>Scenarios</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for variant in summary %}
+                    <tr {% if variant.variant_id == winner.variant_id %}class="winner"{% endif %}>
+                        <td>{{ variant.variant_id }}</td>
+                        <td>{{ variant.avg_score|round(2) }}</td>
+                        <td>{{ variant.total_score|round(2) }}</td>
+                        <td>{{ variant.scenario_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <section id="results">
+            <h2>Detailed Results</h2>
+            {% for result in results %}
+            <div class="scenario">
+                <h3>Scenario: {{ result.scenario_id }}</h3>
+                <details>
+                    <summary>Show Input</summary>
+                    <pre>{{ result.input }}</pre>
+                </details>
+
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Variant</th>
+                            <th>Output</th>
+                            <th>Scores</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for output in result.variant_outputs %}
+                        <tr>
+                            <td>{{ output.variant_id }}</td>
+                            <td>{{ output.output }}</td>
+                            <td>
+                                {% for judge_result in output.judge_results %}
+                                <div>
+                                    <strong>{{ judge_result.judge_id }}:</strong> {{ judge_result.score }}/10
+                                    <details class="judge-reasoning">
+                                        <summary>Reasoning</summary>
+                                        <p>{{ judge_result.reasoning }}</p>
+                                        {% if judge_result.evidence %}
+                                        <p><em>Evidence:</em> {{ judge_result.evidence }}</p>
+                                        {% endif %}
+                                    </details>
+                                </div>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        </section>
+
+        <section id="telemetry">
+            <h2>Execution Metrics</h2>
+            <ul>
+                <li><strong>Total Duration:</strong> {{ telemetry.total_duration_seconds }}s</li>
+                <li><strong>LLM Calls:</strong> {{ telemetry.llm_calls.total }}</li>
+                <li><strong>Tokens:</strong> {{ telemetry.llm_calls.tokens.prompt_total }} prompt, {{ telemetry.llm_calls.tokens.completion_total }} completion</li>
+            </ul>
+        </section>
+
+        <footer>
+            <p>Config Hash: {{ metadata.config_hash }}</p>
+        </footer>
+    </div>
+</body>
+</html>
