@@ -79,15 +79,15 @@ def generate_scenarios_json(eval_root: Path, eval_name: str) -> None:
     scenarios_data: Dict[str, Any] = {
         "scenarios": [
             {
-                "scenario_id": "scenario-1",
-                "input": "What is the capital of France?",
-                "expected_output": "Paris",
+                "id": "scenario-1",
+                "input": {"text": "What is the capital of France?"},
+                "expected_behavior": "Paris",
                 "metadata": {"category": "geography", "difficulty": "easy"},
             },
             {
-                "scenario_id": "scenario-2",
-                "input": "Explain quantum computing in simple terms",
-                "expected_output": "",
+                "id": "scenario-2",
+                "input": {"text": "Explain quantum computing in simple terms"},
+                "expected_behavior": "Provide a clear explanation of quantum computing principles",
                 "metadata": {"category": "technology", "difficulty": "medium"},
             },
         ]
