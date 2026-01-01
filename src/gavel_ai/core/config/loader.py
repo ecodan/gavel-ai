@@ -11,9 +11,6 @@ from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
 from gavel_ai.core.exceptions import ConfigError, ValidationError
-from gavel_ai.telemetry import get_tracer
-
-tracer = get_tracer(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -64,53 +61,49 @@ def load_config(
         ConfigError: If file not found or invalid format
         ValidationError: If config fails Pydantic validation
     """
-    with tracer.start_as_current_span("config.load_config") as span:
-        span.set_attribute("config_path", str(config_path))
-        span.set_attribute("model", model.__name__)
+    # Check if file exists
+    if not config_path.exists():
+        raise ConfigError(
+            f"Config file not found: {config_path} - Create file or check path"
+        )
 
-        # Check if file exists
-        if not config_path.exists():
+    # Read file content
+    content = config_path.read_text()
+
+    # Substitute environment variables
+    if substitute_env:
+        content = substitute_env_vars(content)
+
+    # Parse based on file extension
+    try:
+        if config_path.suffix == ".json":
+            data: Dict[str, Any] = json.loads(content)
+        elif config_path.suffix in (".yaml", ".yml"):
+            data = yaml.safe_load(content)
+        elif config_path.suffix == ".toml":
+            data = toml.loads(content)
+        else:
             raise ConfigError(
-                f"Config file not found: {config_path} - Create file or check path"
+                f"Unsupported config format: {config_path.suffix} - "
+                f"Use .json, .yaml, or .toml"
             )
+    except json.JSONDecodeError as e:
+        raise ConfigError(
+            f"Invalid JSON in {config_path} - Fix JSON syntax: {e}"
+        ) from None
+    except yaml.YAMLError as e:
+        raise ConfigError(
+            f"Invalid YAML in {config_path} - Fix YAML syntax: {e}"
+        ) from None
+    except toml.TomlDecodeError as e:
+        raise ConfigError(
+            f"Invalid TOML in {config_path} - Fix TOML syntax: {e}"
+        ) from None
 
-        # Read file content
-        content = config_path.read_text()
-
-        # Substitute environment variables
-        if substitute_env:
-            content = substitute_env_vars(content)
-
-        # Parse based on file extension
-        try:
-            if config_path.suffix == ".json":
-                data: Dict[str, Any] = json.loads(content)
-            elif config_path.suffix in (".yaml", ".yml"):
-                data = yaml.safe_load(content)
-            elif config_path.suffix == ".toml":
-                data = toml.loads(content)
-            else:
-                raise ConfigError(
-                    f"Unsupported config format: {config_path.suffix} - "
-                    f"Use .json, .yaml, or .toml"
-                )
-        except json.JSONDecodeError as e:
-            raise ConfigError(
-                f"Invalid JSON in {config_path} - Fix JSON syntax: {e}"
-            ) from None
-        except yaml.YAMLError as e:
-            raise ConfigError(
-                f"Invalid YAML in {config_path} - Fix YAML syntax: {e}"
-            ) from None
-        except toml.TomlDecodeError as e:
-            raise ConfigError(
-                f"Invalid TOML in {config_path} - Fix TOML syntax: {e}"
-            ) from None
-
-        # Validate with Pydantic
-        try:
-            return model.model_validate(data)
-        except PydanticValidationError as e:
-            raise ValidationError(
-                f"Config validation failed in {config_path} - Fix validation errors: {e}"
-            ) from None
+    # Validate with Pydantic
+    try:
+        return model.model_validate(data)
+    except PydanticValidationError as e:
+        raise ValidationError(
+            f"Config validation failed in {config_path} - Fix validation errors: {e}"
+        ) from None

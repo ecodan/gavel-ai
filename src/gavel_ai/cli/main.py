@@ -1,12 +1,19 @@
 """Main Typer CLI application for Gavel-AI."""
+from pathlib import Path
 from typing import Optional
 
 import typer
+from dotenv import load_dotenv
 
 from gavel_ai.cli.workflows import autotune, conv, oneshot
+from gavel_ai.log_config import get_application_logger
 from gavel_ai.telemetry import get_tracer
 
+# Load .env file once at module import
+load_dotenv(verbose=False, override=False)
+
 tracer = get_tracer(__name__)
+app_logger = get_application_logger()
 
 # Create main Typer app
 app = typer.Typer(
@@ -34,6 +41,7 @@ def main(
     ),
 ) -> None:
     """Gavel-AI: Open-source, provider-agnostic AI evaluation framework."""
+    # .env loaded at module level - no action needed here
     pass
 
 

@@ -520,9 +520,12 @@ This keeps v1 focused and shippable while building foundation for future expansi
 - Traces to: Sam Patel journey (safety metrics), Dr. Wong (custom evaluation)
 
 **FR-1.6:** Evaluation configs support templating and environment variable substitution
-- Variables like `{{provider_api_key}}`, `{{scenario_count}}` can be templated
-- Environment variable injection for secrets management
+- Variables like `{{ANTHROPIC_API_KEY}}`, `{{OPENAI_API_KEY}}` can be templated in config files
+- Automatic `.env` file loading via `python-dotenv` on CLI startup
+- Environment variable injection for secrets management (no hardcoded API keys)
+- Config files use `{{VAR_NAME}}` syntax for substitution
 - Config inheritance for standardized team setups
+- `.env` files automatically excluded from git via `.gitignore`
 - Traces to: Priya Desai (team standardization), Morgan Kim (CI/CD scripting)
 
 ---
@@ -982,6 +985,10 @@ This keeps v1 focused and shippable while building foundation for future expansi
 - API keys not logged, displayed, or stored in plaintext in telemetry
 - Secrets masked in debug output (show "***" for API key values)
 - Environment variable injection for credentials (no hardcoding in configs)
+- Automatic `.env` file loading via `python-dotenv>=1.0.0` dependency
+- `.env.example` template provided for easy setup
+- `.env` files excluded from git via `.gitignore` to prevent accidental commits
+- Config files use `{{VAR_NAME}}` substitution pattern for secure credential injection
 - Run artifact permissions prevent world-readable access to stored credentials (if present)
 
 **NFR-S2: Data confidentiality**

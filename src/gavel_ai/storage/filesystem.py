@@ -14,7 +14,6 @@ from typing import Any, Dict, List, Optional
 from gavel_ai.core.exceptions import StorageError
 from gavel_ai.core.models import ArtifactRef
 from gavel_ai.storage.base import Run
-from gavel_ai.telemetry import get_tracer
 
 
 class LocalFilesystemRun(Run):
@@ -127,58 +126,53 @@ class LocalFilesystemRun(Run):
         Raises:
             StorageError: If run not found or load fails
         """
-        tracer = get_tracer(__name__)
-        with tracer.start_as_current_span("storage.load") as span:
-            span.set_attribute("storage.type", "filesystem")
-            span.set_attribute("run.id", run_id)
+        # Find run directory by searching evaluations
+        base_path = Path(base_dir)
+        eval_dirs = list(base_path.glob(f"evaluations/*/runs/{run_id}"))
 
-            # Find run directory by searching evaluations
-            base_path = Path(base_dir)
-            eval_dirs = list(base_path.glob(f"evaluations/*/runs/{run_id}"))
+        if not eval_dirs:
+            raise StorageError(
+                f"StorageError: Run {run_id} not found - Check run ID"
+            )
 
-            if not eval_dirs:
-                raise StorageError(
-                    f"StorageError: Run {run_id} not found - Check run ID"
-                )
+        run_dir = eval_dirs[0]
 
-            run_dir = eval_dirs[0]
+        # Extract eval_name from path
+        eval_name = run_dir.parent.parent.name
 
-            # Extract eval_name from path
-            eval_name = run_dir.parent.parent.name
+        # Load metadata first to reconstruct run
+        try:
+            metadata = await LocalFilesystemRun._load_metadata_file(run_dir)
+        except Exception as e:
+            raise StorageError(
+                f"StorageError: Failed to load metadata for run {run_id} - {e}"
+            ) from e
 
-            # Load metadata first to reconstruct run
-            try:
-                metadata = await LocalFilesystemRun._load_metadata_file(run_dir)
-            except Exception as e:
-                raise StorageError(
-                    f"StorageError: Failed to load metadata for run {run_id} - {e}"
-                ) from e
+        # Create run instance
+        run = LocalFilesystemRun(run_id, eval_name, metadata, base_dir)
 
-            # Create run instance
-            run = LocalFilesystemRun(run_id, eval_name, metadata, base_dir)
+        # Load all artifacts (if they exist)
+        try:
+            if (run_dir / "manifest.json").exists():
+                await run.load_manifest()
+            if (run_dir / "config").exists():
+                await run.load_config()
+            if (run_dir / "telemetry.jsonl").exists():
+                await run.load_telemetry()
+            if (run_dir / "results.jsonl").exists():
+                await run.load_results()
+            if (run_dir / "run_metadata.json").exists():
+                await run.load_metadata()
+            if (run_dir / "gavel.log").exists():
+                await run.load_log()
+            if (run_dir / "report.html").exists():
+                await run.load_report()
+        except Exception as e:
+            raise StorageError(
+                f"StorageError: Failed to load artifacts for run {run_id} - {e}"
+            ) from e
 
-            # Load all artifacts (if they exist)
-            try:
-                if (run_dir / "manifest.json").exists():
-                    await run.load_manifest()
-                if (run_dir / "config").exists():
-                    await run.load_config()
-                if (run_dir / "telemetry.jsonl").exists():
-                    await run.load_telemetry()
-                if (run_dir / "results.jsonl").exists():
-                    await run.load_results()
-                if (run_dir / "run_metadata.json").exists():
-                    await run.load_metadata()
-                if (run_dir / "gavel.log").exists():
-                    await run.load_log()
-                if (run_dir / "report.html").exists():
-                    await run.load_report()
-            except Exception as e:
-                raise StorageError(
-                    f"StorageError: Failed to load artifacts for run {run_id} - {e}"
-                ) from e
-
-            return run
+        return run
 
     @staticmethod
     async def _load_metadata_file(run_dir: Path) -> Dict[str, Any]:

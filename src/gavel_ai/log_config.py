@@ -19,6 +19,7 @@ import logging
 import os
 import sys
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Optional
 
 # Module-level logger name constant
@@ -95,7 +96,145 @@ def create_logger(
     return logger
 
 
+def get_application_logger(
+    base_dir: str = ".gavel",
+    level: Optional[int] = None,
+) -> logging.Logger:
+    """
+    Get application-level logger with rotating file handler.
+
+    Creates a logger that writes to {base_dir}/gavel.log with automatic
+    log rotation (10MB max, 5 backups). Use for top-level lifecycle events
+    like application startup, eval creation, and shutdown.
+
+    Args:
+        base_dir: Base directory for logs (default: .gavel)
+        level: Log level (default: DEBUG if GAVEL_DEBUG=true, else INFO)
+
+    Returns:
+        Configured application logger
+
+    Example:
+        ```python
+        from gavel_ai.log_config import get_application_logger
+
+        app_logger = get_application_logger()
+        app_logger.info("Gavel-AI v0.1.0 started")
+        app_logger.info("Evaluation 'test_os' created")
+        ```
+    """
+    # Create .gavel directory if doesn't exist
+    log_dir = Path(base_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    # Application log file
+    log_file = log_dir / "gavel.log"
+
+    # Make logger name unique per base_dir to avoid handler conflicts
+    # In production, base_dir is always ".gavel" so logger is reused
+    # In tests, each tmp_path gets its own logger
+    resolved_path = str(log_dir.resolve())
+    # Use hash to keep name short but unique
+    import hashlib
+    path_hash = hashlib.md5(resolved_path.encode()).hexdigest()[:8]
+    app_logger_name = f"{LOGGER_NAME}.app.{path_hash}"
+
+    # Use create_logger with file handler (already has rotation)
+    logger = create_logger(
+        name=app_logger_name,
+        level=level,
+        log_file=str(log_file),
+    )
+
+    # Disable propagation to prevent duplicate logs from parent loggers
+    logger.propagate = False
+
+    return logger
+
+
+def get_run_logger(
+    run_id: str,
+    eval_name: str,
+    base_dir: str = ".gavel",
+    level: Optional[int] = None,
+) -> logging.Logger:
+    """
+    Get run-specific logger with single file handler (no rotation).
+
+    Creates a logger that writes to
+    {base_dir}/evaluations/{eval_name}/runs/{run_id}/run.log.
+    Use for run-specific operations like config loading, scenario execution,
+    and judge results.
+
+    Args:
+        run_id: Run identifier (e.g., "run-20251231-120000")
+        eval_name: Evaluation name (e.g., "test_os")
+        base_dir: Base directory for logs (default: .gavel)
+        level: Log level (default: DEBUG if GAVEL_DEBUG=true, else INFO)
+
+    Returns:
+        Configured run-specific logger
+
+    Example:
+        ```python
+        from gavel_ai.log_config import get_run_logger
+
+        run_logger = get_run_logger(run_id="run-123", eval_name="test_os")
+        run_logger.info("Loaded 15 scenarios")
+        run_logger.info("Executing scenario 'test-1'")
+        ```
+    """
+    # Create run log directory
+    run_dir = Path(base_dir) / "evaluations" / eval_name / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Run log file (no rotation)
+    log_file = run_dir / "run.log"
+
+    # Create logger with unique name
+    logger_name = f"{LOGGER_NAME}.run.{run_id}"
+
+    # Get logger instance
+    logger = logging.getLogger(logger_name)
+
+    # Only configure if not already configured (avoid duplicate handlers)
+    if logger.handlers:
+        return logger
+
+    # Set log level
+    if level is None:
+        level = logging.DEBUG if DEBUG_MODE else logging.INFO
+    logger.setLevel(level)
+
+    # Create formatter
+    formatter = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
+
+    # Add file handler (no rotation for run logs - single file per run)
+    try:
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except (OSError, IOError) as e:
+        # Fallback: log to application logger if run logger fails
+        app_logger = get_application_logger(base_dir)
+        app_logger.warning(f"Could not create run logger at {log_file}: {e}")
+
+    # Disable propagation to prevent duplicate logs from parent loggers
+    logger.propagate = False
+
+    return logger
+
+
 # Module-level logger instance (created on import)
 logger = create_logger(LOGGER_NAME)
 
-__all__ = ["create_logger", "logger", "LOGGER_NAME", "LOG_FORMAT", "LOG_DATE_FORMAT"]
+__all__ = [
+    "create_logger",
+    "get_application_logger",
+    "get_run_logger",
+    "logger",
+    "LOGGER_NAME",
+    "LOG_FORMAT",
+    "LOG_DATE_FORMAT",
+]

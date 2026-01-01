@@ -1,32 +1,34 @@
 """
-Backward compatibility module for telemetry imports.
+Telemetry module for gavel-ai.
 
-This module maintains compatibility with existing imports:
-    from gavel_ai.telemetry import get_tracer, configure_run_telemetry, etc.
-
-The actual implementation has been moved to gavel_ai.telemetry package (spans.py, metadata.py).
+Provides OpenTelemetry span collection and run metadata aggregation.
 """
 
-# Re-export everything from the telemetry package for backward compatibility
-from gavel_ai.telemetry import (  # noqa: F401
+# Import from spans module
+from gavel_ai.telemetry.spans import (
     DynamicSpanProcessor,
-    LLMMetrics,
     NoOpSpanExporter,
-    RunMetadataCollector,
-    RunMetadataSchema,
-    ScenarioTimingStats,
     TelemetryFileExporter,
     configure_run_telemetry,
     get_current_telemetry_path,
-    get_metadata_collector,
     get_tracer,
-    reset_metadata_collector,
     reset_telemetry,
     start_span,
     trace,
 )
 
+# Import from metadata module
+from gavel_ai.telemetry.metadata import (
+    LLMMetrics,
+    RunMetadataCollector,
+    RunMetadataSchema,
+    ScenarioTimingStats,
+    get_metadata_collector,
+    reset_metadata_collector,
+)
+
 __all__ = [
+    # Span collection and export (Story 7.1)
     "get_tracer",
     "start_span",
     "trace",
@@ -36,6 +38,7 @@ __all__ = [
     "TelemetryFileExporter",
     "NoOpSpanExporter",
     "DynamicSpanProcessor",
+    # Run metadata collection and aggregation (Story 7.2)
     "ScenarioTimingStats",
     "LLMMetrics",
     "RunMetadataSchema",

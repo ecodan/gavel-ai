@@ -39,6 +39,7 @@ class OneShotReporter(Jinja2Reporter):
         Extends parent _build_context() with OneShot-specific data:
         - winner: Winning variant based on total scores
         - judges: List of unique judges used in evaluation
+        - performance: Performance metrics from run metadata (timing, tokens, etc.)
 
         Args:
             run: Run instance with metadata, results, and telemetry
@@ -52,6 +53,7 @@ class OneShotReporter(Jinja2Reporter):
         # Add OneShot-specific context
         context["winner"] = self._calculate_winner(context["summary"])
         context["judges"] = self._extract_judges_list(run)
+        context["performance"] = self._extract_performance_metrics(run)
 
         return context
 
@@ -123,3 +125,45 @@ class OneShotReporter(Jinja2Reporter):
                     })
 
         return judges
+
+    def _extract_performance_metrics(self, run: Any) -> Dict[str, Any]:
+        """
+        Extract performance metrics from run metadata (Story 7.2).
+
+        Args:
+            run: Run instance with metadata
+
+        Returns:
+            Dict[str, Any]: Performance metrics for template rendering
+        """
+        import json
+        from pathlib import Path
+
+        # Try to load run_metadata.json if it exists
+        try:
+            # Check if run has run_dir attribute (LocalFilesystemRun)
+            run_dir = getattr(run, "run_dir", None)
+            if run_dir:
+                metadata_file = Path(run_dir) / "run_metadata.json"
+                if metadata_file.exists():
+                    with open(metadata_file, "r", encoding="utf-8") as f:
+                        metadata_data = json.load(f)
+                    return {
+                        "has_metrics": True,
+                        "total_duration_seconds": metadata_data.get("total_duration_seconds", 0),
+                        "scenario_timing": metadata_data.get("scenario_timing", {}),
+                        "llm_calls": metadata_data.get("llm_calls", {}),
+                        "execution": metadata_data.get("execution", {}),
+                    }
+        except Exception:
+            # If metadata file not found or parsing fails, continue with empty metrics
+            pass
+
+        # Return empty metrics structure if not found
+        return {
+            "has_metrics": False,
+            "total_duration_seconds": 0,
+            "scenario_timing": {},
+            "llm_calls": {},
+            "execution": {},
+        }

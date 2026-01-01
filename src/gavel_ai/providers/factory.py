@@ -9,18 +9,19 @@ import time
 from typing import Any, Dict
 
 from pydantic import BaseModel, ConfigDict
-from pydantic_ai import Agent
+from pydantic_ai import Agent, models
+from pydantic_ai.providers import Provider
 
 from gavel_ai.core.config.agents import ModelDefinition
 from gavel_ai.core.exceptions import ProcessorError
-from gavel_ai.telemetry import get_tracer
+from gavel_ai.telemetry import get_metadata_collector, get_tracer
 
 # Import provider classes for passing API keys
 try:
     from pydantic_ai.providers.anthropic import AnthropicProvider
-    from pydantic_ai.providers.openai import OpenAIProvider
     from pydantic_ai.providers.google import GoogleProvider
     from pydantic_ai.providers.ollama import OllamaProvider
+    from pydantic_ai.providers.openai import OpenAIProvider
 except ImportError:
     # Fallback if provider imports change in future versions
     AnthropicProvider = None  # type: ignore
@@ -52,18 +53,35 @@ class ProviderFactory:
         """Initialize provider factory."""
         self.tracer = get_tracer(__name__)
 
-    def create_agent(self, model_def: ModelDefinition) -> Agent:
+    def create_agent(self, model_def: ModelDefinition, output_type: type = str) -> Agent:
         """
-        Create Pydantic-AI agent from model definition.
+        Create Pydantic-AI agent from model definition with configurable output type.
 
         Args:
             model_def: Model definition with provider and configuration
+            output_type: Expected output type - can be str (default), Pydantic model,
+                        or built-in types. Use Pydantic models for structured outputs
+                        (e.g., JudgeVerdict, EvaluationResult). Use str for raw text.
 
         Returns:
             Configured Pydantic-AI Agent instance
 
         Raises:
             ProcessorError: If provider is unsupported or configuration invalid
+
+        Example:
+            # Simple string output (default)
+            agent = factory.create_agent(model_def)
+
+            # Structured output with Pydantic model
+            class JudgeVerdict(BaseModel):
+                winner: Literal["subject", "baseline", "tie"]
+                confidence: float
+                reasoning: str
+
+            agent = factory.create_agent(model_def, output_type=JudgeVerdict)
+            result = await agent.run(prompt)
+            verdict: JudgeVerdict = result.output  # Type-safe!
         """
         with self.tracer.start_as_current_span("provider.create_agent") as span:
             span.set_attribute("provider", model_def.model_provider)
@@ -76,56 +94,110 @@ class ProviderFactory:
             # Resolve environment variables in API key
             if api_key and api_key.startswith("${") and api_key.endswith("}"):
                 env_var_name = api_key[2:-1]
-                api_key = os.getenv(env_var_name)
-
-            # Create provider instance with credentials
-            provider_instance = None
+                resolved_key = os.getenv(env_var_name)
+                if not resolved_key:
+                    from gavel_ai.core.exceptions import ConfigError
+                    raise ConfigError(
+                        f"Environment variable '{env_var_name}' not set - "
+                        f"Set {env_var_name} or provide api_key directly in provider_auth"
+                    )
+                api_key = resolved_key
 
             try:
-                if model_def.model_provider == "anthropic":
-                    if AnthropicProvider is not None and api_key:
-                        provider_instance = AnthropicProvider(
-                            model_name=model_def.model_version,
-                            api_key=api_key,
-                        )
-                    model_string = f"anthropic:{model_def.model_version}"
+                # Build model string: "provider:model_version"
+                # This is used by models.infer_model() to select the correct model
+                model_string = f"{model_def.model_provider}:{model_def.model_version}"
 
-                elif model_def.model_provider == "openai":
-                    if OpenAIProvider is not None and api_key:
-                        provider_instance = OpenAIProvider(
-                            model_name=model_def.model_version,
-                            api_key=api_key,
-                        )
-                    model_string = f"openai:{model_def.model_version}"
+                # Create provider_factory function that returns configured provider instances
+                # Providers are created with auth credentials ONLY (no model_name parameter)
+                def provider_factory(provider_name: str) -> Provider:
+                    """
+                    Factory function for creating provider instances with credentials.
 
-                elif model_def.model_provider == "google":
-                    if GoogleProvider is not None and api_key:
-                        provider_instance = GoogleProvider(
-                            model_name=model_def.model_version,
-                            api_key=api_key,
-                        )
-                    model_string = f"google-genai:{model_def.model_version}"
+                    NOTE: Providers do NOT take model_name parameter.
+                    Model selection happens via model_string passed to models.infer_model().
 
-                elif model_def.model_provider == "ollama":
-                    if OllamaProvider is not None:
-                        provider_instance = OllamaProvider(
-                            model_name=model_def.model_version,
+                    Parameter mapping:
+                    - model_def.provider_auth['api_key'] → provider api_key parameter
+                    - model_def.provider_auth['base_url'] → provider base_url parameter
+                    - model_def.model_version → extracted from model_string by Pydantic-AI
+                    """
+                    if provider_name == "anthropic":
+                        if AnthropicProvider is None:
+                            raise ProcessorError(
+                                "Anthropic provider not available - "
+                                "Install pydantic-ai with anthropic support"
+                            )
+                        if not api_key:
+                            raise ProcessorError(
+                                "Anthropic API key required - "
+                                "Set 'api_key' in provider_auth or ANTHROPIC_API_KEY env var"
+                            )
+                        # Anthropic provider: Only api_key and base_url parameters
+                        return AnthropicProvider(
+                            api_key=api_key,
+                            base_url=base_url,
+                        )
+
+                    elif provider_name == "openai":
+                        if OpenAIProvider is None:
+                            raise ProcessorError(
+                                "OpenAI provider not available - "
+                                "Install pydantic-ai with openai support"
+                            )
+                        if not api_key:
+                            raise ProcessorError(
+                                "OpenAI API key required - "
+                                "Set 'api_key' in provider_auth or OPENAI_API_KEY env var"
+                            )
+                        # OpenAI provider: Only api_key and base_url parameters
+                        return OpenAIProvider(
+                            api_key=api_key,
+                            base_url=base_url,
+                        )
+
+                    elif provider_name == "google":
+                        if GoogleProvider is None:
+                            raise ProcessorError(
+                                "Google provider not available - "
+                                "Install pydantic-ai with google support"
+                            )
+                        if not api_key:
+                            raise ProcessorError(
+                                "Google API key required - "
+                                "Set 'api_key' in provider_auth or GOOGLE_API_KEY env var"
+                            )
+                        # Google provider: Only api_key and base_url parameters
+                        return GoogleProvider(
+                            api_key=api_key,
+                            base_url=base_url,
+                        )
+
+                    elif provider_name == "ollama":
+                        if OllamaProvider is None:
+                            raise ProcessorError(
+                                "Ollama provider not available - "
+                                "Install pydantic-ai with ollama support"
+                            )
+                        # Ollama provider: Only base_url parameter (no API key required)
+                        return OllamaProvider(
                             base_url=base_url or "http://localhost:11434",
                         )
-                    model_string = f"ollama:{model_def.model_version}"
 
-                else:
-                    raise ProcessorError(
-                        f"Unsupported provider '{model_def.model_provider}' - "
-                        f"Supported providers: anthropic, openai, google, ollama"
-                    )
+                    else:
+                        raise ProcessorError(
+                            f"Unsupported provider '{provider_name}' - "
+                            f"Supported providers: anthropic, openai, google, ollama"
+                        )
 
-                # Create agent with provider instance if available
-                if provider_instance:
-                    agent = Agent(model=provider_instance)
-                else:
-                    # Fallback to model string (requires env vars)
-                    agent = Agent(model=model_string)
+                # Create model using infer_model with custom provider_factory
+                # This creates the correct Model subclass (AnthropicModel, OpenAIModel, etc.)
+                # with the provider instance and model name combined
+                model = models.infer_model(model_string, provider_factory=provider_factory)
+
+                # Create agent with the configured model and output type
+                # output_type can be str (default) for raw text or a Pydantic model for structured data
+                agent = Agent(model=model, output_type=output_type)
 
                 return agent
 
@@ -158,17 +230,21 @@ class ProviderFactory:
                 # Call agent
                 response = await agent.run(prompt)
 
-                # Extract output
-                output = str(response.data)
+                # Extract output (use .output, not deprecated .data)
+                output = str(response.output)
 
                 # Extract metadata
                 metadata: Dict[str, Any] = {}
 
                 # Tokens (if available)
+                prompt_tokens = 0
+                completion_tokens = 0
                 if hasattr(response, "usage") and response.usage:
+                    prompt_tokens = getattr(response.usage, "prompt_tokens", 0)
+                    completion_tokens = getattr(response.usage, "completion_tokens", 0)
                     metadata["tokens"] = {
-                        "prompt": getattr(response.usage, "prompt_tokens", 0),
-                        "completion": getattr(response.usage, "completion_tokens", 0),
+                        "prompt": prompt_tokens,
+                        "completion": completion_tokens,
                         "total": getattr(response.usage, "total_tokens", 0),
                     }
                 else:
@@ -185,6 +261,19 @@ class ProviderFactory:
                 duration_ms = int((time.time() - start_time) * 1000)
                 metadata["latency_ms"] = duration_ms
 
+                # Record LLM call in metadata collector
+                metadata_collector = get_metadata_collector()
+                metadata_collector.record_llm_call(
+                    model=model_str,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                )
+
+                # Set comprehensive span attributes per telemetry spec
+                span.set_attribute("llm.provider", metadata["provider"])
+                span.set_attribute("llm.model", metadata["model"])
+                span.set_attribute("llm.tokens.prompt", prompt_tokens)
+                span.set_attribute("llm.tokens.completion", completion_tokens)
                 span.set_attribute("llm.tokens.total", metadata["tokens"]["total"])
                 span.set_attribute("llm.latency_ms", duration_ms)
 
@@ -192,7 +281,7 @@ class ProviderFactory:
 
             except TimeoutError as e:
                 raise ProcessorError(
-                    f"LLM call timed out - Increase timeout_seconds or check provider status"
+                    "LLM call timed out - Increase timeout_seconds or check provider status"
                 ) from e
             except Exception as e:
                 raise ProcessorError(

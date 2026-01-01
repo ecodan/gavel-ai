@@ -131,8 +131,8 @@ class DeepEvalJudge(Judge):
             JudgeError: On evaluation failures
         """
         with self.tracer.start_as_current_span("judge.evaluate") as span:
-            span.set_attribute("judge.type", self.config.judge_type)
             span.set_attribute("judge.id", self.config.judge_id)
+            span.set_attribute("judge.name", self.config.judge_type)  # DeepEval metric name
             span.set_attribute("scenario.id", scenario.id)
 
             try:

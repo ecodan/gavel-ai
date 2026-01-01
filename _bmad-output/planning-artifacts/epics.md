@@ -233,7 +233,7 @@ So that the project is distributable and all development tools are properly conf
   **Then** the following are specified:
   - Project name, version, description
   - Python 3.10+ requirement (no strict version barriers on dependencies)
-  - Core dependencies: pydantic-ai>=1.39.0, typer, deepeval, jinja2, pydantic, opentelemetry-api
+  - Core dependencies: pydantic-ai>=1.39.0, typer, deepeval, jinja2, pydantic, opentelemetry-api, python-dotenv>=1.0.0
   - Optional development dependencies: pytest, black, ruff, mypy, pre-commit
 
 - **Given** tool configuration in pyproject.toml
@@ -471,9 +471,17 @@ So that configuration errors are caught early with clear messages.
   **When** it is loaded
   **Then** a ValidationError is raised with guidance on fixing the issue
 
-- **Given** environment variables are referenced (e.g., {{LLM_API_KEY}})
+- **Given** environment variables are referenced (e.g., {{ANTHROPIC_API_KEY}})
   **When** the config is loaded
-  **Then** environment variables are substituted
+  **Then** environment variables are substituted using the `{{VAR_NAME}}` pattern
+
+- **Given** a `.env` file exists in the project root
+  **When** the CLI starts
+  **Then** environment variables are automatically loaded via `python-dotenv`
+
+- **Given** an environment variable is missing
+  **When** referenced in a config file
+  **Then** a ConfigError is raised with helpful message: "Environment variable 'VAR_NAME' not set - Set VAR_NAME environment variable or provide value directly"
 
 **Configuration Files to Support:**
 - agents.json (Pydantic model definition)
@@ -484,6 +492,19 @@ So that configuration errors are caught early with clear messages.
 - Prompts in prompts/ (TOML format)
 
 **Related Requirements:** FR-1.2, FR-1.3, FR-1.4, FR-1.6, FR-9.6
+
+**Implementation Note (2026-01-01):**
+- Added `python-dotenv>=1.0.0` to `pyproject.toml` dependencies
+- CLI (`src/gavel_ai/cli/main.py`) now calls `load_dotenv(verbose=False, override=False)` in main callback
+- Created `.env.example` template with example API key placeholders
+- Updated test evaluation (`test_os/config/agents.json`) to use `{{ANTHROPIC_API_KEY}}` syntax
+- Added 4 unit tests in `tests/unit/test_dotenv_loading.py` verifying:
+  - load_dotenv called on CLI startup
+  - Environment variable substitution works correctly
+  - Missing variables raise helpful ConfigError
+  - Correct parameters (verbose=False, override=False)
+- Created `SETUP.md` with complete .env configuration guide
+- Updated README.md and docs/quickstart/getting-started.md with .env setup instructions
 
 ---
 
@@ -796,6 +817,43 @@ So that new providers can be added without changing processor code.
   **When** an LLM call is made
   **Then** an OT span "llm.call" is emitted with: provider, model, tokens, latency
 
+- **Given** an agent is created with `output_type=str` (default)
+  **When** the agent is invoked
+  **Then** the response.output is a string with raw text
+
+- **Given** an agent is created with `output_type=PydanticModel`
+  **When** the agent is invoked
+  **Then** the response.output is a validated Pydantic model instance (type-safe)
+
+**Enhancement Notes (2026-01-01):**
+
+The `ProviderFactory.create_agent()` method now supports configurable output types via the `output_type` parameter:
+
+- **Default behavior**: `output_type=str` returns raw text responses (maintains backward compatibility)
+- **Structured outputs**: `output_type=PydanticModel` enables type-safe, validated responses for specialized components
+- **Use cases**:
+  - Processors: Use default `str` for flexible text processing
+  - Judges: Use structured models like `JudgeVerdict(winner, confidence, reasoning)` for type safety
+  - Reporters: Use structured models for formatted outputs
+
+**Example:**
+```python
+# Default: raw text
+agent = factory.create_agent(model_def)
+result = await agent.run(prompt)
+text: str = result.output
+
+# Structured: type-safe verdict
+class JudgeVerdict(BaseModel):
+    winner: Literal["subject", "baseline", "tie"]
+    confidence: float
+    reasoning: str
+
+agent = factory.create_agent(model_def, output_type=JudgeVerdict)
+result = await agent.run(prompt)
+verdict: JudgeVerdict = result.output  # Validated!
+```
+
 **Related Requirements:** FR-2.2, Decision 1, FR-2.4
 
 ---
@@ -831,6 +889,57 @@ So that temporary API issues don't fail the evaluation.
 - max_retries: 3 (configurable per eval)
 
 **Related Requirements:** FR-2.1, NFR-R2, Decision 7
+
+---
+
+### Story 3.8: Wire CLI `gavel oneshot run` to Execution Pipeline
+
+As a user,
+I want `gavel oneshot run --eval <name>` to execute my evaluation end-to-end,
+So that I can run scenarios, judge results, and generate reports with a single command.
+
+**Acceptance Criteria:**
+
+- **Given** I run `gavel oneshot run --eval test_os`
+  **When** the command completes successfully
+  **Then**:
+  - RunContext is created with timestamped run directory
+  - Config files are loaded and validated
+  - Processor executes all scenarios
+  - Judges evaluate all results
+  - Results are stored in results.jsonl
+  - Telemetry is captured in telemetry.jsonl
+  - Report is generated (report.html)
+  - Run manifest is saved (manifest.json)
+
+- **Given** valid config files exist in `.gavel/evaluations/<eval>/config/`
+  **When** `gavel oneshot run` executes
+  **Then**:
+  - agents.json is loaded and validated
+  - eval_config.json is loaded and validated
+  - async_config.json is loaded and validated
+  - scenarios.json is loaded and validated
+  - All Pydantic validation errors produce helpful messages
+
+- **Given** the evaluation directory doesn't exist
+  **When** `gavel oneshot run --eval missing_eval` is executed
+  **Then** ConfigError is raised: "Evaluation 'missing_eval' not found - Run 'gavel oneshot create' first"
+
+- **Given** `--scenarios 1-5` option is provided
+  **When** execution runs
+  **Then** only scenarios 1-5 are executed
+
+- **Given** I run the same evaluation twice
+  **When** both runs complete
+  **Then** separate run directories exist with unique timestamps
+
+**Technical Notes:**
+- Orchestrates all components: ConfigLoader → RunContext → Processor → Executor → Judges → Storage → Report
+- Replaces stub implementation in `src/gavel_ai/cli/workflows/oneshot.py:run()`
+- Creates ConfigLoader class for config file orchestration
+- Wires all backend infrastructure built in Epics 2-6
+
+**Related Requirements:** FR-2.1, FR-7.3, FR-3.1, FR-3.2, FR-9.1
 
 ---
 

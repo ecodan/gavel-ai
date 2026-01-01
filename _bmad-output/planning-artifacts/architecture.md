@@ -77,6 +77,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - Pydantic-AI (or similar) for provider abstraction
 - DeepEval for LLM-as-judge
 - Jinja2 for report templating
+- python-dotenv>=1.0.0 for automatic `.env` file loading and environment variable management
 - Optional: visualization, database adapters (post-v1)
 
 ### Cross-Cutting Concerns Identified
@@ -207,6 +208,7 @@ gavel-ai/
 | **Type Checking** | Mypy | Strict type validation |
 | **Testing** | Pytest | Industry standard; fixture-based |
 | **Config Format** | JSON/YAML | Human-readable, versionable |
+| **Env Management** | python-dotenv | Automatic .env loading for API keys |
 | **Reporting** | Jinja2 | Templating flexibility |
 | **Judging** | DeepEval | LLM-as-judge integration |
 | **Telemetry** | OpenTelemetry | Native OT native instrumentation |
@@ -231,9 +233,34 @@ gavel-ai/
 
 **Rationale:** Supports all required providers (Claude, GPT, Gemini, Ollama), vendor-agnostic API, built-in observability hooks, type-safe, V1 API stability through v2.0
 
-**Implementation:** Use Pydantic-AI directly for provider abstraction, swappable providers without code changes, custom provider support for future extensions
+**Implementation:**
+- Use Pydantic-AI directly for provider abstraction via `ProviderFactory` class
+- Swappable providers without code changes
+- Configurable `output_type` parameter supports both raw text (`str`, default) and structured outputs (Pydantic models)
+- Custom provider support for future extensions
 
-**Affects:** Core processor logic, config schema, agent definition, telemetry instrumentation
+**Output Type Strategy:**
+- **Default (`output_type=str`)**: Raw text responses for general-purpose processors (PromptInputProcessor, etc.)
+- **Structured (`output_type=PydanticModel`)**: Type-safe, validated outputs for specialized components (Judges, Reporters)
+- Higher-layer components can specify structured models while maintaining flexible low-level abstraction
+
+**Example:**
+```python
+# Raw text output (default)
+agent = factory.create_agent(model_def)
+
+# Structured output for judges
+class JudgeVerdict(BaseModel):
+    winner: Literal["subject", "baseline", "tie"]
+    confidence: float
+    reasoning: str
+
+agent = factory.create_agent(model_def, output_type=JudgeVerdict)
+result = await agent.run(prompt)
+verdict: JudgeVerdict = result.output  # Type-safe!
+```
+
+**Affects:** Core processor logic, config schema, agent definition, telemetry instrumentation, judge implementations
 
 ---
 
@@ -1282,6 +1309,7 @@ gavel-ai/
 
 ```
 CLI (main.py)
+  → load_dotenv() (automatic .env loading on startup)
   → Executor (processors/executor.py)
     → PromptInputProcessor / ClosedBoxInputProcessor
       → Pydantic-AI (provider abstraction)
@@ -1309,7 +1337,9 @@ CLI (main.py)
 3. **Config Validation:** All models use Pydantic with `extra='ignore'`
    - Load time validation (no runtime surprises)
    - Lenient on unknown fields (forward compatible)
-   - Module: `core/models.py`, `core/config.py`
+   - Environment variable substitution via `{{VAR_NAME}}` syntax in config files
+   - Automatic `.env` loading via `python-dotenv` on CLI startup
+   - Module: `core/models.py`, `core/config.py`, `core/config/loader.py`
 
 **External Integration Points:**
 - LLM providers: Claude, GPT, Gemini, Ollama (via Pydantic-AI v1.39.0)

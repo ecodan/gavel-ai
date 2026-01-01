@@ -220,3 +220,35 @@ def pytest_configure(config: Any) -> None:
     config.addinivalue_line("markers", "integration: Integration tests")
     config.addinivalue_line("markers", "slow: Slow running tests")
     config.addinivalue_line("markers", "asyncio: Async tests")
+
+
+# Telemetry test fixtures
+@pytest.fixture(scope="session", autouse=True)
+def ensure_telemetry_initialized():
+    """
+    Ensure telemetry module is properly initialized for all tests.
+
+    This fixture runs once per session and ensures our DynamicSpanProcessor
+    is properly connected to the global TracerProvider. This is needed because
+    pytest plugins (deepeval, logfire) may initialize OT before our module.
+    """
+    from gavel_ai.telemetry import spans
+
+    # Force re-registration of our processor if needed
+    if spans._dynamic_processor is None:
+        spans._tracer_provider = spans._initialize_tracer_provider()
+
+    yield
+
+    # Reset telemetry after all tests
+    from gavel_ai.telemetry import reset_telemetry
+    reset_telemetry()
+
+
+@pytest.fixture
+def reset_telemetry_after_test():
+    """Reset telemetry state after each test that uses this fixture."""
+    from gavel_ai.telemetry import reset_telemetry
+
+    yield
+    reset_telemetry()

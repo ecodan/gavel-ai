@@ -73,6 +73,8 @@ development_status:
   3-5-implement-executor-orchestration-and-concurrency: done
   3-6-implement-provider-abstraction-with-pydantic-ai-integration: done
   3-7-implement-timeout-and-retry-logic: done
+  3-8-wire-cli-oneshot-run-to-execution-pipeline: done
+  3-9-fix-provider-factory-interface-mismatch: done
   epic-3-retrospective: optional
 
   # ============================================================================
@@ -121,14 +123,14 @@ development_status:
   # EPIC 7: Observability & Quality
   # Goal: Comprehensive observability, error handling, and quality gates
   # ============================================================================
-  epic-7: backlog
-  7-1-implement-telemetry-collection-and-storage: backlog
-  7-2-implement-run-metadata-telemetry: backlog
+  epic-7: in-progress
+  7-1-implement-telemetry-collection-and-storage: done
+  7-2-implement-run-metadata-telemetry: done
   7-3-implement-error-categorization-and-handling: backlog
   7-4-implement-debug-mode: backlog
   7-5-implement-health-checks-and-diagnostics: backlog
   7-6-implement-pre-execution-validation: backlog
-  7-7-implement-structured-logging-to-gavel-log: backlog
+  7-7-implement-structured-logging-to-gavel-log: done
   7-8-implement-ci-cd-integration-support: backlog
   epic-7-retrospective: optional
 
@@ -136,19 +138,19 @@ development_status:
 # SUMMARY STATISTICS
 # ============================================================================
 # Total Epics: 7
-# Total Stories: 47
+# Total Stories: 49
 # Total Retrospectives: 7
-# Grand Total Items: 61
+# Grand Total Items: 63
 
 summary:
   epics_total: 7
-  stories_total: 47
+  stories_total: 49
   retrospectives_total: 7
-  items_total: 61
+  items_total: 63
   status_breakdown:
-    backlog: 25
+    backlog: 19
     ready-for-dev: 0
     in-progress: 0
     review: 0
-    done: 29
+    done: 34
     optional: 7

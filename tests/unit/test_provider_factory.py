@@ -20,9 +20,9 @@ class TestProviderFactory:
         factory = ProviderFactory()
         assert factory is not None
 
-    @patch("gavel_ai.providers.factory.AnthropicProvider")
+    @patch("gavel_ai.providers.factory.models.infer_model")
     @patch("gavel_ai.providers.factory.Agent")
-    def test_create_agent_with_anthropic_provider(self, MockAgent, MockAnthropicProvider):
+    def test_create_agent_with_anthropic_provider(self, MockAgent, mock_infer_model):
         """Test creating agent with Anthropic provider."""
         model_def = ModelDefinition(
             model_provider="anthropic",
@@ -32,8 +32,8 @@ class TestProviderFactory:
             provider_auth={"api_key": "test-key"},
         )
 
-        mock_provider = MagicMock()
-        MockAnthropicProvider.return_value = mock_provider
+        mock_model = MagicMock()
+        mock_infer_model.return_value = mock_model
 
         mock_agent = MagicMock()
         MockAgent.return_value = mock_agent
@@ -42,15 +42,17 @@ class TestProviderFactory:
         agent = factory.create_agent(model_def)
 
         assert agent is not None
-        MockAnthropicProvider.assert_called_once_with(
-            model_name="claude-3-5-sonnet-latest",
-            api_key="test-key",
-        )
-        MockAgent.assert_called_once_with(model=mock_provider)
+        # Verify infer_model was called with correct model string
+        mock_infer_model.assert_called_once()
+        call_args = mock_infer_model.call_args
+        assert call_args[0][0] == "anthropic:claude-3-5-sonnet-latest"
+        assert "provider_factory" in call_args[1]
+        # Verify Agent was created with the model from infer_model and output_type=str
+        MockAgent.assert_called_once_with(model=mock_model, output_type=str)
 
-    @patch("gavel_ai.providers.factory.OpenAIProvider")
+    @patch("gavel_ai.providers.factory.models.infer_model")
     @patch("gavel_ai.providers.factory.Agent")
-    def test_create_agent_with_openai_provider(self, MockAgent, MockOpenAIProvider):
+    def test_create_agent_with_openai_provider(self, MockAgent, mock_infer_model):
         """Test creating agent with OpenAI provider."""
         model_def = ModelDefinition(
             model_provider="openai",
@@ -60,8 +62,8 @@ class TestProviderFactory:
             provider_auth={"api_key": "test-key"},
         )
 
-        mock_provider = MagicMock()
-        MockOpenAIProvider.return_value = mock_provider
+        mock_model = MagicMock()
+        mock_infer_model.return_value = mock_model
 
         mock_agent = MagicMock()
         MockAgent.return_value = mock_agent
@@ -70,10 +72,13 @@ class TestProviderFactory:
         agent = factory.create_agent(model_def)
 
         assert agent is not None
-        MockOpenAIProvider.assert_called_once_with(
-            model_name="gpt-4",
-            api_key="test-key",
-        )
+        # Verify infer_model was called with correct model string
+        mock_infer_model.assert_called_once()
+        call_args = mock_infer_model.call_args
+        assert call_args[0][0] == "openai:gpt-4"
+        assert "provider_factory" in call_args[1]
+        # Verify Agent was created with the model from infer_model and output_type=str
+        MockAgent.assert_called_once_with(model=mock_model, output_type=str)
 
     def test_create_agent_with_unsupported_provider_raises_error(self):
         """Test unsupported provider raises clear error."""
@@ -90,6 +95,38 @@ class TestProviderFactory:
         with pytest.raises(ProcessorError, match="Unsupported provider"):
             factory.create_agent(model_def)
 
+    @patch("gavel_ai.providers.factory.models.infer_model")
+    @patch("gavel_ai.providers.factory.Agent")
+    def test_create_agent_with_custom_output_type(self, MockAgent, mock_infer_model):
+        """Test creating agent with custom Pydantic output type."""
+        from pydantic import BaseModel
+
+        # Define a custom output type
+        class CustomOutput(BaseModel):
+            result: str
+            score: int
+
+        model_def = ModelDefinition(
+            model_provider="anthropic",
+            model_family="claude",
+            model_version="claude-3-5-sonnet-latest",
+            model_parameters={"temperature": 0.7},
+            provider_auth={"api_key": "test-key"},
+        )
+
+        mock_model = MagicMock()
+        mock_infer_model.return_value = mock_model
+
+        mock_agent = MagicMock()
+        MockAgent.return_value = mock_agent
+
+        factory = ProviderFactory()
+        agent = factory.create_agent(model_def, output_type=CustomOutput)
+
+        assert agent is not None
+        # Verify Agent was created with custom output_type
+        MockAgent.assert_called_once_with(model=mock_model, output_type=CustomOutput)
+
 
 class TestProviderExecution:
     """Test provider execution and response handling."""
@@ -104,7 +141,7 @@ class TestProviderExecution:
         mock_agent.model = "anthropic:claude-3-5-sonnet-latest"
 
         mock_response = MagicMock()
-        mock_response.data = "Test response"
+        mock_response.output = "Test response"
         mock_response.usage.prompt_tokens = 10
         mock_response.usage.completion_tokens = 20
         mock_response.usage.total_tokens = 30
@@ -127,7 +164,7 @@ class TestProviderExecution:
         mock_agent.model = "anthropic:claude-3-5-sonnet-latest"
 
         mock_response = MagicMock()
-        mock_response.data = "Response"
+        mock_response.output = "Response"
         mock_response.usage.prompt_tokens = 50
         mock_response.usage.completion_tokens = 100
         mock_response.usage.total_tokens = 150
@@ -164,7 +201,7 @@ class TestProviderExecution:
         mock_agent.model = "anthropic:claude-3-5-sonnet-latest"
 
         mock_response = MagicMock()
-        mock_response.data = "Response without usage"
+        mock_response.output = "Response without usage"
         mock_response.usage = None
 
         mock_agent.run = AsyncMock(return_value=mock_response)
