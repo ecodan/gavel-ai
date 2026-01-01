@@ -74,7 +74,7 @@ class Jinja2Reporter(Reporter):
         with self.tracer.start_as_current_span("reporter.generate") as span:
             span.set_attribute("reporter.type", "jinja2")
             span.set_attribute("run.id", getattr(run, "run_id", "unknown"))
-            span.set_attribute("template.name", template)
+            span.set_attribute("template.name", str(template))
             span.set_attribute("output.format", self.config.output_format)
 
             # Build context from run data

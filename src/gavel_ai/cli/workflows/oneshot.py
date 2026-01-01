@@ -197,7 +197,7 @@ def run(
             inputs = [
                 Input(
                     id=scenario.id,
-                    text=scenario.input.get("input", ""),
+                    text=scenario.input.get("text", scenario.input.get("input", "")),
                     metadata=scenario.metadata or {},
                 )
                 for scenario in scenarios_list
@@ -259,26 +259,7 @@ def run(
                 run_logger.info(f"Successfully stored results to {results_file}")
                 typer.echo(f"✓ Stored {len(evaluation_results)} results to {results_file}")
 
-            # 8. Generate report
-            report_path = run_obj.run_dir / "report.html"
-            reporter_config = ReporterConfig(
-                template_path="oneshot",
-                output_format="html",
-            )
-            reporter = OneShotReporter(reporter_config)
-
-            # Set run data for reporter
-            run_obj.results_data = (
-                [r.model_dump() for r in evaluation_results] if evaluation_results else []
-            )
-            run_obj.metadata_data = run_metadata
-
-            run_logger.info(f"Generating report to {report_path}")
-            asyncio.run(reporter.generate(run_obj, report_path))
-            run_logger.info(f"Successfully generated report: {report_path}")
-            typer.echo(f"✓ Generated report: {report_path}")
-
-            # 9. Record run end and compute metadata
+            # 8. Record run end and compute metadata (BEFORE report generation)
             run_logger.info("Recording run end and computing metadata statistics")
             metadata_collector.record_run_end()
             run_metadata_stats = metadata_collector.compute_statistics(
@@ -294,6 +275,37 @@ def run(
                 f.write(run_metadata_stats.model_dump_json(indent=2))
             run_logger.info(f"Run metadata saved to {metadata_file}")
             typer.echo(f"✓ Saved run metadata to {metadata_file}")
+
+            # 9. Generate report (AFTER metadata is computed and saved)
+            report_path = run_obj.run_dir / "report.html"
+            # Use absolute path to templates directory
+            from gavel_ai.reporters.jinja_reporter import Jinja2Reporter
+            templates_dir = Path(__file__).parent.parent.parent / "reporters" / "templates"
+            reporter_config = ReporterConfig(
+                template_path=str(templates_dir),
+                output_format="html",
+            )
+            reporter = OneShotReporter(reporter_config)
+
+            # Set run data for reporter
+            run_obj.results_data = (
+                [r.model_dump() for r in evaluation_results] if evaluation_results else []
+            )
+            run_obj.metadata_data = run_metadata
+            # Also set results and telemetry attributes for the reporter to access
+            run_obj.results = run_obj.results_data
+            # Set telemetry from run_metadata_stats for template rendering
+            run_obj.telemetry = {
+                "total_duration_seconds": run_metadata_stats.total_duration_seconds,
+                "llm_calls": run_metadata_stats.llm_calls.model_dump(),
+            }
+
+            run_logger.info(f"Generating report to {report_path}")
+            report_content = asyncio.run(reporter.generate(run_obj, "oneshot.html"))
+            with open(report_path, "w", encoding="utf-8") as f:
+                f.write(report_content)
+            run_logger.info(f"Successfully generated report: {report_path}")
+            typer.echo(f"✓ Generated report: {report_path}")
 
             # 10. Save run
             run_logger.info("Saving run manifest")
