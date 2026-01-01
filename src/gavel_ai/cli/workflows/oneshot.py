@@ -289,7 +289,6 @@ def run(
 
             # Save metadata to file
             import json
-            from pathlib import Path
             metadata_file = run_obj.run_dir / "run_metadata.json"
             with open(metadata_file, "w", encoding="utf-8") as f:
                 f.write(run_metadata_stats.model_dump_json(indent=2))
