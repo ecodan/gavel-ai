@@ -1,4 +1,6 @@
 """OneShot evaluation workflow CLI commands."""
+import json
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -151,6 +153,16 @@ def run(
             typer.echo(f"✓ Created run: {run_id}")
             span.set_attribute("run_id", run_id)
 
+            # 2.5. Copy evaluation configs to run/config/ for reproducibility
+            source_config_dir = Path(DEFAULT_EVAL_ROOT) / eval / "config"
+            dest_config_dir = run_obj.run_dir / "config"
+            if source_config_dir.exists():
+                run_logger.info(f"Copying config directory to {dest_config_dir}")
+                shutil.copytree(source_config_dir, dest_config_dir, dirs_exist_ok=True)
+                typer.echo(f"✓ Copied evaluation configs to run directory")
+            else:
+                run_logger.warning(f"Config directory not found at {source_config_dir}")
+
             # 3. Instantiate processor
             # Get model definition from agents config
             models = agents_config.get("_models", {})
@@ -165,6 +177,10 @@ def run(
 
             model_data = models[model_id]
             model_def = ModelDefinition.model_validate(model_data)
+
+            # Extract test subject (prompt/system under test) and model variant
+            test_subject = subject_agent.get("prompt", "unknown")
+            model_variant = model_data.get("model_version", "unknown")
 
             # Create processor config
             processor_config = ProcessorConfig(
@@ -249,15 +265,80 @@ def run(
                 run_logger.info("No judges configured - skipping judging")
                 typer.echo("⚠ No judges configured - skipping judging")
 
-            # 7. Store results
-            results_file = run_obj.run_dir / "results.jsonl"
-            storage = ResultStorage(results_file)
+            # 7. Store results (two-file design: results_raw.jsonl and results_judged.jsonl)
+            from gavel_ai.storage.results_exporter import ResultsExporter
 
-            if evaluation_results:
-                run_logger.info(f"Storing {len(evaluation_results)} results to {results_file}")
-                storage.append_batch(evaluation_results)
-                run_logger.info(f"Successfully stored results to {results_file}")
-                typer.echo(f"✓ Stored {len(evaluation_results)} results to {results_file}")
+            exporter = ResultsExporter(run_obj.run_dir, processor_type=eval_config.processor_type)
+
+            # Export raw processor results (immutable)
+            run_logger.info(f"Exporting {len(processor_results)} processor results to results_raw.jsonl")
+            raw_results_file = exporter.export_raw_results(
+                scenarios_list,
+                processor_results,
+                test_subject=test_subject,
+                variant_id=model_variant,
+            )
+            typer.echo(f"✓ Exported raw results to {raw_results_file.name}")
+
+            # Export judged results (mutable)
+            run_logger.info(f"Exporting {len(processor_results)} judged results to results_judged.jsonl")
+            judged_results_file = exporter.export_judged_results(
+                scenarios=scenarios_list,
+                processor_results=processor_results,
+                judge_evaluations=[r.model_dump() if hasattr(r, 'model_dump') else r for r in evaluation_results],
+                test_subject=test_subject,
+                variant_id=model_variant,
+            )
+            typer.echo(f"✓ Exported judged results to {judged_results_file.name}")
+
+            # 7.5. Generate manifest.json with reproducibility info
+            manifest_file = run_obj.run_dir / "manifest.json"
+            try:
+                # Compute config hash for reproducibility
+                config_files_for_hash = {
+                    "agents": run_obj.run_dir / "config" / "agents.json",
+                    "eval_config": run_obj.run_dir / "config" / "eval_config.json",
+                    "async_config": run_obj.run_dir / "config" / "async_config.json",
+                }
+                # Scenarios might be in config or might be in data - try both
+                scenarios_path = run_obj.run_dir / "config" / "scenarios.json"
+                if scenarios_path.exists():
+                    config_files_for_hash["scenarios"] = scenarios_path
+                else:
+                    # Try scenarios.csv in the original evaluation data directory
+                    alt_scenarios = Path(DEFAULT_EVAL_ROOT) / eval / "data" / "scenarios.json"
+                    if alt_scenarios.exists():
+                        config_files_for_hash["scenarios"] = alt_scenarios
+                    else:
+                        run_logger.warning("Could not find scenarios file for config hash")
+
+                config_hash = exporter.compute_config_hash(config_files_for_hash) if len(config_files_for_hash) >= 3 else "unknown"
+
+                # Determine status based on results
+                failed_count = sum(1 for pr in processor_results if pr.error is not None)
+                status = "completed" if failed_count == 0 else "partial" if failed_count < len(processor_results) else "failed"
+
+                manifest_data = {
+                    "timestamp": run_metadata["start_time"],
+                    "run_id": run_id,
+                    "eval_name": eval,
+                    "config_hash": config_hash,
+                    "scenario_count": len(scenarios_list),
+                    "variant_count": 1,  # Currently fixed at 1 (subject_agent)
+                    "judge_count": len(eval_config.judges) if eval_config.judges else 0,
+                    "processor_type": eval_config.processor_type,
+                    "status": status,
+                    "completed_count": len(scenarios_list) - failed_count,
+                    "failed_count": failed_count,
+                    "duration_seconds": time.time() - start_time,
+                }
+
+                with open(manifest_file, "w", encoding="utf-8") as f:
+                    json.dump(manifest_data, f, indent=2)
+                run_logger.info(f"Manifest saved to {manifest_file}")
+                typer.echo(f"✓ Generated manifest with config hash")
+            except FileNotFoundError as e:
+                run_logger.warning(f"Could not compute config hash: {e}")
 
             # 8. Record run end and compute metadata (BEFORE report generation)
             run_logger.info("Recording run end and computing metadata statistics")
@@ -269,7 +350,6 @@ def run(
             run_logger.info(f"Metadata computed - {run_metadata_stats.scenario_timing.count} scenarios processed")
 
             # Save metadata to file
-            import json
             metadata_file = run_obj.run_dir / "run_metadata.json"
             with open(metadata_file, "w", encoding="utf-8") as f:
                 f.write(run_metadata_stats.model_dump_json(indent=2))

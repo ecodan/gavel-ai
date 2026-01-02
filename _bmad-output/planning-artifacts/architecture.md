@@ -325,7 +325,7 @@ class InputProcessor(ABC):
 
 ### Decision 4: Run Artifact Schema & Storage
 
-**Choice:** Flat directory structure with simplified JSON
+**Choice:** Flat directory structure with two-file results design (immutable raw + mutable judged)
 
 **Run Directory Structure:**
 ```
@@ -333,8 +333,9 @@ runs/<timestamp>/
 ├── manifest.json          # Run metadata (timestamp, config hash, counts)
 ├── config/                # Copy of eval configs
 ├── telemetry.jsonl        # Simplified OT spans
-├── results.jsonl          # Judged results
-├── run_metadata.json      # Performance metrics
+├── results_raw.jsonl      # Immutable processor outputs (one entry per test_subject × variant × scenario)
+├── results_judged.jsonl   # Mutable judge results (regenerated when judges change)
+├── run_metadata.json      # Performance metrics (timing, tokens, execution stats)
 ├── gavel.log              # Execution log
 └── report.html            # Generated report
 ```
@@ -359,22 +360,77 @@ runs/<timestamp>/
 }
 ```
 
-**Results JSONL Schema:**
+**Results Raw JSONL Schema (Immutable):**
 ```json
 {
-  "scenario_id": "...",
-  "variant_id": "...",
-  "processor_output": "...",
-  "judge_id": "...",
-  "judge_score": 8,
-  "judge_reasoning": "...",
-  "judge_evidence": "..."
+  "test_subject": "assistant:v1",
+  "variant_id": "claude-sonnet-4-5-20250929",
+  "scenario_id": "scenario_1",
+  "processor_output": "The LLM response text",
+  "timing_ms": 4250,
+  "tokens_prompt": 156,
+  "tokens_completion": 87,
+  "error": null,
+  "timestamp": "2025-12-27T14:30:22.123Z"
 }
 ```
 
-**Rationale:** Simple and direct, human-readable, versionable, easy to integrate with existing tools
+**Results Judged JSONL Schema (Mutable):**
+```json
+{
+  "test_subject": "assistant:v1",
+  "variant_id": "claude-sonnet-4-5-20250929",
+  "scenario_id": "scenario_1",
+  "processor_output": "The LLM response text",
+  "timing_ms": 4250,
+  "tokens_prompt": 156,
+  "tokens_completion": 87,
+  "error": null,
+  "judges": [
+    {
+      "judge_id": "similarity",
+      "judge_name": "deepeval.similarity",
+      "judge_score": 8,
+      "judge_reasoning": "Response closely matches expected output",
+      "judge_evidence": "Similarity score: 0.92"
+    },
+    {
+      "judge_id": "faithfulness",
+      "judge_name": "deepeval.faithfulness",
+      "judge_score": 7,
+      "judge_reasoning": "All claims supported by context",
+      "judge_evidence": "3/3 claims verified"
+    }
+  ]
+}
+```
 
-**Affects:** RunContext implementation, telemetry collector, result storage, report generation
+**Two-File Design Rationale:**
+
+**results_raw.jsonl (Immutable)**
+- Record of processor execution (one entry per test_subject × variant × scenario combo)
+- Never changes once written
+- Preserves complete execution context: outputs, timing, tokens, errors
+- test_subject: prompt/system under test name (e.g., "assistant:v1", "research_agent:v2")
+- variant_id: model version or parameter configuration (e.g., "claude-sonnet-4-5-20250929", "gpt-4o")
+- Enables reproducibility (can re-judge without re-running processors)
+- Foundation for re-judging workflow (FR-3.3)
+
+**results_judged.jsonl (Mutable)**
+- Complete evaluation picture with all judge scores
+- Same schema as results_raw.jsonl with added judges array
+- Regenerated when judges change (delete results_judged.jsonl, re-apply judges from results_raw.jsonl)
+- Supports FR-3.3: "Users can re-judge existing runs without re-execution"
+- Multiple judges per entry: judges array contains all judge results for each scenario × test_subject × variant combo
+
+**Workflow Example:**
+1. User runs evaluation → results_raw.jsonl written (immutable, contains test_subject + variant_id)
+2. Judges applied → results_judged.jsonl written (mutable, same base schema + judges array)
+3. User changes judges (adds/removes judges)
+4. System regenerates results_judged.jsonl from results_raw.jsonl (no API calls needed)
+5. Original processor outputs preserved in results_raw.jsonl with test_subject and variant metadata
+
+**Affects:** RunContext implementation, telemetry collector, result storage, report generation, re-judge workflow (FR-3.3)
 
 ---
 

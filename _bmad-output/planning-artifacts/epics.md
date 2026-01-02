@@ -1091,56 +1091,156 @@ So that results are evaluated consistently without race conditions (parallel sup
 
 ---
 
-### Story 4.6: Implement Result Storage (results.jsonl)
+### Story 4.6: Implement Result Storage (Two-File Design)
 
 As a developer,
-I want processor outputs and judge evaluations stored in results.jsonl,
-So that results can be analyzed, re-judged, and reported.
+I want processor outputs stored immutably and judge evaluations stored mutably,
+So that results can be re-judged without re-executing processors and results are reproducible.
+
+**Updated Design (2026-01-01):**
+
+The results storage now uses a **two-file design** for clean separation of concerns:
+- **results_raw.jsonl** — Immutable processor execution record
+- **results_judged.jsonl** — Mutable judgment layer (regenerable when judges change)
 
 **Acceptance Criteria:**
 
+**results_raw.jsonl (Immutable):**
 - **Given** a processor produces an output
-  **When** all judges evaluate it
-  **Then** a single JSON line is written to results.jsonl with:
+  **When** execution completes
+  **Then** a single JSON line is written to results_raw.jsonl with:
   - scenario_id
   - variant_id (model/agent)
-  - subject_id (PUT or SUT)
-  - processor_output
-  - For each judge: judge_id, score, reasoning, evidence
-  - timestamp
+  - processor_type ("prompt_input", "closedbox_input", etc.)
+  - processor_output (complete LLM response)
+  - timing_ms (end-to-end latency)
+  - tokens_prompt (input tokens)
+  - tokens_completion (output tokens)
+  - error (null if success, error message if failed)
+  - timestamp (ISO 8601)
 
-- **Given** 1000 results are generated
-  **When** results.jsonl is examined
-  **Then** each result is on its own line (JSONL format)
+- **Given** 1000 scenarios are processed
+  **When** results_raw.jsonl is examined
+  **Then** each result is on its own line (JSONL format) with no judges array
 
-- **Given** results.jsonl exists
-  **When** re-judging is requested
-  **Then** the results can be loaded and re-evaluated
+- **Given** results_raw.jsonl exists
+  **When** it's inspected
+  **Then** it contains only processor execution data (no judge scores)
 
-**Results JSONL Schema:**
-```json
-{
-  "scenario_id": "scenario-1",
-  "variant_id": "claude-sonnet",
-  "subject_id": "put",
-  "processor_output": "The capital of France is Paris.",
-  "judges": [
-    {
-      "judge_id": "similarity",
-      "score": 9,
-      "reasoning": "Accurate and concise",
-      "evidence": "Correct answer with minimal extra words"
-    }
-  ],
-  "timestamp": "2025-12-28T14:30:22Z"
-}
-```
+**results_judged.jsonl (Mutable):**
+- **Given** all processors complete and judges execute
+  **When** evaluation completes
+  **Then** results_judged.jsonl is written with one line per (scenario × variant × processor) combo containing:
+  - All fields from results_raw.jsonl
+  - judges array: multiple judge results per entry
+    - judge_id, judge_name, judge_score (1-10), judge_reasoning, judge_evidence
+
+- **Given** results_judged.jsonl is examined
+  **When** judges are checked
+  **Then** multiple judges per entry are supported (judges array)
+
+- **Given** an evaluation has no judges configured
+  **When** results_judged.jsonl is written
+  **Then** the judges array is empty []
+
+**Immutability Contract:**
+- Once results_raw.jsonl is written, it never changes (source of truth for execution)
+- results_judged.jsonl can be regenerated from results_raw.jsonl without re-running processors
+- Supports FR-3.3: Re-judge existing runs without re-execution
+
+**Related Requirements:** FR-3.2, FR-8.4, Decision 4, FR-3.3
+
+---
+
+### Story 4.7: Export results_raw.jsonl from Processor Outputs
+
+As a developer,
+I want processor outputs automatically exported to results_raw.jsonl,
+So that execution records are immutable and available for re-judging.
+
+**Acceptance Criteria:**
+
+- **Given** processors complete execution
+  **When** results are saved
+  **Then** results_raw.jsonl is created with one JSONL entry per (scenario × variant × processor) combo
+
+- **Given** processor output data exists
+  **When** exported to results_raw.jsonl
+  **Then** each entry contains:
+  - scenario_id (from input)
+  - variant_id (from model/agent)
+  - processor_type (from processor config)
+  - processor_output (complete LLM response string)
+  - timing_ms (latency from ProcessorResult)
+  - tokens_prompt (input tokens from ProcessorResult)
+  - tokens_completion (output tokens from ProcessorResult)
+  - error (null if success, error message if failed)
+  - timestamp (ISO 8601 format)
+
+- **Given** 1000 processor results are exported
+  **When** results_raw.jsonl is examined
+  **Then** it has 1000 lines (JSONL format, one entry per line)
+
+- **Given** results_raw.jsonl is written
+  **When** the file is created
+  **Then** it's writable to disk atomically (no partial writes)
+
+**Implementation Notes:**
+- Export happens in `oneshot.py:run()` after executor completes (step 7)
+- File written to: `run_dir / "results_raw.jsonl"`
+- Uses jsonlines library for JSONL writing
+- Timestamp uses datetime.now(timezone.utc).isoformat()
 
 **Related Requirements:** FR-3.2, FR-8.4, Decision 4
 
 ---
 
-### Story 4.7: Implement Re-judging Capability
+### Story 4.8: Export results_judged.jsonl with Judge Evaluations
+
+As a developer,
+I want judge evaluations automatically exported to results_judged.jsonl,
+So that complete evaluation results are available for reporting and analysis.
+
+**Acceptance Criteria:**
+
+- **Given** processors complete AND judges evaluate all results
+  **When** results are saved
+  **Then** results_judged.jsonl is created with one JSONL entry per (scenario × variant × processor) combo
+
+- **Given** judge evaluation data exists
+  **When** exported to results_judged.jsonl
+  **Then** each entry contains:
+  - All fields from results_raw.jsonl (scenario_id, processor_output, timing_ms, etc.)
+  - judges array with multiple judge results (even if empty):
+    - judge_id (unique judge identifier)
+    - judge_name (e.g., "deepeval.similarity")
+    - judge_score (integer 1-10)
+    - judge_reasoning (human-readable explanation)
+    - judge_evidence (supporting details)
+
+- **Given** no judges are configured
+  **When** results_judged.jsonl is exported
+  **Then** the judges array is empty [] for each entry
+
+- **Given** multiple judges are configured
+  **When** results_judged.jsonl is exported
+  **Then** each entry has N judge objects (one per judge)
+
+- **Given** results_judged.jsonl is written
+  **When** the file is created
+  **Then** it can be re-created from results_raw.jsonl without re-running processors
+
+**Implementation Notes:**
+- Export happens in `oneshot.py:run()` after judge_executor completes (step 8)
+- File written to: `run_dir / "results_judged.jsonl"`
+- Can be regenerated by running judges again on results_raw.jsonl data
+- Supports FR-3.3 (re-judge workflow)
+
+**Related Requirements:** FR-3.2, FR-8.4, Decision 4, FR-3.3
+
+---
+
+### Story 4.9: Implement Re-judging Capability
 
 As a user,
 I want to re-judge existing results without re-running evaluations,
@@ -1148,21 +1248,32 @@ So that I can iterate on judge definitions without expensive API calls.
 
 **Acceptance Criteria:**
 
-- **Given** a completed run with results.jsonl
+- **Given** a completed run with results_raw.jsonl
   **When** `gavel oneshot judge --run <run-id>` is invoked
-  **Then** the existing results are re-judged with current judge config
+  **Then** results_raw.jsonl is loaded and judges are re-applied to create new results_judged.jsonl
 
-- **Given** new judges are added
+- **Given** new judges are added to eval config
   **When** re-judging runs
-  **Then** new judge results are added to the results
+  **Then** new judge results are computed and written to results_judged.jsonl
 
 - **Given** judge definitions change
   **When** re-judging runs
-  **Then** old judge results are preserved and new results are added
+  **Then** results_judged.jsonl is completely regenerated with all judges (old and new)
 
 - **Given** re-judging completes
   **When** examined
-  **Then** execution is fast (<1s for typical eval) since no API calls are made
+  **Then** execution is fast (<1s for typical eval) since no LLM calls are made (judges only evaluate stored outputs)
+
+- **Given** re-judging finishes
+  **When** report is regenerated
+  **Then** report.html is updated with new judge scores
+
+**Implementation Notes:**
+- Load results_raw.jsonl from existing run
+- Apply judges from current eval config
+- Write new results_judged.jsonl (overwrites previous version)
+- results_raw.jsonl remains unchanged
+- No LLM processor calls needed
 
 **Related Requirements:** FR-3.3, FR-3.2
 
@@ -1356,7 +1467,8 @@ So that v1 evaluations are simple, versionable, and human-readable.
   - manifest.json
   - config/ (copy of all eval configs)
   - telemetry.jsonl
-  - results.jsonl
+  - results_raw.jsonl (immutable processor outputs)
+  - results_judged.jsonl (judge evaluations)
   - run_metadata.json
   - gavel.log
   - report.html
@@ -1369,6 +1481,46 @@ So that v1 evaluations are simple, versionable, and human-readable.
 
 ---
 
+### Story 6.2.1: Populate config/ Directory with Evaluation Configs
+
+As a developer,
+I want evaluation configs copied to the run directory,
+So that runs are self-contained, reproducible, and auditable.
+
+**Acceptance Criteria:**
+
+- **Given** an evaluation runs
+  **When** the run directory is created
+  **Then** the following configs are copied to `run_dir/config/`:
+  - agents.json
+  - eval_config.json
+  - async_config.json
+  - scenarios.json (or scenarios.csv)
+  - All judge configs from config/judges/
+
+- **Given** a run has completed
+  **When** I inspect `run_dir/config/`
+  **Then** the configs are readable and match the original eval configs
+
+- **Given** the original eval config changes
+  **When** an old run is examined
+  **Then** the original config is still available in `run_dir/config/`
+
+- **Given** 100+ config files exist
+  **When** run directory is created
+  **Then** all configs are copied efficiently (no performance issues)
+
+**Implementation Notes:**
+- Copy happens during `LocalFilesystemRun.save()` or in `oneshot.py:run()` before execution starts
+- Source: `.gavel/evaluations/<eval>/config/`
+- Destination: `run_dir/config/`
+- Use shutil.copytree or similar for directory copying
+- Handle empty judge configs directory gracefully
+
+**Related Requirements:** FR-3.1, FR-3.2, FR-8.6, NFR-R1 (Reproducibility)
+
+---
+
 ### Story 6.3: Implement Manifest (Run Metadata)
 
 As a user,
@@ -1378,22 +1530,74 @@ So that I can understand what was run, when, and with what configuration.
 **Acceptance Criteria:**
 
 - **Given** a run completes
-  **When** manifest.json is examined
+  **When** manifest.json is written to run directory
   **Then** it contains:
-  - timestamp (ISO format)
-  - config_hash (hash of all configs for reproducibility)
-  - scenario_count (number of scenarios)
-  - variant_count (number of variants)
-  - judge_versions (list of judge versions)
-  - status (completed, failed, partial)
-  - duration (total run time)
-  - metadata (custom key/value pairs)
+  - timestamp (ISO 8601 format - run start time)
+  - config_hash (SHA256 hash of all configs for reproducibility)
+  - scenario_count (number of scenarios executed)
+  - variant_count (number of variants/agents tested)
+  - judge_count (number of judges applied)
+  - processor_type (e.g., "prompt_input", "closedbox_input")
+  - status ("completed", "failed", or "partial")
+  - duration_seconds (total run time)
+  - completed_count (scenarios successfully completed)
+  - failed_count (scenarios that failed)
 
 - **Given** two runs with same config and scenarios
   **When** config_hash is compared
   **Then** they match (reproducibility verification)
 
-**Related Requirements:** FR-3.2, FR-8.5
+- **Given** manifest.json exists in run directory
+  **When** it's examined
+  **Then** all counts match the actual results in results_raw.jsonl and results_judged.jsonl
+
+**Implementation Notes:**
+- Created after execution and judging completes
+- Config hash: SHA256(agents.json + eval_config.json + async_config.json + scenarios.json)
+- Status is set based on whether all scenarios completed successfully
+- File written to: `run_dir / "manifest.json"`
+- Use Pydantic model for validation
+
+**Related Requirements:** FR-3.2, FR-8.5, NFR-R1 (Reproducibility)
+
+---
+
+### Story 6.3.1: Generate Configuration Hash for Reproducibility
+
+As a developer,
+I want configuration hashes computed for reproducibility verification,
+So that identical configs are easily recognized.
+
+**Acceptance Criteria:**
+
+- **Given** evaluation configs exist
+  **When** hash is computed
+  **Then** it's computed from:
+  - agents.json contents
+  - eval_config.json contents
+  - async_config.json contents
+  - scenarios.json (or .csv) contents
+  (in consistent order)
+
+- **Given** configs are identical
+  **When** hash is computed for two runs
+  **Then** both hashes match exactly
+
+- **Given** a config file changes (even whitespace)
+  **When** hash is recomputed
+  **Then** the hash differs
+
+- **Given** config hash is saved in manifest.json
+  **When** reproducibility is verified
+  **Then** I can compare hashes to confirm identical configurations
+
+**Implementation Notes:**
+- Use hashlib.sha256()
+- Hash the JSON content in canonical form (sorted keys)
+- Include file modification times if desired for additional uniqueness
+- Store in manifest.json as "config_hash" field
+
+**Related Requirements:** NFR-R1 (Reproducibility), FR-8.5
 
 ---
 
@@ -1535,11 +1739,15 @@ So that custom analysis scripts and notebooks can load and analyze results.
 
 **User Stories:**
 
-### Story 7.1: Implement Telemetry Collection & Storage
+### Story 7.1: Implement Telemetry Collection & Storage with ISO 8601 Format
 
 As a developer,
-I want complete execution telemetry captured in OpenTelemetry format,
+I want complete execution telemetry captured in OpenTelemetry format with proper timestamps,
 So that performance, debugging, and observability are built-in.
+
+**Updated Requirements (2026-01-01):**
+
+Telemetry format updated to use ISO 8601 timestamps for consistency with other run artifacts.
 
 **Acceptance Criteria:**
 
@@ -1555,19 +1763,23 @@ So that performance, debugging, and observability are built-in.
   **When** individual spans are inspected
   **Then** each span has: trace_id, span_id, parent_span_id, name, timestamps, duration, attributes, status
 
+- **Given** span timestamps are recorded
+  **When** telemetry.jsonl is examined
+  **Then** start_time_iso and end_time_iso use ISO 8601 format (e.g., 2026-01-01T23:29:10.123456Z)
+
 - **Given** telemetry is enabled
   **When** evaluation runs
   **Then** <5% overhead is added (performance impact is minimal)
 
-**Telemetry Format:**
+**Telemetry Format (ISO 8601):**
 ```json
 {
   "trace_id": "uuid",
   "span_id": "uuid",
   "parent_span_id": "uuid or null",
   "name": "processor.execute",
-  "start_time_iso": "2025-12-27T14:30:22.123Z",
-  "end_time_iso": "2025-12-27T14:30:24.456Z",
+  "start_time_iso": "2026-01-01T23:29:10.123456Z",
+  "end_time_iso": "2026-01-01T23:29:12.456789Z",
   "duration_ms": 2333,
   "status": "ok|error",
   "attributes": {
@@ -1578,7 +1790,13 @@ So that performance, debugging, and observability are built-in.
 }
 ```
 
-**Related Requirements:** FR-2.4, FR-8.3, Decision 9
+**Implementation Notes:**
+- Use datetime.now(timezone.utc).isoformat() for timestamp consistency
+- Timestamps include microseconds (6 decimal places)
+- All timestamps are in UTC timezone
+- Consistent format with results_raw.jsonl and manifest.json timestamps
+
+**Related Requirements:** FR-2.4, FR-8.3, Decision 9, NFR-R1 (Reproducibility)
 
 ---
 
