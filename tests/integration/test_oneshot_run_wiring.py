@@ -29,37 +29,53 @@ class TestConfigLoaderIntegration:
         eval_dir = eval_root / eval_name
 
         # Create directory structure
-        (eval_dir / "config").mkdir(parents=True)
+        (eval_dir / "config" / "prompts").mkdir(parents=True)
+        (eval_dir / "config" / "judges").mkdir(parents=True)
         (eval_dir / "data").mkdir(parents=True)
-        (eval_dir / "prompts").mkdir(parents=True)
+        (eval_dir / "runs").mkdir(parents=True)
 
-        # Create eval_config.json
+        # Create eval_config.json (new format with nested async)
         eval_config_data = {
+            "eval_type": "oneshot",
+            "test_subject_type": "local",
             "eval_name": "test_eval",
-            "eval_type": "local",
-            "processor_type": "prompt_input",
-            "scenarios_file": "data/scenarios.json",
-            "agents_file": "config/agents.json",
-            "judges_config": "config/judges/",
-            "output_dir": "runs/",
+            "description": "Test evaluation",
+            "test_subjects": [
+                {
+                    "prompt_name": "default",
+                    "judges": [
+                        {
+                            "id": "quality",
+                            "deepeval_name": "deepeval.geval",
+                            "config": {
+                                "model": "test_model",
+                                "criteria": "Evaluate quality",
+                                "evaluation_steps": ["Step 1", "Step 2"],
+                            },
+                        }
+                    ],
+                }
+            ],
+            "variants": ["test_model"],
+            "scenarios": {"source": "file.local", "name": "scenarios.json"},
+            "execution": {"max_concurrent": 5},
+            "async": {
+                "num_workers": 4,
+                "arrival_rate_per_sec": 20.0,
+                "exec_rate_per_min": 100,
+                "max_retries": 3,
+                "task_timeout_seconds": 300,
+                "stuck_timeout_seconds": 600,
+                "emit_progress_interval_sec": 10,
+            },
         }
         with open(eval_dir / "config" / "eval_config.json", "w") as f:
             json.dump(eval_config_data, f)
 
-        # Create async_config.json
-        async_config_data = {
-            "max_workers": 4,
-            "timeout_seconds": 30,
-            "retry_count": 3,
-            "error_handling": "fail_fast",
-        }
-        with open(eval_dir / "config" / "async_config.json", "w") as f:
-            json.dump(async_config_data, f)
-
         # Create agents.json
         agents_data = {
             "_models": {
-                "test-model": {
+                "test_model": {
                     "model_provider": "anthropic",
                     "model_family": "claude",
                     "model_version": "claude-test",
@@ -67,27 +83,25 @@ class TestConfigLoaderIntegration:
                     "provider_auth": {"api_key": "test-key"},
                 }
             },
-            "subject_agent": {"model_id": "test-model", "prompt": "default:v1"},
+            "subject_agent": {"model_id": "test_model", "prompt": "default:v1"},
         }
         with open(eval_dir / "config" / "agents.json", "w") as f:
             json.dump(agents_data, f)
 
-        # Create scenarios.json
-        scenarios_data = {
-            "scenarios": [
-                {
-                    "id": "s1",
-                    "input": {"input": "test"},
-                    "expected_behavior": "output",
-                    "metadata": {},
-                }
-            ]
-        }
+        # Create scenarios.json (root-level array)
+        scenarios_data = [
+            {
+                "scenario_id": "s1",
+                "input": "test input",
+                "expected": "expected output",
+                "metadata": {"category": "test"},
+            }
+        ]
         with open(eval_dir / "data" / "scenarios.json", "w") as f:
             json.dump(scenarios_data, f)
 
-        # Create prompt template
-        with open(eval_dir / "prompts" / "default.toml", "w") as f:
+        # Create prompt template in config/prompts/
+        with open(eval_dir / "config" / "prompts" / "default.toml", "w") as f:
             f.write('v1 = "Test prompt: {{input}}"')
 
         # Test loading
@@ -95,10 +109,12 @@ class TestConfigLoaderIntegration:
 
         eval_config = loader.load_eval_config()
         assert eval_config.eval_name == "test_eval"
-        assert eval_config.processor_type == "prompt_input"
-
-        async_config = loader.load_async_config()
-        assert async_config.max_workers == 4
+        assert eval_config.eval_type == "oneshot"
+        assert eval_config.test_subject_type == "local"
+        assert eval_config.async_config.num_workers == 4
+        assert len(eval_config.test_subjects) == 1
+        assert eval_config.test_subjects[0].prompt_name == "default"
+        assert eval_config.variants == ["test_model"]
 
         agents_config = loader.load_agents_config()
         assert "_models" in agents_config
@@ -106,7 +122,7 @@ class TestConfigLoaderIntegration:
 
         scenarios = loader.load_scenarios()
         assert len(scenarios) == 1
-        assert scenarios[0].id == "s1"
+        assert scenarios[0].scenario_id == "s1"
 
         prompt = loader.load_prompt_template()
         assert "Test prompt" in prompt
@@ -154,10 +170,10 @@ class TestConfigLoaderIntegration:
         eval_root = tmp_path / "evaluations"
         eval_name = "test_eval"
         eval_dir = eval_root / eval_name
-        (eval_dir / "prompts").mkdir(parents=True)
+        (eval_dir / "config" / "prompts").mkdir(parents=True)
 
         # Create prompt with only v1
-        with open(eval_dir / "prompts" / "default.toml", "w") as f:
+        with open(eval_dir / "config" / "prompts" / "default.toml", "w") as f:
             f.write('v1 = "Test prompt"')
 
         loader = ConfigLoader(eval_root, eval_name)

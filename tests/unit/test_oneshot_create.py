@@ -28,9 +28,9 @@ class TestOneshotCreateCommand:
         # Verify directory structure
         assert (eval_dir / "config").exists()
         assert (eval_dir / "data").exists()
-        assert (eval_dir / "prompts").exists()
         assert (eval_dir / "runs").exists()
         assert (eval_dir / "config" / "judges").exists()
+        assert (eval_dir / "config" / "prompts").exists()
 
     def test_create_generates_config_files(self, tmp_path: Path) -> None:
         """Test that all config files are generated."""
@@ -45,10 +45,8 @@ class TestOneshotCreateCommand:
         # Verify all config files exist
         assert (eval_dir / "config" / "agents.json").exists()
         assert (eval_dir / "config" / "eval_config.json").exists()
-        assert (eval_dir / "config" / "async_config.json").exists()
         assert (eval_dir / "data" / "scenarios.json").exists()
-        assert (eval_dir / "data" / "scenarios.csv").exists()
-        assert (eval_dir / "prompts" / "default.toml").exists()
+        assert (eval_dir / "config" / "prompts" / "default.toml").exists()
 
     def test_agents_config_valid_json(self, tmp_path: Path) -> None:
         """Test that generated agents.json is valid JSON with correct structure."""
@@ -88,16 +86,28 @@ class TestOneshotCreateCommand:
         with open(eval_config_file) as f:
             eval_config = json.load(f)
 
-        # Verify structure
+        # Verify core structure
         assert eval_config["eval_name"] == eval_name
-        assert eval_config["eval_type"] == "local"  # default
-        assert eval_config["processor_type"] == "prompt_input"
-        assert "scenarios_file" in eval_config
-        assert "agents_file" in eval_config
+        assert eval_config["eval_type"] == "oneshot"
+        assert eval_config["test_subject_type"] == "local"
+        assert "description" in eval_config
 
-    def test_eval_config_respects_type_parameter(self, tmp_path: Path) -> None:
-        """Test that eval_config.json respects --type parameter."""
-        eval_name = "in_situ_eval"
+        # Verify nested structures
+        assert "test_subjects" in eval_config
+        assert "variants" in eval_config
+        assert "scenarios" in eval_config
+        assert "execution" in eval_config
+        assert "async" in eval_config
+
+        # Verify async config is nested
+        async_config = eval_config["async"]
+        assert "num_workers" in async_config
+        assert "arrival_rate_per_sec" in async_config
+        assert "max_retries" in async_config
+
+    def test_eval_config_has_correct_defaults(self, tmp_path: Path) -> None:
+        """Test that eval_config.json has correct default values."""
+        eval_name = "test_eval"
         runner.invoke(
             app,
             [
@@ -105,8 +115,6 @@ class TestOneshotCreateCommand:
                 "create",
                 "--eval",
                 eval_name,
-                "--type",
-                "in-situ",
                 "--eval-root",
                 str(tmp_path),
             ],
@@ -116,24 +124,35 @@ class TestOneshotCreateCommand:
         with open(eval_config_file) as f:
             eval_config = json.load(f)
 
-        assert eval_config["eval_type"] == "in-situ"
+        # Verify eval_type is always oneshot
+        assert eval_config["eval_type"] == "oneshot"
+        # Verify test_subject_type defaults to local
+        assert eval_config["test_subject_type"] == "local"
+        # Verify default async config values
+        assert eval_config["async"]["num_workers"] == 8
+        assert eval_config["async"]["arrival_rate_per_sec"] == 20.0
 
-    def test_async_config_valid_json(self, tmp_path: Path) -> None:
-        """Test that generated async_config.json is valid JSON."""
+    def test_async_config_nested_in_eval_config(self, tmp_path: Path) -> None:
+        """Test that async config is nested inside eval_config.json."""
         eval_name = "test_eval"
         runner.invoke(
             app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)]
         )
 
-        async_config_file = tmp_path / eval_name / "config" / "async_config.json"
-        with open(async_config_file) as f:
-            async_config = json.load(f)
+        eval_config_file = tmp_path / eval_name / "config" / "eval_config.json"
+        with open(eval_config_file) as f:
+            eval_config = json.load(f)
 
-        # Verify structure
-        assert "max_workers" in async_config
-        assert "timeout_seconds" in async_config
-        assert "retry_count" in async_config
-        assert "error_handling" in async_config
+        # Verify async config exists and has required fields
+        assert "async" in eval_config
+        async_config = eval_config["async"]
+        assert "num_workers" in async_config
+        assert "arrival_rate_per_sec" in async_config
+        assert "exec_rate_per_min" in async_config
+        assert "max_retries" in async_config
+        assert "task_timeout_seconds" in async_config
+        assert "stuck_timeout_seconds" in async_config
+        assert "emit_progress_interval_sec" in async_config
 
     def test_scenarios_json_valid(self, tmp_path: Path) -> None:
         """Test that generated scenarios.json is valid JSON with sample scenarios."""
@@ -146,46 +165,25 @@ class TestOneshotCreateCommand:
         with open(scenarios_file) as f:
             scenarios = json.load(f)
 
-        # Verify structure
-        assert "scenarios" in scenarios
-        assert len(scenarios["scenarios"]) >= 2
+        # Verify it's a root-level array (not wrapped)
+        assert isinstance(scenarios, list)
+        assert len(scenarios) >= 2
 
         # Verify scenario structure
-        scenario = scenarios["scenarios"][0]
+        scenario = scenarios[0]
         assert "scenario_id" in scenario
         assert "input" in scenario
-        assert "expected_output" in scenario
+        assert "expected" in scenario
         assert "metadata" in scenario
 
-    def test_scenarios_csv_valid(self, tmp_path: Path) -> None:
-        """Test that generated scenarios.csv is valid CSV."""
-        eval_name = "test_eval"
-        runner.invoke(
-            app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)]
-        )
-
-        scenarios_file = tmp_path / eval_name / "data" / "scenarios.csv"
-        assert scenarios_file.exists()
-
-        # Read and verify CSV structure
-        with open(scenarios_file) as f:
-            header = f.readline().strip()
-            assert "scenario_id" in header
-            assert "input" in header
-            assert "expected_output" in header
-
-            # At least one data row
-            first_row = f.readline().strip()
-            assert len(first_row) > 0
-
     def test_prompts_toml_valid(self, tmp_path: Path) -> None:
-        """Test that generated prompts/default.toml is valid TOML."""
+        """Test that generated config/prompts/default.toml is valid TOML."""
         eval_name = "test_eval"
         runner.invoke(
             app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)]
         )
 
-        prompts_file = tmp_path / eval_name / "prompts" / "default.toml"
+        prompts_file = tmp_path / eval_name / "config" / "prompts" / "default.toml"
         with open(prompts_file) as f:
             prompts = toml.load(f)
 
@@ -292,10 +290,12 @@ class TestOneshotCreateCommand:
         with open(eval_dir / "config" / "eval_config.json") as f:
             eval_config = json.load(f)
             assert "eval_name" in eval_config
-            assert "processor_type" in eval_config
+            assert "test_subject_type" in eval_config
+            assert "test_subjects" in eval_config
             # Should NOT have camelCase
             assert "evalName" not in str(eval_config)
-            assert "processorType" not in str(eval_config)
+            assert "testSubjectType" not in str(eval_config)
+            assert "testSubjects" not in str(eval_config)
 
 
 class TestScaffoldingFunctions:
@@ -315,7 +315,9 @@ class TestScaffoldingFunctions:
         # Verify all files exist
         assert (eval_dir / "config" / "agents.json").exists()
         assert (eval_dir / "config" / "eval_config.json").exists()
-        assert (eval_dir / "config" / "async_config.json").exists()
         assert (eval_dir / "data" / "scenarios.json").exists()
-        assert (eval_dir / "data" / "scenarios.csv").exists()
-        assert (eval_dir / "prompts" / "default.toml").exists()
+        assert (eval_dir / "config" / "prompts" / "default.toml").exists()
+
+        # Verify directories exist
+        assert (eval_dir / "config" / "judges").exists()
+        assert (eval_dir / "config" / "prompts").exists()

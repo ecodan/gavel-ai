@@ -1,5 +1,4 @@
 """Scaffolding functions for gavel oneshot create command."""
-import csv
 import json
 from pathlib import Path
 from typing import Any, Dict
@@ -40,15 +39,42 @@ def generate_agents_config(eval_root: Path, eval_name: str) -> None:
 
 
 def generate_eval_config(eval_root: Path, eval_name: str, eval_type: str) -> None:
-    """Generate eval_config.json template."""
+    """Generate eval_config.json template with nested async config."""
     eval_config: Dict[str, Any] = {
+        "eval_type": "oneshot",
+        "test_subject_type": "local",
         "eval_name": eval_name,
-        "eval_type": eval_type,
-        "processor_type": "prompt_input",
-        "scenarios_file": "data/scenarios.json",
-        "agents_file": "config/agents.json",
-        "judges_config": "config/judges/",
-        "output_dir": "runs/",
+        "description": "Evaluation scaffolded by gavel oneshot create",
+        "test_subjects": [
+            {
+                "prompt_name": "default",
+                "judges": [
+                    {
+                        "name": "quality",
+                        "type": "deepeval.geval",
+                        "model": "gpt-4",
+                        "criteria": "Evaluate the quality and accuracy of the response",
+                        "evaluation_steps": [
+                            "Check if the response is accurate",
+                            "Verify completeness of answer",
+                            "Assess clarity and usefulness",
+                        ],
+                    }
+                ],
+            }
+        ],
+        "variants": ["claude_standard"],
+        "scenarios": {"source": "file.local", "name": "scenarios.json"},
+        "execution": {"max_concurrent": 5},
+        "async": {
+            "num_workers": 8,
+            "arrival_rate_per_sec": 20.0,
+            "exec_rate_per_min": 100,
+            "max_retries": 3,
+            "task_timeout_seconds": 300,
+            "stuck_timeout_seconds": 600,
+            "emit_progress_interval_sec": 10,
+        },
     }
 
     output_file = eval_root / eval_name / "config" / "eval_config.json"
@@ -58,40 +84,22 @@ def generate_eval_config(eval_root: Path, eval_name: str, eval_type: str) -> Non
         json.dump(eval_config, f, indent=2)
 
 
-def generate_async_config(eval_root: Path, eval_name: str) -> None:
-    """Generate async_config.json template."""
-    async_config: Dict[str, Any] = {
-        "max_workers": 4,
-        "timeout_seconds": 30,
-        "retry_count": 3,
-        "error_handling": "fail_fast",
-    }
-
-    output_file = eval_root / eval_name / "config" / "async_config.json"
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(output_file, "w") as f:
-        json.dump(async_config, f, indent=2)
-
-
 def generate_scenarios_json(eval_root: Path, eval_name: str) -> None:
     """Generate scenarios.json template with sample scenarios."""
-    scenarios_data: Dict[str, Any] = {
-        "scenarios": [
-            {
-                "id": "scenario-1",
-                "input": {"text": "What is the capital of France?"},
-                "expected_behavior": "Paris",
-                "metadata": {"category": "geography", "difficulty": "easy"},
-            },
-            {
-                "id": "scenario-2",
-                "input": {"text": "Explain quantum computing in simple terms"},
-                "expected_behavior": "Provide a clear explanation of quantum computing principles",
-                "metadata": {"category": "technology", "difficulty": "medium"},
-            },
-        ]
-    }
+    scenarios_data = [
+        {
+            "scenario_id": "scenario-1",
+            "input": "What is the capital of France?",
+            "expected": "Paris",
+            "metadata": {"category": "geography", "difficulty": "easy"},
+        },
+        {
+            "scenario_id": "scenario-2",
+            "input": "Explain quantum computing in simple terms",
+            "expected": "",
+            "metadata": {"category": "technology", "difficulty": "medium"},
+        },
+    ]
 
     output_file = eval_root / eval_name / "data" / "scenarios.json"
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -100,38 +108,8 @@ def generate_scenarios_json(eval_root: Path, eval_name: str) -> None:
         json.dump(scenarios_data, f, indent=2)
 
 
-def generate_scenarios_csv(eval_root: Path, eval_name: str) -> None:
-    """Generate scenarios.csv template with sample scenarios."""
-    output_file = eval_root / eval_name / "data" / "scenarios.csv"
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(output_file, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(
-            ["scenario_id", "input", "expected_output", "category", "difficulty"]
-        )
-        writer.writerow(
-            [
-                "scenario-1",
-                "What is the capital of France?",
-                "Paris",
-                "geography",
-                "easy",
-            ]
-        )
-        writer.writerow(
-            [
-                "scenario-2",
-                "Explain quantum computing in simple terms",
-                "",
-                "technology",
-                "medium",
-            ]
-        )
-
-
 def generate_prompts_toml(eval_root: Path, eval_name: str) -> None:
-    """Generate prompts/default.toml template."""
+    """Generate config/prompts/default.toml template."""
     prompt_template = """v1 = '''
 You are a helpful AI assistant.
 
@@ -141,7 +119,7 @@ Please provide a clear, accurate answer.
 '''
 """
 
-    output_file = eval_root / eval_name / "prompts" / "default.toml"
+    output_file = eval_root / eval_name / "config" / "prompts" / "default.toml"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_file, "w") as f:
@@ -155,11 +133,11 @@ def create_directory_structure(eval_root: Path, eval_name: str) -> None:
     # Create main directories
     (eval_dir / "config").mkdir(parents=True, exist_ok=True)
     (eval_dir / "data").mkdir(parents=True, exist_ok=True)
-    (eval_dir / "prompts").mkdir(parents=True, exist_ok=True)
     (eval_dir / "runs").mkdir(parents=True, exist_ok=True)
 
     # Create subdirectories
     (eval_dir / "config" / "judges").mkdir(parents=True, exist_ok=True)
+    (eval_dir / "config" / "prompts").mkdir(parents=True, exist_ok=True)
 
 
 def generate_all_templates(eval_root: Path, eval_name: str, eval_type: str) -> None:
@@ -171,7 +149,5 @@ def generate_all_templates(eval_root: Path, eval_name: str, eval_type: str) -> N
         create_directory_structure(eval_root, eval_name)
         generate_agents_config(eval_root, eval_name)
         generate_eval_config(eval_root, eval_name, eval_type)
-        generate_async_config(eval_root, eval_name)
         generate_scenarios_json(eval_root, eval_name)
-        generate_scenarios_csv(eval_root, eval_name)
         generate_prompts_toml(eval_root, eval_name)

@@ -21,11 +21,10 @@ class ConfigLoader:
     Orchestrates loading of all configuration files for evaluation.
 
     Simple wrapper that coordinates loading of:
-    - eval_config.json: Evaluation configuration
-    - async_config.json: Async execution settings
+    - eval_config.json: Evaluation configuration (includes nested async config)
     - agents.json: Model and agent definitions
     - scenarios.json or scenarios.csv: Test scenarios
-    - prompts/*.toml: Prompt templates
+    - config/prompts/*.toml: Prompt templates
     """
 
     def __init__(self, eval_root: Path, eval_name: str):
@@ -41,7 +40,7 @@ class ConfigLoader:
         self.eval_dir = self.eval_root / eval_name
         self.config_dir = self.eval_dir / "config"
         self.data_dir = self.eval_dir / "data"
-        self.prompts_dir = self.eval_dir / "prompts"
+        self.prompts_dir = self.config_dir / "prompts"
 
     def load_eval_config(self) -> EvalConfig:
         """
@@ -68,6 +67,9 @@ class ConfigLoader:
         """
         Load and validate async_config.json.
 
+        Note: Deprecated. Async config is now nested in eval_config.json.
+        This method is kept for backward compatibility with legacy configs.
+
         Returns:
             AsyncConfig: Validated async configuration
 
@@ -80,7 +82,8 @@ class ConfigLoader:
         if not config_file.exists():
             raise ConfigError(
                 f"Config file not found: {config_file} - "
-                f"Run 'gavel oneshot create' or add async_config.json"
+                f"Async configuration is now nested in eval_config.json. "
+                f"Run 'gavel oneshot create' to generate the correct structure."
             )
 
         return load_config(config_file, AsyncConfig)
@@ -167,7 +170,7 @@ class ConfigLoader:
         if not prompt_file.exists():
             raise ConfigError(
                 f"Prompt file not found: {prompt_file} - "
-                f"Add {prompt_name}.toml to prompts directory"
+                f"Add {prompt_name}.toml to config/prompts/ directory"
             )
 
         # Load TOML file

@@ -54,7 +54,7 @@ development_status:
   # ============================================================================
   epic-2: done
   2-1-build-typer-cli-entry-point-and-base-command-structure: done
-  2-2-implement-gavel-oneshot-create-scaffolding: done
+  2-2-implement-gavel-oneshot-create-scaffolding: review
   2-3-implement-config-loading-and-validation: done
   2-4-implement-agents-configuration-schema: done
   2-5-implement-scenarios-configuration: done

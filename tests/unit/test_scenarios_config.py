@@ -32,7 +32,8 @@ class TestScenarioModel:
         scenario = Scenario.model_validate(scenario_data)
 
         assert scenario.id == "scenario-1"
-        assert scenario.input["user_input"] == "What is 2+2?"
+        # Input is converted from dict to string
+        assert scenario.input == "What is 2+2?"
         assert scenario.expected_behavior is None
 
     def test_parse_scenario_with_expected_behavior(self) -> None:
@@ -140,34 +141,36 @@ class TestCSVLoader:
         with open(scenarios_file, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(
-                ["scenario_id", "input", "expected_output", "category", "difficulty"]
+                ["scenario_id", "input", "expected"]
             )
             writer.writerow(
-                ["scenario-1", "What is the capital of France?", "Paris", "geography", "easy"]
+                ["scenario-1", "What is the capital of France?", "Paris"]
             )
             writer.writerow(
-                ["scenario-2", "Explain quantum computing", "", "technology", "medium"]
+                ["scenario-2", "Explain quantum computing", ""]
             )
 
         scenarios = load_scenarios_csv(scenarios_file)
 
         assert len(scenarios) == 2
         assert scenarios[0].id == "scenario-1"
-        assert scenarios[0].input["input"] == "What is the capital of France?"
-        assert scenarios[0].input["category"] == "geography"
+        # Input is converted from CSV string to Scenario input field
+        assert scenarios[0].input == "What is the capital of France?"
+        assert scenarios[0].expected == "Paris"
 
     def test_load_scenarios_csv_alternate_id_column(self, tmp_path: Path) -> None:
         """Test CSV with 'id' column instead of 'scenario_id'."""
         scenarios_file = tmp_path / "scenarios.csv"
         with open(scenarios_file, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["id", "user_input"])
+            writer.writerow(["id", "input"])
             writer.writerow(["scenario-1", "Test input"])
 
         scenarios = load_scenarios_csv(scenarios_file)
 
         assert len(scenarios) == 1
         assert scenarios[0].id == "scenario-1"
+        assert scenarios[0].input == "Test input"
 
     def test_load_scenarios_csv_missing_id_raises_error(self, tmp_path: Path) -> None:
         """Test that ValidationError is raised when CSV has no id column."""
@@ -269,20 +272,18 @@ class TestPlaceholderSubstitution:
 
     def test_process_scenario_input(self) -> None:
         """Test processing scenario input with placeholders."""
+        # For placeholders to work with string input, we need to use scenario metadata
         scenario = Scenario.model_validate(
             {
                 "id": "scenario-1",
-                "input": {
-                    "prompt_template": "Translate '{{text}}' to French",
-                    "text": "Hello world",
-                },
+                "input": "Translate '{{text}}' to French",
+                "metadata": {"text": "Hello world"},
             }
         )
 
         processed = process_scenario_input(scenario)
 
-        assert processed["prompt_template"] == "Translate 'Hello world' to French"
-        assert processed["text"] == "Hello world"  # Unchanged
+        assert processed == "Translate 'Hello world' to French"
 
     def test_process_scenario_input_no_placeholders(self) -> None:
         """Test processing scenario input without placeholders."""
@@ -292,7 +293,8 @@ class TestPlaceholderSubstitution:
 
         processed = process_scenario_input(scenario)
 
-        assert processed["user_input"] == "Simple text"
+        # Input dict gets converted to string "Simple text"
+        assert processed == "Simple text"
 
 
 class TestPerformance:

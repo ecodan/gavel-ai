@@ -124,8 +124,8 @@ def run(
             run_logger.info("Loading eval_config.json")
             eval_config = loader.load_eval_config()
 
-            run_logger.info("Loading async_config.json")
-            async_config = loader.load_async_config()
+            # Async config is now nested in eval_config
+            async_config = eval_config.async_config
 
             run_logger.info("Loading agents.json")
             agents_config = loader.load_agents_config()
@@ -182,38 +182,41 @@ def run(
             test_subject = subject_agent.get("prompt", "unknown")
             model_variant = model_data.get("model_version", "unknown")
 
+            # Determine processor type based on test_subject_type
+            processor_type = "prompt_input" if eval_config.test_subject_type == "local" else "closedbox_input"
+
             # Create processor config
             processor_config = ProcessorConfig(
-                processor_type=eval_config.processor_type,
-                parallelism=async_config.max_workers,
-                timeout_seconds=async_config.timeout_seconds,
-                error_handling=async_config.error_handling,
+                processor_type=processor_type,
+                parallelism=async_config.num_workers,
+                timeout_seconds=async_config.task_timeout_seconds,
+                error_handling="fail_fast",  # Default error handling
             )
 
-            if eval_config.processor_type == "prompt_input":
+            if processor_type == "prompt_input":
                 processor = PromptInputProcessor(
                     config=processor_config,
                     model_def=model_def,
                 )
-            elif eval_config.processor_type == "closedbox_input":
+            elif processor_type == "closedbox_input":
                 processor = ClosedBoxInputProcessor(
                     config=processor_config,
                     model_def=model_def,
                 )
             else:
                 raise ConfigError(
-                    f"Unknown processor_type '{eval_config.processor_type}' - "
+                    f"Unknown processor_type '{processor_type}' - "
                     f"Use 'prompt_input' or 'closedbox_input'"
                 )
 
-            typer.echo(f"✓ Initialized {eval_config.processor_type} processor")
-            run_logger.info(f"Initialized {eval_config.processor_type} processor")
+            typer.echo(f"✓ Initialized {processor_type} processor")
+            run_logger.info(f"Initialized {processor_type} processor")
 
             # 4. Convert scenarios to inputs
             inputs = [
                 Input(
-                    id=scenario.id,
-                    text=scenario.input.get("text", scenario.input.get("input", "")),
+                    id=scenario.scenario_id,
+                    text=scenario.input,  # input is now a string
                     metadata=scenario.metadata or {},
                 )
                 for scenario in scenarios_list
@@ -221,12 +224,12 @@ def run(
 
             # 5. Execute scenarios
             typer.echo(f"Executing {len(inputs)} scenarios...")
-            run_logger.info(f"Executing {len(inputs)} scenarios with {async_config.max_workers} workers")
+            run_logger.info(f"Executing {len(inputs)} scenarios with {async_config.num_workers} workers")
 
             executor = Executor(
                 processor=processor,
-                parallelism=async_config.max_workers,
-                error_handling=async_config.error_handling,
+                parallelism=async_config.num_workers,
+                error_handling="fail_fast",  # Use default error handling
             )
 
             processor_results = asyncio.run(executor.execute(inputs))
@@ -234,15 +237,22 @@ def run(
             typer.echo(f"✓ Executed {len(processor_results)} scenarios")
 
             # 6. Execute judges (if configured)
-            if eval_config.judges:
-                typer.echo(f"Running {len(eval_config.judges)} judges...")
+            # Judges are now part of test_subjects
+            judges_list = []
+            if eval_config.test_subjects:
+                for subject in eval_config.test_subjects:
+                    if subject.judges:
+                        judges_list.extend(subject.judges)
+
+            if judges_list:
+                typer.echo(f"Running {len(judges_list)} judges...")
                 run_logger.info(
-                    f"Running {len(eval_config.judges)} judges on {len(processor_results)} results"
+                    f"Running {len(judges_list)} judges on {len(processor_results)} results"
                 )
 
                 judge_executor = JudgeExecutor(
-                    judge_configs=eval_config.judges,
-                    error_handling=async_config.error_handling,
+                    judge_configs=judges_list,
+                    error_handling="fail_fast",  # Use default error handling
                 )
 
                 # Execute judges on each result

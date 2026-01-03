@@ -104,6 +104,7 @@ class TestDeepEvalJudgeInitialization:
             name="custom_quality",
             criteria="Evaluate response quality",
             evaluation_steps=["Check accuracy", "Evaluate clarity"],
+            evaluation_params=["Evaluate response quality", "Check accuracy", "Evaluate clarity"],
             model="gpt-4",
             threshold=0.7,
         )

@@ -55,9 +55,11 @@ class DeepEvalJudge(Judge):
         """
         super().__init__(config)
 
-        if config.judge_type not in self.JUDGE_TYPE_MAP:
+        # Get judge_type from either new or old field
+        judge_type = config.type or config.judge_type
+        if not judge_type or judge_type not in self.JUDGE_TYPE_MAP:
             raise JudgeError(
-                f"Unsupported DeepEval judge type '{config.judge_type}' - "
+                f"Unsupported DeepEval judge type '{judge_type}' - "
                 f"Use one of: {', '.join(self.JUDGE_TYPE_MAP.keys())}"
             )
 
@@ -75,27 +77,37 @@ class DeepEvalJudge(Judge):
             JudgeError: On metric creation failures
         """
         try:
-            metric_class = self.JUDGE_TYPE_MAP[self.config.judge_type]
+            # Get judge_type from either new or old field
+            judge_type = self.config.type or self.config.judge_type
+            judge_id = self.config.name or self.config.judge_id
 
-            # Extract metric-specific config
-            metric_config = self.config.config.copy()
+            metric_class = self.JUDGE_TYPE_MAP[judge_type]
+
+            # Extract metric-specific config (backward compatible with both old and new schema)
+            metric_config = self.config.config.copy() if self.config.config else {}
 
             # Handle GEval separately (different constructor)
-            if self.config.judge_type == "deepeval.geval":
-                # GEval requires name, criteria, evaluation_steps
+            if judge_type == "deepeval.geval":
+                # GEval requires name, criteria, evaluation_steps via evaluation_params
+                # Support both new schema (fields on JudgeConfig) and old schema (fields in config)
+                criteria = self.config.criteria or metric_config.get(
+                    "criteria", "Evaluate the quality of the response"
+                )
+                evaluation_steps = self.config.evaluation_steps or metric_config.get(
+                    "evaluation_steps",
+                    [
+                        "Check if the response answers the question",
+                        "Evaluate the clarity and accuracy",
+                    ],
+                )
+                evaluation_params = [criteria] + (evaluation_steps if evaluation_steps else [])
+
                 return metric_class(
-                    name=metric_config.get("name", self.config.judge_id),
-                    criteria=metric_config.get(
-                        "criteria", "Evaluate the quality of the response"
-                    ),
-                    evaluation_steps=metric_config.get(
-                        "evaluation_steps",
-                        [
-                            "Check if the response answers the question",
-                            "Evaluate the clarity and accuracy",
-                        ],
-                    ),
-                    model=metric_config.get("model", "gpt-4"),
+                    name=metric_config.get("name", judge_id),
+                    criteria=criteria,
+                    evaluation_steps=evaluation_steps,
+                    evaluation_params=evaluation_params,
+                    model=metric_config.get("model") or self.config.model or "gpt-4",
                     threshold=self.config.threshold or 0.5,
                 )
 
@@ -109,8 +121,9 @@ class DeepEvalJudge(Judge):
             return metric_class(**kwargs)
 
         except Exception as e:
+            judge_type = self.config.type or self.config.judge_type
             raise JudgeError(
-                f"Failed to create DeepEval metric '{self.config.judge_type}': {e} - "
+                f"Failed to create DeepEval metric '{judge_type}': {e} - "
                 f"Check judge configuration and API credentials"
             ) from e
 
@@ -131,8 +144,10 @@ class DeepEvalJudge(Judge):
             JudgeError: On evaluation failures
         """
         with self.tracer.start_as_current_span("judge.evaluate") as span:
-            span.set_attribute("judge.id", self.config.judge_id)
-            span.set_attribute("judge.name", self.config.judge_type)  # DeepEval metric name
+            judge_id = self.config.name or self.config.judge_id
+            judge_type = self.config.type or self.config.judge_type
+            span.set_attribute("judge.id", judge_id)
+            span.set_attribute("judge.name", judge_type)  # DeepEval metric name
             span.set_attribute("scenario.id", scenario.id)
 
             try:
@@ -154,7 +169,7 @@ class DeepEvalJudge(Judge):
                 return JudgeResult(
                     score=normalized_score,
                     reasoning=reasoning,
-                    evidence=f"DeepEval {self.config.judge_type} score: {raw_score:.3f}",
+                    evidence=f"DeepEval {judge_type} score: {raw_score:.3f}",
                 )
 
             except JudgeError:
@@ -178,10 +193,13 @@ class DeepEvalJudge(Judge):
         Returns:
             LLMTestCase instance
         """
-        # Extract input text from scenario
-        input_text = scenario.input.get("text") or scenario.input.get(
-            "query"
-        ) or str(scenario.input)
+        # Extract input text from scenario (support both dict and string formats)
+        if isinstance(scenario.input, dict):
+            input_text = scenario.input.get("text") or scenario.input.get(
+                "query"
+            ) or str(scenario.input)
+        else:
+            input_text = str(scenario.input)
 
         # Create test case with available data
         test_case_kwargs: Dict[str, Any] = {
@@ -189,16 +207,17 @@ class DeepEvalJudge(Judge):
             "actual_output": subject_output,
         }
 
-        # Add expected output if available
-        if scenario.expected_behavior:
-            test_case_kwargs["expected_output"] = scenario.expected_behavior
+        # Add expected output if available (support both old and new field names)
+        expected_output = scenario.expected or scenario.expected_behavior
+        if expected_output:
+            test_case_kwargs["expected_output"] = expected_output
 
-        # Add context if available in scenario input
-        if "context" in scenario.input:
+        # Add context if available in scenario input (for dict format)
+        if isinstance(scenario.input, dict) and "context" in scenario.input:
             test_case_kwargs["context"] = [scenario.input["context"]]
 
-        # Add retrieval context if available
-        if "retrieval_context" in scenario.input:
+        # Add retrieval context if available (for dict format)
+        if isinstance(scenario.input, dict) and "retrieval_context" in scenario.input:
             test_case_kwargs["retrieval_context"] = scenario.input[
                 "retrieval_context"
             ]
@@ -236,4 +255,5 @@ class DeepEvalJudge(Judge):
         if hasattr(self.metric, "score_breakdown"):
             return str(self.metric.score_breakdown)
 
-        return f"{self.config.judge_type} evaluation completed"
+        judge_type = self.config.type or self.config.judge_type
+        return f"{judge_type} evaluation completed"

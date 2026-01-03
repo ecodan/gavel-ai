@@ -71,14 +71,28 @@ class Scenario(BaseModel):
 
     Represents a single test scenario to be evaluated, with input data
     and optional expected behavior for judge evaluation.
+
+    Supports both old and new field names:
+    - Old: id, input (dict), expected_behavior
+    - New: scenario_id, input (string), expected
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     id: str
     input: Dict[str, Any]
-    expected_behavior: Optional[str] = None
+    expected_behavior: Optional[str] = Field(None, validation_alias="expected")
     metadata: Dict[str, Any] = {}
+
+    @property
+    def expected(self) -> Optional[str]:
+        """Backward compatibility: access expected_behavior as expected."""
+        return self.expected_behavior
+
+    @property
+    def scenario_id(self) -> str:
+        """Backward compatibility: access id as scenario_id."""
+        return self.id
 
 
 class JudgeConfig(BaseModel):
@@ -89,14 +103,36 @@ class JudgeConfig(BaseModel):
 
     Per Architecture Decision 5: Contains judge type, threshold, and custom criteria
     for DeepEval-native judges with sequential execution.
+
+    Supports both old and new schema:
+    - Old: judge_id, judge_type, threshold, config dict
+    - New: name, type, criteria, evaluation_steps, model, threshold
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    judge_id: str
-    judge_type: str  # e.g., "deepeval.similarity", "deepeval.geval", "custom"
-    threshold: Optional[float] = None
-    config: Dict[str, Any] = {}
+    # New schema fields (with backward compatibility)
+    name: Optional[str] = Field(None, validation_alias="judge_id", description="Judge identifier")
+    type: Optional[str] = Field(None, validation_alias="judge_type", description="Judge type")
+    criteria: Optional[str] = Field(None, description="Evaluation criteria")
+    evaluation_steps: Optional[List[str]] = Field(None, description="Evaluation steps")
+    model: Optional[str] = Field(None, description="Model for judge evaluation")
+    threshold: Optional[float] = Field(None, description="Pass/fail threshold (0.0-1.0)")
+    config: Dict[str, Any] = Field(default_factory=dict, description="Judge-specific config dict")
+
+    # Legacy fields (deprecated)
+    judge_id: Optional[str] = Field(None, description="[DEPRECATED] Use 'name' instead")
+    judge_type: Optional[str] = Field(None, description="[DEPRECATED] Use 'type' instead")
+
+    @property
+    def judge_id_value(self) -> str:
+        """Get judge_id from either name or judge_id field."""
+        return self.name or self.judge_id or ""
+
+    @property
+    def judge_type_value(self) -> str:
+        """Get judge_type from either type or judge_type field."""
+        return self.type or self.judge_type or ""
 
 
 class JudgeResult(BaseModel):

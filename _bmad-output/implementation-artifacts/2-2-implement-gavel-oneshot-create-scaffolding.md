@@ -2,6 +2,39 @@
 
 Status: review
 
+## Dev Agent Record
+
+### Completion Notes
+
+✅ **Story 2-2 Implementation Updated - 2026-01-01**
+
+**Config Structure Corrections Applied:**
+- Updated `eval_config.json` template to include full schema: test_subjects, variants, scenarios object, execution, and nested async config
+- Fixed `scenarios.json` to be root-level JSON array (not wrapped) with `"expected"` field instead of `"expected_output"`
+- Removed separate `async_config.json` file - async config now nested in eval_config.json
+- Moved prompts directory from root to `config/prompts/`
+
+**Implementation Summary:**
+- Updated `src/gavel_ai/cli/scaffolding.py` with corrected template generation:
+  - `generate_eval_config()` now generates complete eval_type: "oneshot" with all required sections
+  - `generate_scenarios_json()` generates root-level array with correct fields
+  - Removed `generate_async_config()` and `generate_scenarios_csv()` functions
+  - Updated `create_directory_structure()` to place prompts in config/prompts/
+  - Updated `generate_all_templates()` to call only active functions
+
+**Tests Updated:**
+- 14/14 tests passing covering all new config structures
+- Updated tests to validate new eval_config schema
+- Fixed scenarios.json format tests (root array, "expected" field)
+- Updated async config test to verify nested structure
+- Updated prompts path test to check config/prompts/default.toml
+- All existing tests still passing (530/530 total suite)
+
+**Files Modified:**
+- `src/gavel_ai/cli/scaffolding.py` - Updated template generation
+- `tests/unit/test_oneshot_create.py` - Updated all tests for new schemas
+- `_bmad-output/implementation-artifacts/2-2-implement-gavel-oneshot-create-scaffolding.md` - Updated story with correct config definitions
+
 ## Story
 
 As a user,
@@ -18,14 +51,12 @@ So that I can get started quickly with a pre-configured evaluation structure.
      my_eval/
      ├── config/
      │   ├── agents.json        # Sample model definitions
-     │   ├── eval_config.json   # Evaluation setup
-     │   ├── async_config.json  # Async/concurrency settings
-     │   └── judges/            # Empty directory for judge configs
+     │   ├── eval_config.json   # Evaluation setup with async config
+     │   ├── judges/            # Empty directory for judge configs
+     │   └── prompts/
+     │       └── default.toml   # Sample prompt template
      ├── data/
-     │   ├── scenarios.json     # Sample scenarios
-     │   └── scenarios.csv      # Alternative CSV format
-     ├── prompts/
-     │   └── default.toml       # Sample prompt template
+     │   └── scenarios.json     # Sample scenarios
      └── runs/                  # Empty directory for run outputs
      ```
 
@@ -54,10 +85,8 @@ So that I can get started quickly with a pre-configured evaluation structure.
 
 - [x] Task 2: Create template generation functions (AC: #2)
   - [x] Implement `agents.json` template generator
-  - [x] Implement `eval_config.json` template generator
-  - [x] Implement `async_config.json` template generator
+  - [x] Implement `eval_config.json` template generator (with nested async config)
   - [x] Implement `scenarios.json` template generator
-  - [x] Implement `scenarios.csv` template generator
   - [x] Implement `prompts/default.toml` template generator
 
 - [x] Task 3: Add validation and error handling (AC: #4)
@@ -102,13 +131,11 @@ def create(
 ├── config/
 │   ├── agents.json
 │   ├── eval_config.json
-│   ├── async_config.json
-│   └── judges/             # Empty directory
+│   ├── judges/             # Empty directory
+│   └── prompts/
+│       └── default.toml
 ├── data/
-│   ├── scenarios.json
-│   └── scenarios.csv
-├── prompts/
-│   └── default.toml
+│   └── scenarios.json
 └── runs/                   # Empty directory
 ```
 
@@ -157,57 +184,70 @@ def create(
 **config/eval_config.json:**
 ```json
 {
+  "eval_type": "oneshot",
+  "test_subject_type": "local",
   "eval_name": "{{eval_name}}",
-  "eval_type": "{{eval_type}}",
-  "processor_type": "prompt_input",
-  "scenarios_file": "data/scenarios.json",
-  "agents_file": "config/agents.json",
-  "judges_config": "config/judges/",
-  "output_dir": "runs/"
-}
-```
-
-**config/async_config.json:**
-```json
-{
-  "max_workers": 4,
-  "timeout_seconds": 30,
-  "retry_count": 3,
-  "error_handling": "fail_fast"
+  "description": "Evaluation scaffolded by gavel oneshot create",
+  "test_subjects": [
+    {
+      "prompt_name": "default",
+      "judges": [
+        {
+          "name": "quality",
+          "type": "deepeval.geval",
+          "model": "gpt-4",
+          "criteria": "Evaluate the quality and accuracy of the response",
+          "evaluation_steps": [
+            "Check if the response is accurate",
+            "Verify completeness of answer",
+            "Assess clarity and usefulness"
+          ]
+        }
+      ]
+    }
+  ],
+  "variants": ["claude_standard"],
+  "scenarios": {
+    "source": "file.local",
+    "name": "scenarios.json"
+  },
+  "execution": {
+    "max_concurrent": 5
+  },
+  "async": {
+    "num_workers": 8,
+    "arrival_rate_per_sec": 20.0,
+    "exec_rate_per_min": 100,
+    "max_retries": 3,
+    "task_timeout_seconds": 300,
+    "stuck_timeout_seconds": 600,
+    "emit_progress_interval_sec": 10
+  }
 }
 ```
 
 **data/scenarios.json:**
 ```json
-{
-  "scenarios": [
-    {
-      "scenario_id": "scenario-1",
-      "input": "What is the capital of France?",
-      "expected_output": "Paris",
-      "metadata": {
-        "category": "geography",
-        "difficulty": "easy"
-      }
-    },
-    {
-      "scenario_id": "scenario-2",
-      "input": "Explain quantum computing in simple terms",
-      "expected_output": "",
-      "metadata": {
-        "category": "technology",
-        "difficulty": "medium"
-      }
+[
+  {
+    "scenario_id": "scenario-1",
+    "input": "What is the capital of France?",
+    "expected": "Paris",
+    "metadata": {
+      "category": "geography",
+      "difficulty": "easy"
     }
-  ]
-}
-```
-
-**data/scenarios.csv:**
-```csv
-scenario_id,input,expected_output,category,difficulty
-scenario-1,"What is the capital of France?","Paris",geography,easy
-scenario-2,"Explain quantum computing in simple terms","",technology,medium
+  },
+  {
+    "scenario_id": "scenario-2",
+    "input": "Explain quantum computing in simple terms",
+    "expected": "",
+    "metadata": {
+      "category": "technology",
+      "difficulty": "medium"
+    }
+  }
+]
 ```
 
 **prompts/default.toml:**
@@ -366,7 +406,7 @@ No critical issues encountered during implementation.
 **Implementation Summary:**
 - Created `src/gavel_ai/cli/scaffolding.py` with template generation functions
 - Implemented `gavel oneshot create` command with full validation and error handling
-- Generated template files include: agents.json, eval_config.json, async_config.json, scenarios.json, scenarios.csv, prompts/default.toml
+- Generated template files include: agents.json, eval_config.json (with nested async config), scenarios.json, prompts/default.toml
 - All template files use snake_case for JSON keys (forward compatible with Pydantic models)
 
 **Tests Added:**
