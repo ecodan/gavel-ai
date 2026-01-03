@@ -14,7 +14,7 @@ from pydantic_ai.providers import Provider
 
 from gavel_ai.core.config.agents import ModelDefinition
 from gavel_ai.core.exceptions import ProcessorError
-from gavel_ai.telemetry import get_metadata_collector, get_tracer
+from gavel_ai.telemetry import get_current_run_id, get_metadata_collector, get_tracer
 
 # Import provider classes for passing API keys
 try:
@@ -270,6 +270,9 @@ class ProviderFactory:
                 )
 
                 # Set comprehensive span attributes per telemetry spec
+                run_id = get_current_run_id()
+                if run_id:
+                    span.set_attribute("run_id", run_id)
                 span.set_attribute("llm.provider", metadata["provider"])
                 span.set_attribute("llm.model", metadata["model"])
                 span.set_attribute("llm.tokens.prompt", prompt_tokens)

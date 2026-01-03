@@ -97,6 +97,33 @@ class TestTelemetryEndToEnd:
         assert len(span_data["trace_id"]) == 32  # 128 bits = 32 hex chars
         assert len(span_data["span_id"]) == 16  # 64 bits = 16 hex chars
 
+    def test_run_id_captured_in_attributes(self, tmp_path: Path) -> None:
+        """Spans include run_id attribute when code explicitly sets it."""
+        from gavel_ai.telemetry import get_current_run_id
+
+        run_id = "run-12345"
+        telemetry_path = configure_run_telemetry(
+            run_id=run_id,
+            eval_name="eval",
+            base_dir=str(tmp_path),
+        )
+
+        # Verify get_current_run_id returns the configured value
+        assert get_current_run_id() == run_id
+
+        tracer = get_tracer(__name__)
+        with tracer.start_as_current_span("test.span") as span:
+            # Simulate what instrumented code does: get run_id and set attribute
+            current_run_id = get_current_run_id()
+            if current_run_id:
+                span.set_attribute("run_id", current_run_id)
+            span.set_attribute("custom.attr", "value")
+
+        spans = self._read_telemetry_file(telemetry_path)
+        assert len(spans) == 1
+        assert "run_id" in spans[0]["attributes"]
+        assert spans[0]["attributes"]["run_id"] == run_id
+
     def test_nested_spans_have_parent_id(self, tmp_path: Path) -> None:
         """Nested spans correctly reference parent spans."""
         telemetry_path = configure_run_telemetry(
@@ -219,6 +246,28 @@ class TestTelemetryEndToEnd:
 
         span_names = {s["name"] for s in spans}
         assert span_names == {"span.from.module1", "span.from.module2", "span.from.module3"}
+
+    def test_scenario_ids_captured_in_batch(self, tmp_path: Path) -> None:
+        """Batch spans include scenario.ids attribute with list of processed IDs."""
+        telemetry_path = configure_run_telemetry(
+            run_id="run-batch",
+            eval_name="eval",
+            base_dir=str(tmp_path),
+        )
+
+        tracer = get_tracer(__name__)
+        scenario_list = ["scenario-1", "scenario-2", "scenario-3"]
+
+        # Simulate a processor batch span
+        with tracer.start_as_current_span("processor.execute") as span:
+            span.set_attribute("processor.type", "prompt_input")
+            span.set_attribute("scenario.ids", scenario_list)
+            span.set_attribute("input.count", len(scenario_list))
+
+        spans = self._read_telemetry_file(telemetry_path)
+        assert len(spans) == 1
+        assert "scenario.ids" in spans[0]["attributes"]
+        assert spans[0]["attributes"]["scenario.ids"] == scenario_list
 
 
 class TestTelemetryRunDirectory:

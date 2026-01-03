@@ -22,6 +22,7 @@ from deepeval.test_case import LLMTestCase
 from gavel_ai.core.exceptions import JudgeError
 from gavel_ai.core.models import JudgeConfig, JudgeResult, Scenario
 from gavel_ai.judges.base import Judge
+from gavel_ai.telemetry import get_current_run_id
 
 
 class DeepEvalJudge(Judge):
@@ -146,6 +147,9 @@ class DeepEvalJudge(Judge):
         with self.tracer.start_as_current_span("judge.evaluate") as span:
             judge_id = self.config.name or self.config.judge_id
             judge_type = self.config.type or self.config.judge_type
+            run_id = get_current_run_id()
+            if run_id:
+                span.set_attribute("run_id", run_id)
             span.set_attribute("judge.id", judge_id)
             span.set_attribute("judge.name", judge_type)  # DeepEval metric name
             span.set_attribute("scenario.id", scenario.id)

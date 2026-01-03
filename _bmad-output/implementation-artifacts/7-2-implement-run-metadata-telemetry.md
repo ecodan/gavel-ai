@@ -1,6 +1,6 @@
 # Story 7.2: Implement Run Metadata Telemetry
 
-Status: completed
+Status: done
 
 ## Story
 

@@ -12,6 +12,7 @@ from gavel_ai.telemetry import (
     NoOpSpanExporter,
     TelemetryFileExporter,
     configure_run_telemetry,
+    get_current_run_id,
     get_current_telemetry_path,
     get_tracer,
     reset_telemetry,
@@ -227,3 +228,44 @@ class TestNoOpSpanExporter:
         """Force flush returns True."""
         exporter = NoOpSpanExporter()
         assert exporter.force_flush() is True
+
+
+class TestGetCurrentRunId:
+    """Tests for get_current_run_id function."""
+
+    def test_get_current_run_id_when_configured(self, tmp_path: Path) -> None:
+        """get_current_run_id returns run_id when configured."""
+        try:
+            run_id = "run-test-12345"
+            configure_run_telemetry(
+                run_id=run_id,
+                eval_name="test_eval",
+                base_dir=str(tmp_path),
+            )
+
+            assert get_current_run_id() == run_id
+        finally:
+            reset_telemetry()
+
+    def test_get_current_run_id_when_not_configured(self) -> None:
+        """get_current_run_id returns None when not configured."""
+        try:
+            reset_telemetry()
+            assert get_current_run_id() is None
+        finally:
+            reset_telemetry()
+
+    def test_get_current_run_id_after_reset(self, tmp_path: Path) -> None:
+        """get_current_run_id returns None after reset_telemetry."""
+        try:
+            configure_run_telemetry(
+                run_id="run-temp",
+                eval_name="eval",
+                base_dir=str(tmp_path),
+            )
+            assert get_current_run_id() == "run-temp"
+
+            reset_telemetry()
+            assert get_current_run_id() is None
+        finally:
+            reset_telemetry()

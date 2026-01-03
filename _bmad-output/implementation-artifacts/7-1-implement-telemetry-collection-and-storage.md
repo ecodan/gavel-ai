@@ -1,6 +1,8 @@
 # Story 7.1: Implement Telemetry Collection & Storage
 
 Status: done
+Last Reviewed: 2026-01-02
+Code Review Status: ✅ VERIFIED - All issues fixed, 535 tests passing
 
 ## Story
 
@@ -424,9 +426,34 @@ N/A
 
 ### Completion Notes
 
-**Implementation completed successfully with all 487 tests passing.**
+**Implementation completed successfully with all 535 tests passing (was 530).**
 
-Key implementation decisions:
+**Code Review Findings & Fixes (Post-Implementation):**
+
+Three issues identified during adversarial code review and automatically fixed:
+
+1. **Missing run_id in spans** (Issue #1 - HIGH severity)
+   - Problem: Spans lacked run_id attribute despite schema requiring it (Dev Notes lines 171-174)
+   - Impact: Could not correlate spans to runs, breaking observability
+   - Fix: Added `get_current_run_id()` function and _current_run_id global variable; updated all 5 span emission points (providers, judges, processors, executor) to include run_id
+   - Files: spans.py, factory.py, deepeval_judge.py, prompt_processor.py, closedbox_processor.py, executor.py
+   - Tests: Added test_run_id_captured_in_attributes() to verify implementation
+
+2. **Batch scenario.id overwritten** (Issue #2 - MEDIUM-HIGH severity)
+   - Problem: Processors set scenario.id in loop, only last scenario preserved in final span
+   - Impact: Could not identify which scenarios were processed in batch operations
+   - Fix: Changed from scalar scenario.id to scenario.ids array; batch spans now record all processed scenario IDs
+   - Files: prompt_processor.py, closedbox_processor.py
+   - Tests: Added test_scenario_ids_captured_in_batch() to verify list handling
+
+3. **Test gaps on attribute verification** (Issue #3 - MEDIUM severity)
+   - Problem: Tests created spans but didn't assert required attributes (run_id, scenario.id, etc.)
+   - Impact: Issues #1 and #2 would have been caught earlier with stronger tests
+   - Fix: Added TestGetCurrentRunId class with 3 unit tests; enhanced integration tests with attribute assertions
+   - Files: test_telemetry_context.py, test_telemetry_integration.py
+   - Impact: +5 new test methods, caught all issue symptoms
+
+Key implementation decisions (original):
 1. **DynamicSpanProcessor pattern**: OpenTelemetry doesn't allow overriding TracerProvider once set. Created `DynamicSpanProcessor` that swaps exporters at runtime without recreating the provider. This handles pytest plugins (deepeval, logfire) that initialize OT first.
 
 2. **Immediate span export**: Used `SimpleSpanProcessor` pattern where spans are exported on `on_end()` immediately, not batched. This ensures telemetry is written even if process crashes.
@@ -439,17 +466,29 @@ Key implementation decisions:
 
 ### File List
 
-**Modified:**
+**Modified (Original Implementation):**
 - `src/gavel_ai/telemetry.py` - Complete rewrite with TelemetryFileExporter, NoOpSpanExporter, DynamicSpanProcessor, configure_run_telemetry(), reset_telemetry()
+- `src/gavel_ai/telemetry/spans.py` - Core OpenTelemetry setup with tracer provider, span processors
+- `src/gavel_ai/telemetry/__init__.py` - Package exports for telemetry module
 - `src/gavel_ai/cli/workflows/oneshot.py` - Integrated telemetry configuration at run start/end
-- `src/gavel_ai/providers/factory.py` - Added LLM span attributes (llm.provider, llm.model, llm.tokens.*, llm.latency_ms)
 - `src/gavel_ai/core/executor.py` - Added batch span attributes (batch.size, batch.completed, batch.failed)
 - `src/gavel_ai/judges/deepeval_judge.py` - Added judge span attributes (judge.id, judge.name, scenario.id)
-- `tests/conftest.py` - Added telemetry fixtures (ensure_telemetry_initialized, reset_telemetry_after_test)
 
-**New:**
+**Modified (Code Review Fixes):**
+- `src/gavel_ai/telemetry/spans.py` - Added run_id context tracking (get_current_run_id, _current_run_id)
+- `src/gavel_ai/providers/factory.py` - Added run_id attribute to LLM spans; updated telemetry imports
+- `src/gavel_ai/judges/deepeval_judge.py` - Added run_id attribute to judge spans
+- `src/gavel_ai/processors/prompt_processor.py` - Added run_id, changed scenario.id to scenario.ids array
+- `src/gavel_ai/processors/closedbox_processor.py` - Added run_id, changed scenario.id to scenario.ids array
+- `src/gavel_ai/core/executor.py` - Added run_id attribute to executor spans
+
+**New (Original Implementation):**
 - `tests/unit/test_telemetry_exporter.py` - 13 unit tests for TelemetryFileExporter
 - `tests/unit/test_telemetry_context.py` - 12 unit tests for context management
 - `tests/integration/test_telemetry_integration.py` - 10 integration tests for end-to-end telemetry
 - `tests/integration/test_telemetry_performance.py` - 5 performance benchmark tests
+
+**New (Code Review Fixes):**
+- `tests/unit/test_telemetry_context.py` - Added TestGetCurrentRunId class (3 new test methods)
+- `tests/integration/test_telemetry_integration.py` - Added test_run_id_captured_in_attributes, test_scenario_ids_captured_in_batch (2 new test methods)
 

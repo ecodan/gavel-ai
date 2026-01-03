@@ -9,7 +9,7 @@ from typing import List
 
 from gavel_ai.core.models import Input, ProcessorResult
 from gavel_ai.processors.base import InputProcessor
-from gavel_ai.telemetry import get_metadata_collector, get_tracer
+from gavel_ai.telemetry import get_current_run_id, get_metadata_collector, get_tracer
 
 
 class Executor:
@@ -52,6 +52,9 @@ class Executor:
             Exception: If error_handling is "fail_fast" and any input fails
         """
         with self.tracer.start_as_current_span("executor.run") as span:
+            run_id = get_current_run_id()
+            if run_id:
+                span.set_attribute("run_id", run_id)
             span.set_attribute("executor.parallelism", self.parallelism)
             span.set_attribute("batch.size", len(inputs))
             span.set_attribute("executor.error_handling", self.error_handling)

@@ -12,7 +12,7 @@ import httpx
 from gavel_ai.core.exceptions import ProcessorError
 from gavel_ai.core.models import Input, ProcessorConfig, ProcessorResult
 from gavel_ai.processors.base import InputProcessor
-from gavel_ai.telemetry import get_tracer
+from gavel_ai.telemetry import get_current_run_id, get_tracer
 
 
 class ClosedBoxInputProcessor(InputProcessor):
@@ -66,9 +66,17 @@ class ClosedBoxInputProcessor(InputProcessor):
             ProcessorError: On execution failures
         """
         with self.tracer.start_as_current_span("processor.execute") as span:
+            run_id = get_current_run_id()
+            if run_id:
+                span.set_attribute("run_id", run_id)
             span.set_attribute("processor.type", "closedbox_input")
             span.set_attribute("input.count", len(inputs))
             span.set_attribute("endpoint.url", self.endpoint_url)
+
+            # Record all scenario IDs in the batch
+            scenario_ids = [input_item.id for input_item in inputs]
+            if scenario_ids:
+                span.set_attribute("scenario.ids", scenario_ids)
 
             all_outputs: List[str] = []
             aggregated_metadata: Dict[str, Any] = {
@@ -80,7 +88,6 @@ class ClosedBoxInputProcessor(InputProcessor):
 
             async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
                 for input_item in inputs:
-                    span.set_attribute("scenario.id", input_item.id)
 
                     start_time = time.time()
 

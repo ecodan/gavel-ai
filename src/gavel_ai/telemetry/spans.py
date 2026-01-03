@@ -57,6 +57,7 @@ logger = logging.getLogger("gavel-ai")
 _tracer_provider: Optional[TracerProvider] = None
 _dynamic_processor: Optional["DynamicSpanProcessor"] = None
 _current_telemetry_path: Optional[Path] = None
+_current_run_id: Optional[str] = None
 _initialized: bool = False
 
 
@@ -370,7 +371,7 @@ def configure_run_telemetry(
             reset_telemetry()
         ```
     """
-    global _tracer_provider, _dynamic_processor, _current_telemetry_path
+    global _tracer_provider, _dynamic_processor, _current_telemetry_path, _current_run_id
 
     # Ensure tracer provider is initialized
     if _tracer_provider is None:
@@ -379,6 +380,7 @@ def configure_run_telemetry(
     # Create telemetry file path
     telemetry_path = Path(base_dir) / "evaluations" / eval_name / "runs" / run_id / "telemetry.jsonl"
     _current_telemetry_path = telemetry_path
+    _current_run_id = run_id
 
     # Create new file exporter and swap it in
     file_exporter = TelemetryFileExporter(telemetry_path)
@@ -406,9 +408,10 @@ def reset_telemetry() -> None:
             reset_telemetry()
         ```
     """
-    global _current_telemetry_path, _dynamic_processor
+    global _current_telemetry_path, _dynamic_processor, _current_run_id
 
     _current_telemetry_path = None
+    _current_run_id = None
 
     # Reset to default exporter
     if _dynamic_processor is not None:
@@ -425,6 +428,16 @@ def get_current_telemetry_path() -> Optional[Path]:
         Path to telemetry.jsonl if configured, None otherwise
     """
     return _current_telemetry_path
+
+
+def get_current_run_id() -> Optional[str]:
+    """
+    Get the current run ID if in a run context.
+
+    Returns:
+        Run ID if configured, None otherwise
+    """
+    return _current_run_id
 
 
 def get_tracer(name: str) -> trace.Tracer:
@@ -494,6 +507,7 @@ __all__ = [
     "configure_run_telemetry",
     "reset_telemetry",
     "get_current_telemetry_path",
+    "get_current_run_id",
     "TelemetryFileExporter",
     "NoOpSpanExporter",
     "DynamicSpanProcessor",
