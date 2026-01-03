@@ -18,6 +18,7 @@ from deepeval.metrics import (
     HallucinationMetric,
 )
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+from jinja2 import Template
 
 from gavel_ai.core.config.models import JudgeConfig
 from gavel_ai.core.exceptions import JudgeError
@@ -206,6 +207,10 @@ class DeepEvalJudge(Judge):
         """
         Create DeepEval test case from scenario and output.
 
+        Supports:
+        - Standard expected output from scenario
+        - expected_output_template with Jinja2 rendering for custom scenarios
+
         Args:
             scenario: The test scenario
             subject_output: The subject's output
@@ -227,8 +232,8 @@ class DeepEvalJudge(Judge):
             "actual_output": subject_output,
         }
 
-        # Add expected output if available (support both old and new field names)
-        expected_output = scenario.expected or scenario.expected_behavior
+        # Determine expected output: template rendering takes precedence
+        expected_output = self._get_expected_output(scenario)
         if expected_output:
             test_case_kwargs["expected_output"] = expected_output
 
@@ -243,6 +248,63 @@ class DeepEvalJudge(Judge):
             ]
 
         return LLMTestCase(**test_case_kwargs)
+
+    def _get_expected_output(self, scenario: Scenario) -> str:
+        """
+        Get expected output for the scenario.
+
+        Priority:
+        1. Render expected_output_template if available in judge config AND has required variables
+        2. Use scenario.expected or scenario.expected_behavior if available
+
+        Args:
+            scenario: The test scenario
+
+        Returns:
+            Expected output string or empty string if none available
+        """
+        # Check for GEval expected_output_template in config
+        metric_config = self.config.config.copy() if self.config.config else {}
+        template_str = metric_config.get("expected_output_template")
+
+        if template_str:
+            try:
+                # Render template with scenario and metadata context
+                template = Template(template_str)
+                context = {}
+
+                # Add scenario input as context
+                if isinstance(scenario.input, dict):
+                    context.update(scenario.input)
+                else:
+                    context["input"] = scenario.input
+
+                # Add metadata if available
+                if scenario.metadata:
+                    context.update(scenario.metadata)
+
+                rendered = template.render(**context)
+
+                # Check if template was fully rendered with actual values
+                # Skip if rendered text has multiple consecutive spaces (indicates empty variables)
+                # or if it's mostly whitespace
+                if (
+                    rendered.strip()
+                    and "  " not in rendered
+                    and len(rendered.strip()) > len(template_str) * 0.2
+                ):
+                    return rendered
+            except Exception as e:
+                # Fall through to scenario.expected on template error
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Failed to render expected_output_template: {e} - "
+                    f"falling back to scenario.expected"
+                )
+
+        # Fall back to scenario expected output
+        return scenario.expected or scenario.expected_behavior or ""
 
     def _normalize_score(self, raw_score: float) -> int:
         """

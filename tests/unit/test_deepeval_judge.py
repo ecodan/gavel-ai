@@ -57,6 +57,23 @@ def geval_config():
 
 
 @pytest.fixture
+def geval_config_with_template():
+    """Create config for GEval judge with expected_output_template."""
+    return JudgeConfig(
+        id="custom_template",
+        deepeval_name="deepeval.geval",
+        threshold=0.7,
+        config={
+            "name": "template_quality",
+            "criteria": "Evaluate response quality",
+            "evaluation_steps": ["Check accuracy", "Evaluate clarity"],
+            "expected_output_template": "The capital of {{country}} is {{capital}}",
+            "model": "gpt-4",
+        },
+    )
+
+
+@pytest.fixture
 def mock_scenario():
     """Create a test scenario."""
     return Scenario(
@@ -275,3 +292,74 @@ class TestDeepEvalJudgeScoreNormalization:
             normalized = judge._normalize_score(raw_score)
             assert normalized == expected_normalized
             assert 1 <= normalized <= 10
+
+
+class TestGEvalExpectedOutputTemplate:
+    """Test GEval custom expected_output_template support."""
+
+    def test_expected_output_template_rendering(
+        self, mock_deepeval_metrics, geval_config_with_template, mock_scenario
+    ):
+        """Test that expected_output_template is rendered with scenario context."""
+        # Create a scenario with template variables
+        scenario_with_vars = Scenario(
+            id="geography",
+            input={
+                "text": "What is the capital of France?",
+                "country": "France",
+                "capital": "Paris",
+            },
+            expected_behavior="Paris",
+        )
+
+        judge = DeepEvalJudge(geval_config_with_template)
+
+        # Get expected output via _get_expected_output
+        expected = judge._get_expected_output(scenario_with_vars)
+
+        # Verify template was rendered correctly
+        assert expected == "The capital of France is Paris"
+        assert "{{" not in expected, "Template should be fully rendered"
+
+    def test_expected_output_template_with_test_case(
+        self, mock_deepeval_metrics, geval_config_with_template
+    ):
+        """Test that expected_output_template is used in test case creation."""
+        scenario_with_vars = Scenario(
+            id="geography",
+            input={
+                "text": "What is the capital?",
+                "country": "France",
+                "capital": "Paris",
+            },
+        )
+
+        judge = DeepEvalJudge(geval_config_with_template)
+        test_case = judge._create_test_case(scenario_with_vars, "Paris")
+
+        # Verify expected_output was set to rendered template
+        assert test_case.expected_output == "The capital of France is Paris"
+        assert test_case.input == "What is the capital?"
+        assert test_case.actual_output == "Paris"
+
+    def test_expected_output_fallback_to_scenario(
+        self, mock_deepeval_metrics, geval_config_with_template, mock_scenario
+    ):
+        """Test fallback to scenario.expected when no template variables."""
+        # Scenario without template variables - should use scenario.expected
+        judge = DeepEvalJudge(geval_config_with_template)
+        expected = judge._get_expected_output(mock_scenario)
+
+        # Should fall back to scenario.expected_behavior
+        assert expected == mock_scenario.expected_behavior
+        assert expected == "Paris"
+
+    def test_geval_without_template(
+        self, mock_deepeval_metrics, geval_config, mock_scenario
+    ):
+        """Test GEval judge works without expected_output_template."""
+        judge = DeepEvalJudge(geval_config)
+        expected = judge._get_expected_output(mock_scenario)
+
+        # Should use scenario.expected_behavior
+        assert expected == "Paris"
