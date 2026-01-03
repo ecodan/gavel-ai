@@ -17,6 +17,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from gavel_ai.core.config.models import JudgeConfig  # noqa: F401
+
 
 class Input(BaseModel):
     """
@@ -93,46 +95,6 @@ class Scenario(BaseModel):
     def scenario_id(self) -> str:
         """Backward compatibility: access id as scenario_id."""
         return self.id
-
-
-class JudgeConfig(BaseModel):
-    """
-    Configuration model for judge instances.
-
-    Uses extra='ignore' for forward compatibility - unknown fields are silently ignored.
-
-    Per Architecture Decision 5: Contains judge type, threshold, and custom criteria
-    for DeepEval-native judges with sequential execution.
-
-    Supports both old and new schema:
-    - Old: judge_id, judge_type, threshold, config dict
-    - New: name, type, criteria, evaluation_steps, model, threshold
-    """
-
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
-
-    # New schema fields (with backward compatibility)
-    name: Optional[str] = Field(None, validation_alias="judge_id", description="Judge identifier")
-    type: Optional[str] = Field(None, validation_alias="judge_type", description="Judge type")
-    criteria: Optional[str] = Field(None, description="Evaluation criteria")
-    evaluation_steps: Optional[List[str]] = Field(None, description="Evaluation steps")
-    model: Optional[str] = Field(None, description="Model for judge evaluation")
-    threshold: Optional[float] = Field(None, description="Pass/fail threshold (0.0-1.0)")
-    config: Dict[str, Any] = Field(default_factory=dict, description="Judge-specific config dict")
-
-    # Legacy fields (deprecated)
-    judge_id: Optional[str] = Field(None, description="[DEPRECATED] Use 'name' instead")
-    judge_type: Optional[str] = Field(None, description="[DEPRECATED] Use 'type' instead")
-
-    @property
-    def judge_id_value(self) -> str:
-        """Get judge_id from either name or judge_id field."""
-        return self.name or self.judge_id or ""
-
-    @property
-    def judge_type_value(self) -> str:
-        """Get judge_type from either type or judge_type field."""
-        return self.type or self.judge_type or ""
 
 
 class JudgeResult(BaseModel):

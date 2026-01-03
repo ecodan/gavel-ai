@@ -45,8 +45,8 @@ class TestConfigLoaderIntegration:
                     "prompt_name": "default",
                     "judges": [
                         {
-                            "id": "quality",
-                            "deepeval_name": "deepeval.geval",
+                            "name": "quality",
+                            "type": "deepeval.geval",
                             "config": {
                                 "model": "test_model",
                                 "criteria": "Evaluate quality",

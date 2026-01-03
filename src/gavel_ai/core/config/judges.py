@@ -52,51 +52,51 @@ def load_judge_config(judge: JudgeConfig, eval_root: Path) -> JudgeConfig:
         merged_config = {**(judge.config or {}), **external_config}
 
         return JudgeConfig(
-            id=judge.id,
-            deepeval_name=judge.deepeval_name,
+            name=judge.name,
+            type=judge.type,
             config=merged_config,
             config_ref=judge.config_ref,
         )
 
 
 def validate_judge_ids(judges: List[JudgeConfig]) -> None:
-    """Validate judge IDs are unique.
+    """Validate judge names are unique.
 
     Args:
         judges: List of judge configurations
 
     Raises:
-        JudgeError: If duplicate judge IDs found
+        JudgeError: If duplicate judge names found
     """
     with tracer.start_as_current_span("judges.validate_judge_ids"):
-        judge_ids = [j.id for j in judges]
+        judge_names = [j.name for j in judges]
         seen = set()
         duplicates = []
 
-        for judge_id in judge_ids:
-            if judge_id in seen:
-                duplicates.append(judge_id)
-            seen.add(judge_id)
+        for judge_name in judge_names:
+            if judge_name in seen:
+                duplicates.append(judge_name)
+            seen.add(judge_name)
 
         if duplicates:
             raise JudgeError(
-                f"Duplicate judge IDs found: {', '.join(duplicates)} - "
-                f"Judge IDs must be unique"
+                f"Duplicate judge names found: {', '.join(duplicates)} - "
+                f"Judge names must be unique"
             )
 
 
-def validate_deepeval_name(deepeval_name: str) -> None:
-    """Validate deepeval judge type is supported.
+def validate_judge_type(judge_type: str) -> None:
+    """Validate judge type is supported.
 
     Args:
-        deepeval_name: DeepEval judge type name
+        judge_type: Judge type name
 
     Raises:
-        JudgeError: If deepeval_name not supported
+        JudgeError: If judge type not supported
     """
-    if deepeval_name not in SUPPORTED_DEEPEVAL_JUDGES:
+    if judge_type not in SUPPORTED_DEEPEVAL_JUDGES:
         supported_list = ", ".join(sorted(SUPPORTED_DEEPEVAL_JUDGES))
         raise JudgeError(
-            f"Unsupported deepeval judge: {deepeval_name} - "
+            f"Unsupported judge type: {judge_type} - "
             f"Supported judges: {supported_list}"
         )

@@ -8,11 +8,16 @@ from gavel_ai.core.config.agents import (
 )
 from gavel_ai.core.config.judges import (
     load_judge_config,
-    validate_deepeval_name,
     validate_judge_ids,
+    validate_judge_type,
 )
 from gavel_ai.core.config.loader import load_config
-from gavel_ai.core.config.models import AsyncConfig, EvalConfig, GEvalConfig, JudgeConfig
+from gavel_ai.core.config.models import (
+    AsyncConfig,
+    EvalConfig,
+    GEvalConfig,
+    JudgeConfig,
+)
 from gavel_ai.core.config.scenarios import (
     Scenario,
     ScenarioSet,
@@ -36,7 +41,7 @@ __all__ = [
     "GEvalConfig",
     "load_judge_config",
     "validate_judge_ids",
-    "validate_deepeval_name",
+    "validate_judge_type",
     "Scenario",
     "ScenarioSet",
     "load_scenarios",

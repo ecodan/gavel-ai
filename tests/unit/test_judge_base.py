@@ -77,38 +77,38 @@ class TestJudgeConfig:
     def test_judge_config_creation(self):
         """Test creating a valid JudgeConfig."""
         config = JudgeConfig(
-            judge_id="similarity",
-            judge_type="deepeval.similarity",
+            name="similarity",
+            type="deepeval.similarity",
             threshold=0.8,
             config={"model": "claude-3-5-sonnet"},
         )
 
-        assert config.judge_id == "similarity"
-        assert config.judge_type == "deepeval.similarity"
+        assert config.name == "similarity"
+        assert config.type == "deepeval.similarity"
         assert config.threshold == 0.8
         assert config.config == {"model": "claude-3-5-sonnet"}
 
     def test_judge_config_optional_fields(self):
         """Test that threshold and config are optional."""
         config = JudgeConfig(
-            judge_id="custom",
-            judge_type="custom",
+            name="custom",
+            type="custom",
         )
 
-        assert config.judge_id == "custom"
-        assert config.judge_type == "custom"
+        assert config.name == "custom"
+        assert config.type == "custom"
         assert config.threshold is None
-        assert config.config == {}
+        assert config.config is None
 
     def test_judge_config_extra_fields_ignored(self):
         """Test that extra fields are ignored (forward compatibility)."""
         config = JudgeConfig(
-            judge_id="test",
-            judge_type="test",
+            name="test",
+            type="test",
             unknown_field="ignored",
         )
 
-        assert config.judge_id == "test"
+        assert config.name == "test"
         assert not hasattr(config, "unknown_field")
 
 
@@ -158,7 +158,7 @@ class TestJudgeBaseClass:
 
     def test_judge_is_abstract(self):
         """Test that Judge cannot be instantiated directly."""
-        config = JudgeConfig(judge_id="test", judge_type="test")
+        config = JudgeConfig(name="test", type="test")
 
         with pytest.raises(TypeError) as exc_info:
             Judge(config)
@@ -171,7 +171,7 @@ class TestJudgeBaseClass:
         class IncompleteJudge(Judge):
             pass
 
-        config = JudgeConfig(judge_id="incomplete", judge_type="incomplete")
+        config = JudgeConfig(name="incomplete", type="incomplete")
 
         with pytest.raises(TypeError) as exc_info:
             IncompleteJudge(config)
@@ -193,7 +193,7 @@ class TestJudgeBaseClass:
                     evidence=f"Scenario: {scenario.id}, Output: {subject_output}",
                 )
 
-        config = JudgeConfig(judge_id="concrete", judge_type="test")
+        config = JudgeConfig(name="concrete", type="test")
         judge = ConcreteJudge(config)
 
         assert judge.config == config

@@ -65,15 +65,15 @@ So that I can define evaluation criteria without modifying code.
   "eval_type": "local",
   "judges": [
     {
-      "id": "similarity",
-      "deepeval_name": "deepeval.similarity",
+      "name": "similarity",
+      "type": "deepeval.similarity",
       "config": {
         "threshold": 0.8
       }
     },
     {
-      "id": "custom_accuracy",
-      "deepeval_name": "deepeval.geval",
+      "name": "custom_accuracy",
+      "type": "deepeval.geval",
       "config_ref": "judges/custom_accuracy.json"
     }
   ]
@@ -179,8 +179,8 @@ def load_judge_config(
     merged_config = {**(judge.config or {}), **external_config}
 
     return JudgeConfig(
-        id=judge.id,
-        deepeval_name=judge.deepeval_name,
+        name=judge.name,
+        type=judge.type,
         config=merged_config,
         config_ref=judge.config_ref,
     )
@@ -188,17 +188,17 @@ def load_judge_config(
 
 ### Judge Validation
 
-**Unique IDs:**
+**Unique Names:**
 ```python
 def validate_judge_ids(judges: list[JudgeConfig]) -> None:
-    """Validate judge IDs are unique."""
-    judge_ids = [j.id for j in judges]
-    duplicates = [id for id in judge_ids if judge_ids.count(id) > 1]
+    """Validate judge names are unique."""
+    judge_names = [j.name for j in judges]
+    duplicates = [name for name in judge_names if judge_names.count(name) > 1]
 
     if duplicates:
         raise JudgeError(
-            f"Duplicate judge IDs: {duplicates} - "
-            f"Each judge must have unique ID"
+            f"Duplicate judge names: {duplicates} - "
+            f"Each judge must have unique name"
         )
 ```
 
@@ -214,11 +214,11 @@ SUPPORTED_JUDGES = {
     "deepeval.geval",
 }
 
-def validate_judge_name(judge: JudgeConfig) -> None:
-    """Validate judge uses supported DeepEval name."""
-    if judge.deepeval_name not in SUPPORTED_JUDGES:
+def validate_judge_type(judge: JudgeConfig) -> None:
+    """Validate judge uses supported type."""
+    if judge.type not in SUPPORTED_JUDGES:
         raise JudgeError(
-            f"Unsupported judge '{judge.deepeval_name}' - "
+            f"Unsupported judge type '{judge.type}' - "
             f"Use one of: {', '.join(SUPPORTED_JUDGES)}"
         )
 ```
@@ -239,12 +239,12 @@ def validate_threshold(threshold: float) -> None:
 ```python
 def validate_geval_config(judge: JudgeConfig) -> None:
     """Validate GEval judge has required config."""
-    if judge.deepeval_name != "deepeval.geval":
+    if judge.type != "deepeval.geval":
         return
 
     if not judge.config:
         raise JudgeError(
-            f"GEval judge '{judge.id}' missing config - "
+            f"GEval judge '{judge.name}' missing config - "
             f"Add 'config' with criteria and evaluation_steps"
         )
 
@@ -253,7 +253,7 @@ def validate_geval_config(judge: JudgeConfig) -> None:
 
     if missing:
         raise JudgeError(
-            f"GEval judge '{judge.id}' missing required fields: {missing} - "
+            f"GEval judge '{judge.name}' missing required fields: {missing} - "
             f"Add {', '.join(missing)} to config"
         )
 
@@ -262,7 +262,7 @@ def validate_geval_config(judge: JudgeConfig) -> None:
         GEvalConfig.model_validate(judge.config)
     except ValidationError as e:
         raise JudgeError(
-            f"Invalid GEval config for judge '{judge.id}' - "
+            f"Invalid GEval config for judge '{judge.name}' - "
             f"Fix validation errors: {e}"
         )
 ```

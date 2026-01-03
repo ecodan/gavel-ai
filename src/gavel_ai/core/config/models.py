@@ -5,16 +5,23 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class JudgeConfig(BaseModel):
-    """Judge configuration for config file loading."""
+    """Judge configuration for both config files and runtime usage."""
 
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)  # Forward compatible
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    id: str = Field(..., description="Judge identifier")
-    deepeval_name: str = Field(..., description="DeepEval judge type (e.g., deepeval.geval)")
+    # Standard fields
+    name: str = Field(..., description="Judge identifier (e.g., 'similarity', 'custom_accuracy')")
+    type: str = Field(..., description="Judge type (e.g., 'deepeval.similarity', 'custom.my_judge')")
+
+    # Configuration fields
     config: Optional[Dict[str, Any]] = Field(None, description="Judge-specific config dict")
     config_ref: Optional[str] = Field(None, description="Reference to external config file")
     threshold: Optional[float] = Field(None, description="Judge threshold for pass/fail (0.0-1.0)")
     model: Optional[str] = Field(None, description="LLM model for judge evaluation")
+
+    # GEval-specific fields
+    criteria: Optional[str] = Field(None, description="Evaluation criteria (for GEval judges)")
+    evaluation_steps: Optional[List[str]] = Field(None, description="Evaluation steps (for GEval judges)")
 
 
 class ScenariosConfig(BaseModel):

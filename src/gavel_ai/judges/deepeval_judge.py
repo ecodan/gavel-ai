@@ -20,9 +20,8 @@ from deepeval.metrics import (
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from jinja2 import Template
 
-from gavel_ai.core.config.models import JudgeConfig
 from gavel_ai.core.exceptions import JudgeError
-from gavel_ai.core.models import JudgeResult, Scenario
+from gavel_ai.core.models import JudgeConfig, JudgeResult, Scenario
 from gavel_ai.judges.base import Judge
 from gavel_ai.telemetry import get_current_run_id
 
@@ -51,14 +50,14 @@ class DeepEvalJudge(Judge):
         Initialize DeepEval judge with configuration.
 
         Args:
-            config: JudgeConfig with deepeval_name matching a DeepEval metric
+            config: JudgeConfig with judge type matching a DeepEval metric
 
         Raises:
-            JudgeError: If deepeval_name is not supported
+            JudgeError: If judge type is not supported
         """
         super().__init__(config)
 
-        judge_type = config.deepeval_name
+        judge_type = config.type
         if not judge_type or judge_type not in self.JUDGE_TYPE_MAP:
             raise JudgeError(
                 f"Unsupported DeepEval judge type '{judge_type}' - "
@@ -79,8 +78,8 @@ class DeepEvalJudge(Judge):
             JudgeError: On metric creation failures
         """
         try:
-            judge_type = self.config.deepeval_name
-            judge_id = self.config.id
+            judge_type = self.config.type
+            judge_id = self.config.name
 
             metric_class = self.JUDGE_TYPE_MAP[judge_type]
 
@@ -139,7 +138,7 @@ class DeepEvalJudge(Judge):
             return metric_class(**kwargs)
 
         except Exception as e:
-            judge_type = self.config.deepeval_name
+            judge_type = self.config.type
             raise JudgeError(
                 f"Failed to create DeepEval metric '{judge_type}': {e} - "
                 f"Check judge configuration and API credentials"
@@ -162,8 +161,8 @@ class DeepEvalJudge(Judge):
             JudgeError: On evaluation failures
         """
         with self.tracer.start_as_current_span("judge.evaluate") as span:
-            judge_id = self.config.id
-            judge_type = self.config.deepeval_name
+            judge_id = self.config.name
+            judge_type = self.config.type
             run_id = get_current_run_id()
             if run_id:
                 span.set_attribute("run_id", run_id)
@@ -337,5 +336,5 @@ class DeepEvalJudge(Judge):
         if hasattr(self.metric, "score_breakdown"):
             return str(self.metric.score_breakdown)
 
-        judge_type = self.config.deepeval_name
+        judge_type = self.config.type
         return f"{judge_type} evaluation completed"

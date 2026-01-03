@@ -7,7 +7,7 @@ import pytest
 
 from gavel_ai.core.config.judges import (
     load_judge_config,
-    validate_deepeval_name,
+    validate_judge_type,
     validate_judge_ids,
 )
 from gavel_ai.core.config.models import EvalConfig, GEvalConfig, JudgeConfig
@@ -20,22 +20,22 @@ class TestJudgeConfigModel:
     def test_parse_basic_judge(self) -> None:
         """Test parsing basic judge configuration."""
         judge_data: Dict[str, Any] = {
-            "id": "similarity",
-            "deepeval_name": "deepeval.similarity",
+            "name": "similarity",
+            "type": "deepeval.similarity",
             "config": {"threshold": 0.8},
         }
 
         judge = JudgeConfig.model_validate(judge_data)
 
-        assert judge.id == "similarity"
-        assert judge.deepeval_name == "deepeval.similarity"
+        assert judge.name == "similarity"
+        assert judge.type == "deepeval.similarity"
         assert judge.config == {"threshold": 0.8}
 
     def test_parse_judge_with_config_ref(self) -> None:
         """Test parsing judge with external config reference."""
         judge_data: Dict[str, Any] = {
-            "id": "custom_accuracy",
-            "deepeval_name": "deepeval.geval",
+            "name": "custom_accuracy",
+            "type": "deepeval.geval",
             "config_ref": "judges/custom_accuracy.json",
         }
 
@@ -46,14 +46,14 @@ class TestJudgeConfigModel:
     def test_judge_config_has_extra_ignore(self) -> None:
         """Test that JudgeConfig ignores unknown fields."""
         judge_data: Dict[str, Any] = {
-            "id": "similarity",
-            "deepeval_name": "deepeval.similarity",
+            "name": "similarity",
+            "type": "deepeval.similarity",
             "future_field": "ignored",
         }
 
         judge = JudgeConfig.model_validate(judge_data)
 
-        assert judge.id == "similarity"
+        assert judge.name == "similarity"
         assert not hasattr(judge, "future_field")
 
 
@@ -114,8 +114,8 @@ class TestEvalConfigWithJudges:
             "output_dir": "runs/",
             "judges": [
                 {
-                    "id": "similarity",
-                    "deepeval_name": "deepeval.similarity",
+                    "name": "similarity",
+                    "type": "deepeval.similarity",
                     "config": {"threshold": 0.8},
                 }
             ],
@@ -125,7 +125,7 @@ class TestEvalConfigWithJudges:
 
         assert config.judges is not None
         assert len(config.judges) == 1
-        assert config.judges[0].id == "similarity"
+        assert config.judges[0].name == "similarity"
 
 
 class TestJudgeConfigLoading:
@@ -134,15 +134,15 @@ class TestJudgeConfigLoading:
     def test_load_judge_config_without_config_ref(self) -> None:
         """Test loading judge without external config reference."""
         judge = JudgeConfig(
-            id="similarity",
-            deepeval_name="deepeval.similarity",
+            name="similarity",
+            type="deepeval.similarity",
             config={"threshold": 0.8},
         )
 
         # Should return unchanged
         loaded = load_judge_config(judge, Path("."))
 
-        assert loaded.id == "similarity"
+        assert loaded.name == "similarity"
         assert loaded.config == {"threshold": 0.8}
 
     def test_load_judge_config_with_config_ref(self, tmp_path: Path) -> None:
@@ -164,8 +164,8 @@ class TestJudgeConfigLoading:
 
         # Create judge with config_ref
         judge = JudgeConfig(
-            id="custom",
-            deepeval_name="deepeval.geval",
+            name="custom",
+            type="deepeval.geval",
             config={"threshold": 0.5},  # Should be overridden
             config_ref="config/judges/custom.json",
         )
@@ -179,8 +179,8 @@ class TestJudgeConfigLoading:
     def test_load_judge_config_missing_file(self, tmp_path: Path) -> None:
         """Test that JudgeError is raised for missing config file."""
         judge = JudgeConfig(
-            id="custom",
-            deepeval_name="deepeval.geval",
+            name="custom",
+            type="deepeval.geval",
             config_ref="config/judges/nonexistent.json",
         )
 
@@ -194,20 +194,20 @@ class TestJudgeValidation:
     """Test suite for judge validation functions."""
 
     def test_validate_judge_ids_success(self) -> None:
-        """Test successful validation when judge IDs are unique."""
+        """Test successful validation when judge names are unique."""
         judges = [
-            JudgeConfig(id="similarity", deepeval_name="deepeval.similarity"),
-            JudgeConfig(id="faithfulness", deepeval_name="deepeval.faithfulness"),
+            JudgeConfig(name="similarity", type="deepeval.similarity"),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
 
         # Should not raise exception
         validate_judge_ids(judges)
 
     def test_validate_judge_ids_duplicate(self) -> None:
-        """Test that JudgeError is raised for duplicate IDs."""
+        """Test that JudgeError is raised for duplicate names."""
         judges = [
-            JudgeConfig(id="similarity", deepeval_name="deepeval.similarity"),
-            JudgeConfig(id="similarity", deepeval_name="deepeval.similarity"),  # Duplicate
+            JudgeConfig(name="similarity", type="deepeval.similarity"),
+            JudgeConfig(name="similarity", type="deepeval.similarity"),  # Duplicate
         ]
 
         with pytest.raises(JudgeError) as exc_info:
@@ -217,7 +217,7 @@ class TestJudgeValidation:
         assert "duplicate" in error_msg.lower() or "unique" in error_msg.lower()
 
     def test_validate_deepeval_name_supported(self) -> None:
-        """Test validation of supported DeepEval judge types."""
+        """Test validation of supported judge types."""
         supported_names = [
             "deepeval.similarity",
             "deepeval.faithfulness",
@@ -230,12 +230,12 @@ class TestJudgeValidation:
 
         for name in supported_names:
             # Should not raise exception
-            validate_deepeval_name(name)
+            validate_judge_type(name)
 
     def test_validate_deepeval_name_unsupported(self) -> None:
         """Test that JudgeError is raised for unsupported judge types."""
         with pytest.raises(JudgeError) as exc_info:
-            validate_deepeval_name("deepeval.invalid_judge")
+            validate_judge_type("deepeval.invalid_judge")
 
         error_msg = str(exc_info.value)
         assert "unsupported" in error_msg.lower() or "invalid" in error_msg.lower()
@@ -247,41 +247,41 @@ class TestDeepEvalJudgeTypes:
     def test_similarity_judge(self) -> None:
         """Test similarity judge configuration."""
         judge = JudgeConfig(
-            id="similarity",
-            deepeval_name="deepeval.similarity",
+            name="similarity",
+            type="deepeval.similarity",
             config={"threshold": 0.8},
         )
 
-        validate_deepeval_name(judge.deepeval_name)
-        assert judge.deepeval_name == "deepeval.similarity"
+        validate_judge_type(judge.type)
+        assert judge.type == "deepeval.similarity"
 
     def test_faithfulness_judge(self) -> None:
         """Test faithfulness judge configuration."""
         judge = JudgeConfig(
-            id="faithfulness",
-            deepeval_name="deepeval.faithfulness",
+            name="faithfulness",
+            type="deepeval.faithfulness",
             config={"threshold": 0.7},
         )
 
-        validate_deepeval_name(judge.deepeval_name)
-        assert judge.deepeval_name == "deepeval.faithfulness"
+        validate_judge_type(judge.type)
+        assert judge.type == "deepeval.faithfulness"
 
     def test_hallucination_judge(self) -> None:
         """Test hallucination judge configuration."""
         judge = JudgeConfig(
-            id="hallucination",
-            deepeval_name="deepeval.hallucination",
+            name="hallucination",
+            type="deepeval.hallucination",
             config={"threshold": 0.9},
         )
 
-        validate_deepeval_name(judge.deepeval_name)
-        assert judge.deepeval_name == "deepeval.hallucination"
+        validate_judge_type(judge.type)
+        assert judge.type == "deepeval.hallucination"
 
     def test_geval_custom_judge(self) -> None:
         """Test custom GEval judge configuration."""
         judge = JudgeConfig(
-            id="custom_accuracy",
-            deepeval_name="deepeval.geval",
+            name="custom_accuracy",
+            type="deepeval.geval",
             config={
                 "criteria": "Technical accuracy",
                 "evaluation_steps": ["Check facts", "Verify code"],
@@ -290,5 +290,5 @@ class TestDeepEvalJudgeTypes:
             },
         )
 
-        validate_deepeval_name(judge.deepeval_name)
-        assert judge.deepeval_name == "deepeval.geval"
+        validate_judge_type(judge.type)
+        assert judge.type == "deepeval.geval"

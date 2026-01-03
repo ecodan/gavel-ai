@@ -89,7 +89,7 @@ class TestReJudgeBasics:
         """Test initializing ReJudge engine."""
         configs = [
             JudgeConfig(
-                judge_id="faithfulness", judge_type="deepeval.faithfulness"
+                name="faithfulness", type="deepeval.faithfulness"
             ),
         ]
 
@@ -105,7 +105,7 @@ class TestReJudgeBasics:
         """Test re-judging with no existing results."""
         configs = [
             JudgeConfig(
-                judge_id="faithfulness", judge_type="deepeval.faithfulness"
+                name="faithfulness", type="deepeval.faithfulness"
             ),
         ]
 
@@ -138,7 +138,7 @@ class TestReJudgeAll:
         # Re-judge with new judge
         configs = [
             JudgeConfig(
-                judge_id="faithfulness", judge_type="deepeval.faithfulness"
+                name="faithfulness", type="deepeval.faithfulness"
             ),
         ]
         rejudge = ReJudge(temp_results_file, configs)
@@ -176,7 +176,7 @@ class TestReJudgeAll:
         # Re-judge with same judge (should update)
         configs = [
             JudgeConfig(
-                judge_id="relevancy", judge_type="deepeval.answer_relevancy"
+                name="relevancy", type="deepeval.answer_relevancy"
             ),
         ]
         rejudge = ReJudge(temp_results_file, configs)
@@ -207,7 +207,7 @@ class TestReJudgeAll:
         # Re-judge with new judge, not preserving old
         configs = [
             JudgeConfig(
-                judge_id="faithfulness", judge_type="deepeval.faithfulness"
+                name="faithfulness", type="deepeval.faithfulness"
             ),
         ]
         rejudge = ReJudge(temp_results_file, configs)
@@ -238,7 +238,7 @@ class TestReJudgeAll:
         # Re-judge
         configs = [
             JudgeConfig(
-                judge_id="faithfulness", judge_type="deepeval.faithfulness"
+                name="faithfulness", type="deepeval.faithfulness"
             ),
         ]
         rejudge = ReJudge(temp_results_file, configs)
@@ -274,7 +274,7 @@ class TestReJudgeFiltering:
         # Re-judge only scenario-1
         configs = [
             JudgeConfig(
-                judge_id="faithfulness", judge_type="deepeval.faithfulness"
+                name="faithfulness", type="deepeval.faithfulness"
             ),
         ]
         rejudge = ReJudge(temp_results_file, configs)
@@ -305,7 +305,7 @@ class TestReJudgeFiltering:
         # Re-judge only claude-sonnet variant
         configs = [
             JudgeConfig(
-                judge_id="faithfulness", judge_type="deepeval.faithfulness"
+                name="faithfulness", type="deepeval.faithfulness"
             ),
         ]
         rejudge = ReJudge(temp_results_file, configs)
@@ -331,7 +331,7 @@ class TestReJudgeFiltering:
         # Re-judge non-existent scenario
         configs = [
             JudgeConfig(
-                judge_id="faithfulness", judge_type="deepeval.faithfulness"
+                name="faithfulness", type="deepeval.faithfulness"
             ),
         ]
         rejudge = ReJudge(temp_results_file, configs)
@@ -367,11 +367,11 @@ class TestReJudgeMultipleJudges:
         # Re-judge with two new judges
         configs = [
             JudgeConfig(
-                judge_id="faithfulness", judge_type="deepeval.faithfulness"
+                name="faithfulness", type="deepeval.faithfulness"
             ),
             JudgeConfig(
-                judge_id="quality",
-                judge_type="deepeval.geval",
+                name="quality",
+                type="deepeval.geval",
                 config={
                     "name": "quality",
                     "criteria": "Quality",

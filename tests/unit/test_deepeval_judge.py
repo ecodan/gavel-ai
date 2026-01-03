@@ -13,9 +13,8 @@ from unittest.mock import MagicMock
 import pytest
 from deepeval.test_case import LLMTestCaseParams
 
-from gavel_ai.core.config.models import JudgeConfig
 from gavel_ai.core.exceptions import JudgeError
-from gavel_ai.core.models import JudgeResult, Scenario
+from gavel_ai.core.models import JudgeConfig, JudgeResult, Scenario
 from gavel_ai.judges.deepeval_judge import DeepEvalJudge
 
 
@@ -23,8 +22,8 @@ from gavel_ai.judges.deepeval_judge import DeepEvalJudge
 def answer_relevancy_config():
     """Create config for answer relevancy judge."""
     return JudgeConfig(
-        id="relevancy",
-        deepeval_name="deepeval.answer_relevancy",
+        name="relevancy",
+        type="deepeval.answer_relevancy",
         threshold=0.7,
         config={"model": "gpt-4"},
     )
@@ -34,8 +33,8 @@ def answer_relevancy_config():
 def faithfulness_config():
     """Create config for faithfulness judge."""
     return JudgeConfig(
-        id="faithfulness",
-        deepeval_name="deepeval.faithfulness",
+        name="faithfulness",
+        type="deepeval.faithfulness",
         threshold=0.8,
     )
 
@@ -44,8 +43,8 @@ def faithfulness_config():
 def geval_config():
     """Create config for GEval judge."""
     return JudgeConfig(
-        id="custom",
-        deepeval_name="deepeval.geval",
+        name="custom",
+        type="deepeval.geval",
         threshold=0.7,
         config={
             "name": "custom_quality",
@@ -60,8 +59,8 @@ def geval_config():
 def geval_config_with_template():
     """Create config for GEval judge with expected_output_template."""
     return JudgeConfig(
-        id="custom_template",
-        deepeval_name="deepeval.geval",
+        name="custom_template",
+        type="deepeval.geval",
         threshold=0.7,
         config={
             "name": "template_quality",
@@ -135,8 +134,8 @@ class TestDeepEvalJudgeInitialization:
     def test_unsupported_judge_type_raises_error(self, mock_deepeval_metrics):
         """Test that unsupported judge type raises JudgeError."""
         config = JudgeConfig(
-            id="unsupported",
-            deepeval_name="deepeval.unknown",
+            name="unsupported",
+            type="deepeval.unknown",
         )
 
         with pytest.raises(JudgeError) as exc_info:

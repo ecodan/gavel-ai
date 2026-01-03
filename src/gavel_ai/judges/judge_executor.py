@@ -62,7 +62,7 @@ class JudgeExecutor:
                 self.judges.append(judge)
             except Exception as e:
                 raise JudgeError(
-                    f"Failed to create judge '{config.id}' of type '{config.deepeval_name}': {e}"
+                    f"Failed to create judge '{config.name}' of type '{config.type}': {e}"
                 ) from e
 
     async def execute(
@@ -104,7 +104,7 @@ class JudgeExecutor:
             for judge in self.judges:
                 try:
                     logger.info(
-                        f"Executing judge '{judge.config.id}' for scenario '{scenario.id}'"
+                        f"Executing judge '{judge.config.name}' for scenario '{scenario.id}'"
                     )
 
                     # Evaluate with the judge
@@ -112,7 +112,7 @@ class JudgeExecutor:
 
                     # Store evaluation
                     evaluation = JudgeEvaluation(
-                        judge_id=judge.config.id,
+                        judge_id=judge.config.name,
                         score=result.score,
                         reasoning=result.reasoning,
                         evidence=result.evidence,
@@ -120,11 +120,11 @@ class JudgeExecutor:
                     judge_evaluations.append(evaluation)
 
                     logger.info(
-                        f"Judge '{judge.config.id}' scored {result.score}/10 for scenario '{scenario.id}'"
+                        f"Judge '{judge.config.name}' scored {result.score}/10 for scenario '{scenario.id}'"
                     )
 
                 except Exception as e:
-                    error_msg = f"Judge '{judge.config.id}' failed for scenario '{scenario.id}': {e}"
+                    error_msg = f"Judge '{judge.config.name}' failed for scenario '{scenario.id}': {e}"
 
                     if self.error_handling == "fail_fast":
                         logger.error(error_msg)

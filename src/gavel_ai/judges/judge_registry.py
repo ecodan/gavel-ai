@@ -7,8 +7,8 @@ Per Epic 4 Story 4.4: Registry pattern for pluggable judge discovery.
 
 from typing import Dict, Type
 
-from gavel_ai.core.config.models import JudgeConfig
 from gavel_ai.core.exceptions import JudgeError
+from gavel_ai.core.models import JudgeConfig
 from gavel_ai.judges.base import Judge
 
 
@@ -55,7 +55,7 @@ class JudgeRegistry:
         Raises:
             JudgeError: If judge type is not found in registry
         """
-        judge_type = config.deepeval_name
+        judge_type = config.type
 
         if judge_type not in cls._registry:
             available = ", ".join(sorted(cls._registry.keys()))

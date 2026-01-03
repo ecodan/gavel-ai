@@ -103,8 +103,8 @@ class TestJudgeRegistryFactory:
     def test_create_judge_not_found(self, mock_deepeval_metrics):
         """Test creating judge with unknown type raises helpful error."""
         config = JudgeConfig(
-            judge_id="unknown",
-            judge_type="unknown.type",
+            name="unknown",
+            type="unknown.type",
         )
 
         with pytest.raises(JudgeError) as exc_info:
@@ -118,8 +118,8 @@ class TestJudgeRegistryFactory:
     def test_create_judge_from_registry(self, mock_deepeval_metrics):
         """Test creating judge from registry."""
         config = JudgeConfig(
-            judge_id="relevancy",
-            judge_type="deepeval.answer_relevancy",
+            name="relevancy",
+            type="deepeval.answer_relevancy",
             threshold=0.7,
         )
 
@@ -132,12 +132,12 @@ class TestJudgeRegistryFactory:
         """Test creating different judge types from registry."""
         configs = [
             JudgeConfig(
-                judge_id="relevancy", judge_type="deepeval.answer_relevancy"
+                name="relevancy", type="deepeval.answer_relevancy"
             ),
             JudgeConfig(
-                judge_id="faithfulness", judge_type="deepeval.faithfulness"
+                name="faithfulness", type="deepeval.faithfulness"
             ),
-            JudgeConfig(judge_id="geval", judge_type="deepeval.geval"),
+            JudgeConfig(name="geval", type="deepeval.geval"),
         ]
 
         judges = [JudgeRegistry.create(config) for config in configs]
@@ -162,11 +162,11 @@ class TestJudgeRegistryAutoRegistration:
     def test_auto_registered_judges_are_deepeval(self, mock_deepeval_metrics):
         """Test that auto-registered judges create DeepEvalJudge instances."""
         config = JudgeConfig(
-            judge_id="test",
-            judge_type="deepeval.faithfulness",
+            name="test",
+            type="deepeval.faithfulness",
         )
 
         judge = JudgeRegistry.create(config)
 
         assert isinstance(judge, DeepEvalJudge)
-        assert judge.config.judge_type == "deepeval.faithfulness"
+        assert judge.config.type == "deepeval.faithfulness"

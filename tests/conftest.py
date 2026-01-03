@@ -55,8 +55,8 @@ def sample_eval_config() -> Dict[str, Any]:
         },
         "judge_config": [
             {
-                "judge_id": "test_judge",
-                "judge_type": "deepeval.similarity",
+                "name": "test_judge",
+                "type": "deepeval.similarity",
             }
         ],
     }

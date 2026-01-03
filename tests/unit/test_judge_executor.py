@@ -21,9 +21,9 @@ class TestJudgeExecutorInitialization:
         """Test creating executor with valid judge configs."""
         configs = [
             JudgeConfig(
-                judge_id="relevancy", judge_type="deepeval.answer_relevancy"
+                name="relevancy", type="deepeval.answer_relevancy"
             ),
-            JudgeConfig(judge_id="faithfulness", judge_type="deepeval.faithfulness"),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
 
         executor = JudgeExecutor(configs)
@@ -36,7 +36,7 @@ class TestJudgeExecutorInitialization:
     ):
         """Test creating executor with custom error handling."""
         configs = [
-            JudgeConfig(judge_id="test", judge_type="deepeval.answer_relevancy"),
+            JudgeConfig(name="test", type="deepeval.answer_relevancy"),
         ]
 
         executor = JudgeExecutor(configs, error_handling="continue_on_error")
@@ -55,7 +55,7 @@ class TestJudgeExecutorInitialization:
     ):
         """Test that invalid judge config raises error during initialization."""
         configs = [
-            JudgeConfig(judge_id="invalid", judge_type="invalid.type"),
+            JudgeConfig(name="invalid", type="invalid.type"),
         ]
 
         with pytest.raises(JudgeError) as exc_info:
@@ -78,7 +78,7 @@ class TestJudgeExecutorSingleExecution:
 
         # Create executor
         config = JudgeConfig(
-            judge_id="relevancy", judge_type="deepeval.answer_relevancy"
+            name="relevancy", type="deepeval.answer_relevancy"
         )
         executor = JudgeExecutor([config])
 
@@ -123,9 +123,9 @@ class TestJudgeExecutorSingleExecution:
         # Create executor with two judges
         configs = [
             JudgeConfig(
-                judge_id="relevancy", judge_type="deepeval.answer_relevancy"
+                name="relevancy", type="deepeval.answer_relevancy"
             ),
-            JudgeConfig(judge_id="faithfulness", judge_type="deepeval.faithfulness"),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         executor = JudgeExecutor(configs)
 
@@ -159,7 +159,7 @@ class TestJudgeExecutorSingleExecution:
         mock_metric.reason = "Okay"
 
         config = JudgeConfig(
-            judge_id="test", judge_type="deepeval.answer_relevancy"
+            name="test", type="deepeval.answer_relevancy"
         )
         executor = JudgeExecutor([config])
 
@@ -181,7 +181,7 @@ class TestJudgeExecutorSingleExecution:
         mock_metric.reason = "Okay"
 
         config = JudgeConfig(
-            judge_id="test", judge_type="deepeval.answer_relevancy"
+            name="test", type="deepeval.answer_relevancy"
         )
         executor = JudgeExecutor([config])
 
@@ -214,9 +214,9 @@ class TestJudgeExecutorErrorHandling:
 
         configs = [
             JudgeConfig(
-                judge_id="relevancy", judge_type="deepeval.answer_relevancy"
+                name="relevancy", type="deepeval.answer_relevancy"
             ),
-            JudgeConfig(judge_id="faithfulness", judge_type="deepeval.faithfulness"),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         executor = JudgeExecutor(configs, error_handling="fail_fast")
 
@@ -247,9 +247,9 @@ class TestJudgeExecutorErrorHandling:
 
         configs = [
             JudgeConfig(
-                judge_id="relevancy", judge_type="deepeval.answer_relevancy"
+                name="relevancy", type="deepeval.answer_relevancy"
             ),
-            JudgeConfig(judge_id="faithfulness", judge_type="deepeval.faithfulness"),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         executor = JudgeExecutor(configs, error_handling="continue_on_error")
 
@@ -278,7 +278,7 @@ class TestJudgeExecutorBatchExecution:
         mock_metric.reason = "Good"
 
         config = JudgeConfig(
-            judge_id="test", judge_type="deepeval.answer_relevancy"
+            name="test", type="deepeval.answer_relevancy"
         )
         executor = JudgeExecutor([config])
 
@@ -320,7 +320,7 @@ class TestJudgeExecutorBatchExecution:
         mock_metric.reason = "Okay"
 
         config = JudgeConfig(
-            judge_id="test", judge_type="deepeval.answer_relevancy"
+            name="test", type="deepeval.answer_relevancy"
         )
         executor = JudgeExecutor([config])
 
