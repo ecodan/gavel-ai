@@ -106,33 +106,33 @@ def run(
 
     # Configure telemetry export for this run
     telemetry_path = configure_run_telemetry(run_id=run_id, eval_name=eval, base_dir=".gavel")
-    run_logger.info(f"Telemetry export configured: {telemetry_path}")
+    run_logger.debug(f"Telemetry export configured: {telemetry_path}")
 
     # Initialize metadata collector and record run start
     metadata_collector = get_metadata_collector()
     metadata_collector.record_run_start()
-    run_logger.info("Metadata collector initialized and run start recorded")
+    run_logger.debug("Metadata collector initialized and run start recorded")
 
     try:
         with tracer.start_as_current_span("cli.oneshot.run") as span:
             # 1. Load configs
             typer.echo(f"Running evaluation '{eval}'")
-            run_logger.info(f"Loading configuration for evaluation '{eval}'")
+            run_logger.debug(f"Loading configuration for evaluation '{eval}'")
 
             loader = ConfigLoader(Path(DEFAULT_EVAL_ROOT), eval)
 
-            run_logger.info("Loading eval_config.json")
+            run_logger.debug("Loading eval_config.json")
             eval_config = loader.load_eval_config()
 
             # Async config is now nested in eval_config
             async_config = eval_config.async_config
 
-            run_logger.info("Loading agents.json")
+            run_logger.debug("Loading agents.json")
             agents_config = loader.load_agents_config()
 
-            run_logger.info("Loading scenarios")
+            run_logger.debug("Loading scenarios")
             scenarios_list = loader.load_scenarios()
-            run_logger.info(f"Loaded {len(scenarios_list)} scenarios")
+            run_logger.debug(f"Loaded {len(scenarios_list)} scenarios")
 
             typer.echo(f"✓ Loaded {len(scenarios_list)} scenarios")
 
@@ -157,7 +157,7 @@ def run(
             source_config_dir = Path(DEFAULT_EVAL_ROOT) / eval / "config"
             dest_config_dir = run_obj.run_dir / "config"
             if source_config_dir.exists():
-                run_logger.info(f"Copying config directory to {dest_config_dir}")
+                run_logger.debug(f"Copying config directory to {dest_config_dir}")
                 shutil.copytree(source_config_dir, dest_config_dir, dirs_exist_ok=True)
                 typer.echo(f"✓ Copied evaluation configs to run directory")
             else:
@@ -210,7 +210,7 @@ def run(
                 )
 
             typer.echo(f"✓ Initialized {processor_type} processor")
-            run_logger.info(f"Initialized {processor_type} processor")
+            run_logger.debug(f"Initialized {processor_type} processor")
 
             # 4. Convert scenarios to inputs
             inputs = [
@@ -224,7 +224,7 @@ def run(
 
             # 5. Execute scenarios
             typer.echo(f"Executing {len(inputs)} scenarios...")
-            run_logger.info(f"Executing {len(inputs)} scenarios with {async_config.num_workers} workers")
+            run_logger.info(f"Processing {len(inputs)} scenarios with test_subject={test_subject}, variant_id={model_variant}")
 
             executor = Executor(
                 processor=processor,
@@ -233,7 +233,7 @@ def run(
             )
 
             processor_results = asyncio.run(executor.execute(inputs))
-            run_logger.info(f"Completed execution of {len(processor_results)} scenarios")
+            run_logger.debug(f"Completed execution of {len(processor_results)} scenarios")
             typer.echo(f"✓ Executed {len(processor_results)} scenarios")
 
             # 6. Execute judges (if configured)
@@ -247,7 +247,7 @@ def run(
             if judges_list:
                 typer.echo(f"Running {len(judges_list)} judges...")
                 run_logger.info(
-                    f"Running {len(judges_list)} judges on {len(processor_results)} results"
+                    f"Judging {len(processor_results)} results with {len(judges_list)} judges"
                 )
 
                 judge_executor = JudgeExecutor(
@@ -257,7 +257,7 @@ def run(
 
                 # Execute judges on each result
                 evaluation_results = []
-                for scenario, proc_result in zip(scenarios_list, processor_results, strict=True):
+                for idx, (scenario, proc_result) in enumerate(zip(scenarios_list, processor_results, strict=True), 1):
                     eval_result = asyncio.run(
                         judge_executor.execute(
                             scenario=scenario,
@@ -267,12 +267,13 @@ def run(
                         )
                     )
                     evaluation_results.append(eval_result)
+                    run_logger.info(f"Judged scenario {idx}/{len(scenarios_list)} with test_subject={test_subject}, variant_id=subject_agent")
 
-                run_logger.info(f"Completed judging {len(evaluation_results)} results")
+                run_logger.debug(f"Completed judging {len(evaluation_results)} results")
                 typer.echo("✓ Completed judging")
             else:
                 evaluation_results = []
-                run_logger.info("No judges configured - skipping judging")
+                run_logger.debug("No judges configured - skipping judging")
                 typer.echo("⚠ No judges configured - skipping judging")
 
             # 7. Store results (two-file design: results_raw.jsonl and results_judged.jsonl)
@@ -281,7 +282,7 @@ def run(
             exporter = ResultsExporter(run_obj.run_dir, processor_type=eval_config.processor_type)
 
             # Export raw processor results (immutable)
-            run_logger.info(f"Exporting {len(processor_results)} processor results to results_raw.jsonl")
+            run_logger.debug(f"Exporting {len(processor_results)} processor results to results_raw.jsonl")
             raw_results_file = exporter.export_raw_results(
                 scenarios_list,
                 processor_results,
@@ -291,7 +292,7 @@ def run(
             typer.echo(f"✓ Exported raw results to {raw_results_file.name}")
 
             # Export judged results (mutable)
-            run_logger.info(f"Exporting {len(processor_results)} judged results to results_judged.jsonl")
+            run_logger.debug(f"Exporting {len(processor_results)} judged results to results_judged.jsonl")
             judged_results_file = exporter.export_judged_results(
                 scenarios=scenarios_list,
                 processor_results=processor_results,
@@ -345,25 +346,25 @@ def run(
 
                 with open(manifest_file, "w", encoding="utf-8") as f:
                     json.dump(manifest_data, f, indent=2)
-                run_logger.info(f"Manifest saved to {manifest_file}")
+                run_logger.debug(f"Manifest saved to {manifest_file}")
                 typer.echo(f"✓ Generated manifest with config hash")
             except FileNotFoundError as e:
                 run_logger.warning(f"Could not compute config hash: {e}")
 
             # 8. Record run end and compute metadata (BEFORE report generation)
-            run_logger.info("Recording run end and computing metadata statistics")
+            run_logger.debug("Recording run end and computing metadata statistics")
             metadata_collector.record_run_end()
             run_metadata_stats = metadata_collector.compute_statistics(
                 run_id=run_id,
                 eval_name=eval,
             )
-            run_logger.info(f"Metadata computed - {run_metadata_stats.scenario_timing.count} scenarios processed")
+            run_logger.debug(f"Metadata computed - {run_metadata_stats.scenario_timing.count} scenarios processed")
 
             # Save metadata to file
             metadata_file = run_obj.run_dir / "run_metadata.json"
             with open(metadata_file, "w", encoding="utf-8") as f:
                 f.write(run_metadata_stats.model_dump_json(indent=2))
-            run_logger.info(f"Run metadata saved to {metadata_file}")
+            run_logger.debug(f"Run metadata saved to {metadata_file}")
             typer.echo(f"✓ Saved run metadata to {metadata_file}")
 
             # 9. Generate report (AFTER metadata is computed and saved)
@@ -390,17 +391,17 @@ def run(
                 "llm_calls": run_metadata_stats.llm_calls.model_dump(),
             }
 
-            run_logger.info(f"Generating report to {report_path}")
+            run_logger.debug(f"Generating report to {report_path}")
             report_content = asyncio.run(reporter.generate(run_obj, "oneshot.html"))
             with open(report_path, "w", encoding="utf-8") as f:
                 f.write(report_content)
-            run_logger.info(f"Successfully generated report: {report_path}")
+            run_logger.debug(f"Successfully generated report: {report_path}")
             typer.echo(f"✓ Generated report: {report_path}")
 
             # 10. Save run
-            run_logger.info("Saving run manifest")
+            run_logger.debug("Saving run manifest")
             asyncio.run(run_obj.save())
-            run_logger.info("Run saved successfully")
+            run_logger.debug("Run saved successfully")
 
             # Calculate duration
             duration = time.time() - start_time
@@ -434,7 +435,7 @@ def run(
         # Always reset telemetry and metadata after run completes (success or failure)
         reset_telemetry()
         reset_metadata_collector()
-        run_logger.info("Telemetry and metadata collector reset after run completion")
+        run_logger.debug("Telemetry and metadata collector reset after run completion")
 
 
 @app.command()

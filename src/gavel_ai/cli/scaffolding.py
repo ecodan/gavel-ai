@@ -50,15 +50,17 @@ def generate_eval_config(eval_root: Path, eval_name: str, eval_type: str) -> Non
                 "prompt_name": "default",
                 "judges": [
                     {
-                        "name": "quality",
-                        "type": "deepeval.geval",
-                        "model": "gpt-4",
-                        "criteria": "Evaluate the quality and accuracy of the response",
-                        "evaluation_steps": [
-                            "Check if the response is accurate",
-                            "Verify completeness of answer",
-                            "Assess clarity and usefulness",
-                        ],
+                        "id": "quality",
+                        "deepeval_name": "deepeval.geval",
+                        "config": {
+                            "model": "gpt-4",
+                            "criteria": "Evaluate the quality and accuracy of the response",
+                            "evaluation_steps": [
+                                "Check if the response is accurate",
+                                "Verify completeness of answer",
+                                "Assess clarity and usefulness",
+                            ],
+                        },
                     }
                 ],
             }
