@@ -17,10 +17,11 @@ from deepeval.metrics import (
     GEval,
     HallucinationMetric,
 )
-from deepeval.test_case import LLMTestCase
+from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 
+from gavel_ai.core.config.models import JudgeConfig
 from gavel_ai.core.exceptions import JudgeError
-from gavel_ai.core.models import JudgeConfig, JudgeResult, Scenario
+from gavel_ai.core.models import JudgeResult, Scenario
 from gavel_ai.judges.base import Judge
 from gavel_ai.telemetry import get_current_run_id
 
@@ -49,15 +50,14 @@ class DeepEvalJudge(Judge):
         Initialize DeepEval judge with configuration.
 
         Args:
-            config: JudgeConfig with judge_type matching a DeepEval metric
+            config: JudgeConfig with deepeval_name matching a DeepEval metric
 
         Raises:
-            JudgeError: If judge_type is not supported
+            JudgeError: If deepeval_name is not supported
         """
         super().__init__(config)
 
-        # Get judge_type from either new or old field
-        judge_type = config.type or config.judge_type
+        judge_type = config.deepeval_name
         if not judge_type or judge_type not in self.JUDGE_TYPE_MAP:
             raise JudgeError(
                 f"Unsupported DeepEval judge type '{judge_type}' - "
@@ -78,51 +78,67 @@ class DeepEvalJudge(Judge):
             JudgeError: On metric creation failures
         """
         try:
-            # Get judge_type from either new or old field
-            judge_type = self.config.type or self.config.judge_type
-            judge_id = self.config.name or self.config.judge_id
+            judge_type = self.config.deepeval_name
+            judge_id = self.config.id
 
             metric_class = self.JUDGE_TYPE_MAP[judge_type]
 
-            # Extract metric-specific config (backward compatible with both old and new schema)
+            # Extract metric-specific config from nested config dict
             metric_config = self.config.config.copy() if self.config.config else {}
 
             # Handle GEval separately (different constructor)
             if judge_type == "deepeval.geval":
-                # GEval requires name, criteria, evaluation_steps via evaluation_params
-                # Support both new schema (fields on JudgeConfig) and old schema (fields in config)
-                criteria = self.config.criteria or metric_config.get(
+                # GEval requires name, criteria, evaluation_steps, evaluation_params
+                # Get from nested config dict
+                criteria = metric_config.get(
                     "criteria", "Evaluate the quality of the response"
                 )
-                evaluation_steps = self.config.evaluation_steps or metric_config.get(
+                evaluation_steps = metric_config.get(
                     "evaluation_steps",
                     [
                         "Check if the response answers the question",
                         "Evaluate the clarity and accuracy",
                     ],
                 )
-                evaluation_params = [criteria] + (evaluation_steps if evaluation_steps else [])
+                # evaluation_params must be LLMTestCaseParams enum values (not strings)
+                evaluation_params = [
+                    LLMTestCaseParams.INPUT,
+                    LLMTestCaseParams.ACTUAL_OUTPUT,
+                    LLMTestCaseParams.EXPECTED_OUTPUT,
+                ]
+                # Use threshold from config dict, then fall back to top-level threshold
+                threshold = (
+                    metric_config.get("threshold")
+                    or self.config.threshold
+                    or 0.5
+                )
 
                 return metric_class(
                     name=metric_config.get("name", judge_id),
                     criteria=criteria,
                     evaluation_steps=evaluation_steps,
                     evaluation_params=evaluation_params,
-                    model=metric_config.get("model") or self.config.model or "gpt-4",
-                    threshold=self.config.threshold or 0.5,
+                    model=metric_config.get("model", "gpt-4"),
+                    threshold=threshold,
                 )
 
             # For other judges, pass threshold and model if provided
             kwargs = {}
-            if self.config.threshold is not None:
+            # Check both metric_config and top-level config for threshold/model
+            if metric_config.get("threshold") is not None:
+                kwargs["threshold"] = metric_config["threshold"]
+            elif self.config.threshold is not None:
                 kwargs["threshold"] = self.config.threshold
-            if "model" in metric_config:
+
+            if metric_config.get("model"):
                 kwargs["model"] = metric_config["model"]
+            elif self.config.model:
+                kwargs["model"] = self.config.model
 
             return metric_class(**kwargs)
 
         except Exception as e:
-            judge_type = self.config.type or self.config.judge_type
+            judge_type = self.config.deepeval_name
             raise JudgeError(
                 f"Failed to create DeepEval metric '{judge_type}': {e} - "
                 f"Check judge configuration and API credentials"
@@ -145,8 +161,8 @@ class DeepEvalJudge(Judge):
             JudgeError: On evaluation failures
         """
         with self.tracer.start_as_current_span("judge.evaluate") as span:
-            judge_id = self.config.name or self.config.judge_id
-            judge_type = self.config.type or self.config.judge_type
+            judge_id = self.config.id
+            judge_type = self.config.deepeval_name
             run_id = get_current_run_id()
             if run_id:
                 span.set_attribute("run_id", run_id)
@@ -259,5 +275,5 @@ class DeepEvalJudge(Judge):
         if hasattr(self.metric, "score_breakdown"):
             return str(self.metric.score_breakdown)
 
-        judge_type = self.config.type or self.config.judge_type
+        judge_type = self.config.deepeval_name
         return f"{judge_type} evaluation completed"

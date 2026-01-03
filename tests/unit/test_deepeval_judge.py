@@ -11,9 +11,11 @@ Tests Story 4.2 acceptance criteria:
 from unittest.mock import MagicMock
 
 import pytest
+from deepeval.test_case import LLMTestCaseParams
 
+from gavel_ai.core.config.models import JudgeConfig
 from gavel_ai.core.exceptions import JudgeError
-from gavel_ai.core.models import JudgeConfig, JudgeResult, Scenario
+from gavel_ai.core.models import JudgeResult, Scenario
 from gavel_ai.judges.deepeval_judge import DeepEvalJudge
 
 
@@ -21,8 +23,8 @@ from gavel_ai.judges.deepeval_judge import DeepEvalJudge
 def answer_relevancy_config():
     """Create config for answer relevancy judge."""
     return JudgeConfig(
-        judge_id="relevancy",
-        judge_type="deepeval.answer_relevancy",
+        id="relevancy",
+        deepeval_name="deepeval.answer_relevancy",
         threshold=0.7,
         config={"model": "gpt-4"},
     )
@@ -32,8 +34,8 @@ def answer_relevancy_config():
 def faithfulness_config():
     """Create config for faithfulness judge."""
     return JudgeConfig(
-        judge_id="faithfulness",
-        judge_type="deepeval.faithfulness",
+        id="faithfulness",
+        deepeval_name="deepeval.faithfulness",
         threshold=0.8,
     )
 
@@ -42,8 +44,8 @@ def faithfulness_config():
 def geval_config():
     """Create config for GEval judge."""
     return JudgeConfig(
-        judge_id="custom",
-        judge_type="deepeval.geval",
+        id="custom",
+        deepeval_name="deepeval.geval",
         threshold=0.7,
         config={
             "name": "custom_quality",
@@ -104,7 +106,11 @@ class TestDeepEvalJudgeInitialization:
             name="custom_quality",
             criteria="Evaluate response quality",
             evaluation_steps=["Check accuracy", "Evaluate clarity"],
-            evaluation_params=["Evaluate response quality", "Check accuracy", "Evaluate clarity"],
+            evaluation_params=[
+                LLMTestCaseParams.INPUT,
+                LLMTestCaseParams.ACTUAL_OUTPUT,
+                LLMTestCaseParams.EXPECTED_OUTPUT,
+            ],
             model="gpt-4",
             threshold=0.7,
         )
@@ -112,8 +118,8 @@ class TestDeepEvalJudgeInitialization:
     def test_unsupported_judge_type_raises_error(self, mock_deepeval_metrics):
         """Test that unsupported judge type raises JudgeError."""
         config = JudgeConfig(
-            judge_id="unsupported",
-            judge_type="deepeval.unknown",
+            id="unsupported",
+            deepeval_name="deepeval.unknown",
         )
 
         with pytest.raises(JudgeError) as exc_info:

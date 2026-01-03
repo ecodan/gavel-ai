@@ -13,6 +13,8 @@ class JudgeConfig(BaseModel):
     deepeval_name: str = Field(..., description="DeepEval judge type (e.g., deepeval.geval)")
     config: Optional[Dict[str, Any]] = Field(None, description="Judge-specific config dict")
     config_ref: Optional[str] = Field(None, description="Reference to external config file")
+    threshold: Optional[float] = Field(None, description="Judge threshold for pass/fail (0.0-1.0)")
+    model: Optional[str] = Field(None, description="LLM model for judge evaluation")
 
 
 class ScenariosConfig(BaseModel):
