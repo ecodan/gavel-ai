@@ -241,3 +241,100 @@ def resolve_model_id(agents_config: Dict[str, Any], model_id: str) -> str:
 
     # Otherwise, assume it's already a real model name - pass through
     return model_id
+
+
+def get_model_definition(
+    agents_config: Dict[str, Any], model_id: str
+) -> Dict[str, Any]:
+    """
+    Get the full model definition including provider info.
+
+    This function looks up a model in the agents config and returns the complete
+    definition including model_provider, model_family, and model_version.
+    If model_id is not in _models, returns a minimal definition with only the
+    model_version (assumed to be a standard model name).
+
+    Args:
+        agents_config: Loaded agents configuration dict containing _models definitions
+        model_id: Model identifier to resolve (custom ID or standard name)
+
+    Returns:
+        dict: Model definition with keys:
+            - model_version: Actual model identifier (required)
+            - model_provider: Provider name (optional, None for standard names)
+            - model_family: Model family (optional, None for standard names)
+
+    Raises:
+        ConfigError: If model_id is in _models but missing model_version field
+    """
+    models: Dict[str, Any] = agents_config.get("_models", {})
+
+    # If model_id is in _models, it's a custom ID - return full definition
+    if model_id in models:
+        model_def = models[model_id]
+        model_version: Optional[str] = model_def.get("model_version")
+        if not model_version:
+            raise ConfigError(
+                f"Model '{model_id}' in _models is missing 'model_version' field - "
+                f"Add 'model_version' to the model definition in agents.json"
+            )
+        return {
+            "model_version": model_version,
+            "model_provider": model_def.get("model_provider"),
+            "model_family": model_def.get("model_family"),
+        }
+
+    # Otherwise, assume it's already a real model name - return minimal definition
+    return {
+        "model_version": model_id,
+        "model_provider": None,
+        "model_family": None,
+    }
+
+
+def is_judge_model_compatible(judge_type: str, model_provider: Optional[str]) -> bool:
+    """
+    Check if a judge type is compatible with a model provider.
+
+    Args:
+        judge_type: Judge type identifier (e.g., 'deepeval.geval')
+        model_provider: Model provider name (e.g., 'openai', 'anthropic', None)
+
+    Returns:
+        bool: True if compatible, False otherwise
+    """
+    # GEval only works with OpenAI models
+    if judge_type == "deepeval.geval":
+        return model_provider == "openai" or model_provider is None
+
+    # Other DeepEval judges generally work with any provider
+    return True
+
+
+def find_compatible_model(
+    agents_config: Dict[str, Any], judge_type: str, target_provider: str = "openai"
+) -> Optional[str]:
+    """
+    Find an alternative model compatible with a judge type.
+
+    Args:
+        agents_config: Agents configuration dict
+        judge_type: Judge type identifier
+        target_provider: Preferred provider (default: openai)
+
+    Returns:
+        Model ID (custom or standard) compatible with the judge, or None
+    """
+    models: Dict[str, Any] = agents_config.get("_models", {})
+
+    # For GEval, find an OpenAI model
+    if judge_type == "deepeval.geval":
+        # First, look for a model with the target provider
+        for model_id, model_def in models.items():
+            if model_def.get("model_provider") == target_provider:
+                return model_id
+
+        # If no custom model found, return None (let user provide one)
+        return None
+
+    return None

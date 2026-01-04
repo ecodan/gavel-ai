@@ -147,10 +147,29 @@ class DeepEvalJudge(Judge):
 
         except Exception as e:
             judge_type = self.config.type
-            raise JudgeError(
-                f"Failed to create DeepEval metric '{judge_type}': {e} - "
-                f"Check judge configuration and API credentials"
-            ) from e
+            judge_id = self.config.name
+            error_msg = str(e)
+
+            # Provide helpful error messages for common issues
+            if "No pricing available" in error_msg and "claude" in error_msg.lower():
+                raise JudgeError(
+                    f"GEval judge '{judge_id}' failed: DeepEval's GEval requires an OpenAI model. "
+                    f"You specified a Claude model, which is not supported by GEval. "
+                    f"Update your judge configuration to use an OpenAI model (e.g., 'gpt-4o'). "
+                    f"Original error: {e}"
+                ) from e
+            elif "No pricing available" in error_msg:
+                raise JudgeError(
+                    f"GEval judge '{judge_id}' failed: DeepEval does not recognize the model '{self.config.model}'. "
+                    f"Ensure the model ID is correct and is an OpenAI model. "
+                    f"If using a custom model, you may need to configure pricing information. "
+                    f"Original error: {e}"
+                ) from e
+            else:
+                raise JudgeError(
+                    f"Failed to create DeepEval metric '{judge_type}': {e} - "
+                    f"Check judge configuration and API credentials"
+                ) from e
 
     async def evaluate(
         self, scenario: Scenario, subject_output: str
