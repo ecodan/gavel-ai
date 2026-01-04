@@ -7,11 +7,6 @@ from typing import Optional
 import typer
 
 from gavel_ai.cli.scaffolding import generate_all_templates
-from gavel_ai.core.config_loader import (
-    find_compatible_model,
-    get_model_definition,
-    is_judge_model_compatible,
-)
 from gavel_ai.core.exceptions import ConfigError, ValidationError
 from gavel_ai.log_config import get_application_logger
 from gavel_ai.telemetry import (
@@ -266,46 +261,14 @@ def run(
 
                 if model_to_resolve:
                     try:
-                        # Get full model definition with provider info
-                        model_def = get_model_definition(agents_config, model_to_resolve)
-                        resolved_model = model_def["model_version"]
-                        model_provider = model_def["model_provider"]
-
-                        # Check if judge is compatible with model provider
-                        if not is_judge_model_compatible(judge_config.type, model_provider):
-                            # Try to find a compatible model alternative
-                            compatible_model_id = find_compatible_model(
-                                agents_config, judge_config.type
-                            )
-                            if compatible_model_id:
-                                compatible_def = get_model_definition(
-                                    agents_config, compatible_model_id
-                                )
-                                error_msg = (
-                                    f"Judge '{judge_config.name}' (type: {judge_config.type}) "
-                                    f"is not compatible with model provider '{model_provider}' "
-                                    f"(model: {model_to_resolve}). "
-                                    f"Try using '{compatible_model_id}' instead, "
-                                    f"which has provider '{compatible_def['model_provider']}'."
-                                )
-                            else:
-                                error_msg = (
-                                    f"Judge '{judge_config.name}' (type: {judge_config.type}) "
-                                    f"is not compatible with model provider '{model_provider}' "
-                                    f"(model: {model_to_resolve}). "
-                                    f"No compatible models found in agents.json. "
-                                    f"Add an OpenAI model (e.g., 'gpt-4o') to agents.json._models."
-                                )
-                            run_logger.error(error_msg)
-                            raise ConfigError(error_msg)
-
+                        resolved_model = resolve_model_id(agents_config, model_to_resolve)
                         # Update both locations for consistency
                         judge_config.model = resolved_model
                         if judge_config.config:
                             judge_config.config["model"] = resolved_model
                         run_logger.info(
                             f"Resolved judge '{judge_config.name}' model ID '{model_to_resolve}' "
-                            f"to '{resolved_model}' (provider: {model_provider})"
+                            f"to '{resolved_model}'"
                         )
                     except ConfigError as e:
                         run_logger.error(
