@@ -13,7 +13,7 @@ Defines Pydantic models for:
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -82,7 +82,7 @@ class Scenario(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     id: str
-    input: Dict[str, Any]
+    input: Union[str, Dict[str, Any]]
     expected_behavior: Optional[str] = Field(None, validation_alias="expected")
     metadata: Dict[str, Any] = {}
 
@@ -145,7 +145,7 @@ class EvaluationResult(BaseModel):
     scenario_id: str = Field(..., description="Scenario identifier")
     variant_id: str = Field(..., description="Model/agent variant identifier")
     subject_id: str = Field(..., description="Subject identifier (PUT or SUT)")
-    scenario_input: Dict[str, Any] = Field(
+    scenario_input: Union[str, Dict[str, Any]] = Field(
         ..., description="Original scenario input for re-judging"
     )
     expected_behavior: Optional[str] = Field(
