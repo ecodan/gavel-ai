@@ -1,7 +1,6 @@
 """Unit tests for config loading and validation."""
 import json
 import os
-import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
@@ -11,6 +10,7 @@ import yaml
 
 from gavel_ai.core.config.loader import load_config
 from gavel_ai.core.config.models import AsyncConfig, EvalConfig
+from gavel_ai.core.config_loader import resolve_model_id
 from gavel_ai.core.exceptions import ConfigError, ValidationError
 
 
@@ -288,3 +288,158 @@ class TestConfigModels:
         assert config.timeout_seconds == 30
         assert config.retry_count == 3
         assert config.error_handling == "fail_fast"
+
+
+class TestResolveModelId:
+    """Test suite for resolve_model_id() helper function."""
+
+    def test_resolve_custom_model_id(self) -> None:
+        """Test resolving custom model ID to actual model version."""
+        agents_config: Dict[str, Any] = {
+            "_models": {
+                "claude_standard": {
+                    "model_version": "claude-sonnet-4-5-20250929",
+                    "model_provider": "anthropic",
+                }
+            }
+        }
+
+        result = resolve_model_id(agents_config, "claude_standard")
+        assert result == "claude-sonnet-4-5-20250929"
+
+    def test_resolve_multiple_custom_ids(self) -> None:
+        """Test resolving multiple different custom model IDs."""
+        agents_config: Dict[str, Any] = {
+            "_models": {
+                "claude_standard": {"model_version": "claude-sonnet-4-5-20250929"},
+                "gpt_standard": {"model_version": "gpt-4o-2024-08-06"},
+                "claude_creative": {"model_version": "claude-opus-4-1-20250805"},
+            }
+        }
+
+        assert resolve_model_id(agents_config, "claude_standard") == "claude-sonnet-4-5-20250929"
+        assert resolve_model_id(agents_config, "gpt_standard") == "gpt-4o-2024-08-06"
+        assert resolve_model_id(agents_config, "claude_creative") == "claude-opus-4-1-20250805"
+
+    def test_pass_through_standard_model_name(self) -> None:
+        """Test that standard model names pass through unchanged."""
+        agents_config: Dict[str, Any] = {"_models": {}}
+
+        # Standard model names should pass through
+        assert resolve_model_id(agents_config, "gpt-4o") == "gpt-4o"
+        assert resolve_model_id(agents_config, "claude-sonnet-4-5-20250929") == "claude-sonnet-4-5-20250929"
+        assert resolve_model_id(agents_config, "gemini-2.0-flash") == "gemini-2.0-flash"
+
+    def test_pass_through_when_not_in_models(self) -> None:
+        """Test that model IDs not in _models are passed through."""
+        agents_config: Dict[str, Any] = {
+            "_models": {
+                "claude_standard": {"model_version": "claude-sonnet-4-5-20250929"}
+            }
+        }
+
+        # Unknown custom ID should be passed through (assumed to be standard name)
+        result = resolve_model_id(agents_config, "some-unknown-model")
+        assert result == "some-unknown-model"
+
+    def test_error_when_model_version_missing(self) -> None:
+        """Test that ConfigError is raised when model_version field is missing."""
+        agents_config: Dict[str, Any] = {
+            "_models": {
+                "claude_standard": {
+                    # Missing model_version field
+                    "model_provider": "anthropic"
+                }
+            }
+        }
+
+        with pytest.raises(ConfigError) as exc_info:
+            resolve_model_id(agents_config, "claude_standard")
+
+        error_msg = str(exc_info.value)
+        assert "missing 'model_version'" in error_msg
+        assert "claude_standard" in error_msg
+
+    def test_error_when_model_version_empty(self) -> None:
+        """Test that ConfigError is raised when model_version is empty string."""
+        agents_config: Dict[str, Any] = {
+            "_models": {
+                "claude_standard": {
+                    "model_version": "",  # Empty string is falsy
+                    "model_provider": "anthropic",
+                }
+            }
+        }
+
+        with pytest.raises(ConfigError) as exc_info:
+            resolve_model_id(agents_config, "claude_standard")
+
+        error_msg = str(exc_info.value)
+        assert "missing 'model_version'" in error_msg
+
+    def test_error_when_model_version_none(self) -> None:
+        """Test that ConfigError is raised when model_version is None."""
+        agents_config: Dict[str, Any] = {
+            "_models": {
+                "claude_standard": {
+                    "model_version": None,
+                    "model_provider": "anthropic",
+                }
+            }
+        }
+
+        with pytest.raises(ConfigError) as exc_info:
+            resolve_model_id(agents_config, "claude_standard")
+
+        error_msg = str(exc_info.value)
+        assert "missing 'model_version'" in error_msg
+
+    def test_empty_models_dict(self) -> None:
+        """Test handling of empty _models dict."""
+        agents_config: Dict[str, Any] = {"_models": {}}
+
+        # Should pass through unknown IDs
+        result = resolve_model_id(agents_config, "any-model-id")
+        assert result == "any-model-id"
+
+    def test_missing_models_key(self) -> None:
+        """Test handling when _models key is missing entirely."""
+        agents_config: Dict[str, Any] = {"other_field": "value"}
+
+        # Should pass through any model ID when _models is missing
+        result = resolve_model_id(agents_config, "any-model")
+        assert result == "any-model"
+
+    def test_resolve_with_nested_config_fields(self) -> None:
+        """Test resolving custom ID when model has nested config fields."""
+        agents_config: Dict[str, Any] = {
+            "_models": {
+                "claude_standard": {
+                    "model_version": "claude-sonnet-4-5-20250929",
+                    "model_provider": "anthropic",
+                    "model_family": "claude",
+                    "model_parameters": {
+                        "temperature": 0.7,
+                        "max_tokens": 4096,
+                    },
+                    "provider_auth": {
+                        "api_key": "{{ANTHROPIC_API_KEY}}",
+                    },
+                }
+            }
+        }
+
+        result = resolve_model_id(agents_config, "claude_standard")
+        assert result == "claude-sonnet-4-5-20250929"
+
+    def test_case_sensitive_model_id_lookup(self) -> None:
+        """Test that model ID lookup is case-sensitive."""
+        agents_config: Dict[str, Any] = {
+            "_models": {
+                "claude_standard": {"model_version": "claude-sonnet-4-5-20250929"}
+            }
+        }
+
+        # Different case should not match
+        result = resolve_model_id(agents_config, "Claude_Standard")
+        assert result == "Claude_Standard"  # Passed through, not resolved

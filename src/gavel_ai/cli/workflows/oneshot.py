@@ -9,7 +9,13 @@ import typer
 from gavel_ai.cli.scaffolding import generate_all_templates
 from gavel_ai.core.exceptions import ConfigError, ValidationError
 from gavel_ai.log_config import get_application_logger
-from gavel_ai.telemetry import configure_run_telemetry, get_metadata_collector, get_tracer, reset_telemetry, reset_metadata_collector
+from gavel_ai.telemetry import (
+    configure_run_telemetry,
+    get_metadata_collector,
+    get_tracer,
+    reset_metadata_collector,
+    reset_telemetry,
+)
 
 tracer = get_tracer(__name__)
 app_logger = get_application_logger()
@@ -86,10 +92,9 @@ def run(
     from datetime import datetime, timezone
 
     from gavel_ai.core.config.agents import ModelDefinition
-    from gavel_ai.core.config_loader import ConfigLoader
+    from gavel_ai.core.config_loader import ConfigLoader, resolve_model_id
     from gavel_ai.core.executor import Executor
     from gavel_ai.core.models import Input, ProcessorConfig, ReporterConfig
-    from gavel_ai.core.result_storage import ResultStorage
     from gavel_ai.judges.judge_executor import JudgeExecutor
     from gavel_ai.log_config import get_run_logger
     from gavel_ai.processors.closedbox_processor import ClosedBoxInputProcessor
@@ -159,7 +164,7 @@ def run(
             if source_config_dir.exists():
                 run_logger.debug(f"Copying config directory to {dest_config_dir}")
                 shutil.copytree(source_config_dir, dest_config_dir, dirs_exist_ok=True)
-                typer.echo(f"✓ Copied evaluation configs to run directory")
+                typer.echo("✓ Copied evaluation configs to run directory")
             else:
                 run_logger.warning(f"Config directory not found at {source_config_dir}")
 
@@ -243,6 +248,32 @@ def run(
                 for subject in eval_config.test_subjects:
                     if subject.judges:
                         judges_list.extend(subject.judges)
+
+            # Resolve custom model IDs in judge configurations
+            for judge_config in judges_list:
+                # Check judge config dict first (primary source), then top-level field
+                model_to_resolve = None
+                if judge_config.config and "model" in judge_config.config:
+                    model_to_resolve = judge_config.config["model"]
+                elif judge_config.model:
+                    model_to_resolve = judge_config.model
+
+                if model_to_resolve:
+                    try:
+                        resolved_model = resolve_model_id(agents_config, model_to_resolve)
+                        # Update both locations for consistency
+                        judge_config.model = resolved_model
+                        if judge_config.config:
+                            judge_config.config["model"] = resolved_model
+                        run_logger.info(
+                            f"Resolved judge '{judge_config.name}' model ID '{model_to_resolve}' "
+                            f"to '{resolved_model}'"
+                        )
+                    except ConfigError as e:
+                        run_logger.error(
+                            f"Failed to resolve model for judge '{judge_config.name}': {e}"
+                        )
+                        raise
 
             if judges_list:
                 typer.echo(f"Running {len(judges_list)} judges...")
@@ -347,7 +378,7 @@ def run(
                 with open(manifest_file, "w", encoding="utf-8") as f:
                     json.dump(manifest_data, f, indent=2)
                 run_logger.debug(f"Manifest saved to {manifest_file}")
-                typer.echo(f"✓ Generated manifest with config hash")
+                typer.echo("✓ Generated manifest with config hash")
             except FileNotFoundError as e:
                 run_logger.warning(f"Could not compute config hash: {e}")
 
@@ -370,7 +401,6 @@ def run(
             # 9. Generate report (AFTER metadata is computed and saved)
             report_path = run_obj.run_dir / "report.html"
             # Use absolute path to templates directory
-            from gavel_ai.reporters.jinja_reporter import Jinja2Reporter
             templates_dir = Path(__file__).parent.parent.parent / "reporters" / "templates"
             reporter_config = ReporterConfig(
                 template_path=str(templates_dir),

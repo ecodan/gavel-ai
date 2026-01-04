@@ -5,9 +5,10 @@ configuration files needed for a OneShot evaluation run.
 
 Uses existing config infrastructure from Epic 2.
 """
-import toml
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+import toml
 
 from gavel_ai.core.config.agents import AgentsFile, validate_agent_references
 from gavel_ai.core.config.loader import load_config
@@ -191,3 +192,52 @@ class ConfigLoader:
             )
 
         return prompt_data[version]
+
+
+def resolve_model_id(agents_config: Dict[str, Any], model_id: str) -> str:
+    """
+    Resolve custom model ID to actual model version string.
+
+    This function maps custom model identifiers (defined in agents.json _models)
+    to their actual model version strings recognized by third-party libraries
+    like DeepEval. If the model_id is not found in _models, it's assumed to be
+    a standard model name (e.g., "gpt-4o") and passed through unchanged.
+
+    Args:
+        agents_config: Loaded agents configuration dict containing _models definitions
+        model_id: Model identifier to resolve (custom ID or standard name)
+
+    Returns:
+        str: Resolved actual model version string
+
+    Raises:
+        ConfigError: If model_id is in _models but missing model_version field
+
+    Examples:
+        >>> agents_config = {
+        ...     "_models": {
+        ...         "claude_standard": {
+        ...             "model_version": "claude-sonnet-4-5-20250929"
+        ...         }
+        ...     }
+        ... }
+        >>> resolve_model_id(agents_config, "claude_standard")
+        'claude-sonnet-4-5-20250929'
+
+        >>> resolve_model_id(agents_config, "gpt-4o")  # Standard name passes through
+        'gpt-4o'
+    """
+    models: Dict[str, Any] = agents_config.get("_models", {})
+
+    # If model_id is in _models, it's a custom ID - resolve it
+    if model_id in models:
+        model_version: Optional[str] = models[model_id].get("model_version")
+        if not model_version:
+            raise ConfigError(
+                f"Model '{model_id}' in _models is missing 'model_version' field - "
+                f"Add 'model_version' to the model definition in agents.json"
+            )
+        return model_version
+
+    # Otherwise, assume it's already a real model name - pass through
+    return model_id

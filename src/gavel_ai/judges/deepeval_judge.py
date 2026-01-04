@@ -88,7 +88,7 @@ class DeepEvalJudge(Judge):
 
             # Handle GEval separately (different constructor)
             if judge_type == "deepeval.geval":
-                # GEval requires name, criteria, evaluation_steps, evaluation_params
+                # GEval requires name, criteria, evaluation_steps, evaluation_params, model
                 # Get from nested config dict
                 criteria = metric_config.get(
                     "criteria", "Evaluate the quality of the response"
@@ -113,12 +113,20 @@ class DeepEvalJudge(Judge):
                     or 0.5
                 )
 
+                # Require explicit model - no silent defaults
+                model = metric_config.get("model") or self.config.model
+                if not model:
+                    raise JudgeError(
+                        f"GEval judge '{judge_id}' requires 'model' in config - "
+                        f"Specify model in judge configuration (e.g., 'claude-sonnet-4-5-20250929')"
+                    )
+
                 return metric_class(
                     name=metric_config.get("name", judge_id),
                     criteria=criteria,
                     evaluation_steps=evaluation_steps,
                     evaluation_params=evaluation_params,
-                    model=metric_config.get("model", "gpt-4"),
+                    model=model,
                     threshold=threshold,
                 )
 
