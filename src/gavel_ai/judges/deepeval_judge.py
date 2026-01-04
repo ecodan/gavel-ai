@@ -8,7 +8,7 @@ Per Architecture Decision 5: DeepEval-native judges with sequential execution.
 """
 
 import asyncio
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from deepeval.metrics import (
     AnswerRelevancyMetric,
@@ -17,6 +17,7 @@ from deepeval.metrics import (
     GEval,
     HallucinationMetric,
 )
+from deepeval.models import AnthropicModel, GeminiModel, GPTModel, OllamaModel
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from jinja2 import Template
 
@@ -44,6 +45,68 @@ class DeepEvalJudge(Judge):
         "deepeval.hallucination": HallucinationMetric,
         "deepeval.geval": GEval,
     }
+
+    def _create_model_instance(
+        self, model_name: str, model_family: Optional[str] = None
+    ) -> Any:
+        """
+        Create appropriate DeepEval model instance with cost tracking disabled.
+
+        Uses model_family from agents.json to select the correct model class:
+        - "claude" → AnthropicModel (uses ANTHROPIC_API_KEY)
+        - "gemini" → GeminiModel (uses GOOGLE_API_KEY)
+        - "qwen" (or other Ollama) → OllamaModel (uses base_url)
+        - "gpt" or None → GPTModel (uses OPENAI_API_KEY, default)
+
+        Args:
+            model_name: Model identifier string (e.g., "claude-sonnet-4-5-20250929")
+            model_family: Model family from agents.json (e.g., "claude", "gpt", "gemini")
+                         Falls back to pattern matching if None
+
+        Returns:
+            Configured DeepEvalBaseLLM subclass with cost tracking disabled (cost=0)
+        """
+        # Model family detection - use explicit family if available
+        if model_family:
+            family = model_family.lower()
+        else:
+            # Fallback: pattern matching on model name
+            model_lower = model_name.lower()
+            if "claude" in model_lower:
+                family = "claude"
+            elif "gemini" in model_lower:
+                family = "gemini"
+            elif "qwen" in model_lower or "ollama" in model_lower:
+                family = "qwen"  # or "ollama"
+            else:
+                family = "gpt"  # Default
+
+        # Create model-family-specific instance with cost=0
+        if family == "claude":
+            return AnthropicModel(
+                model=model_name,
+                cost_per_input_token=0,
+                cost_per_output_token=0,
+            )
+        elif family == "gemini":
+            return GeminiModel(
+                model=model_name,
+                cost_per_input_token=0,
+                cost_per_output_token=0,
+            )
+        elif family in ("qwen", "ollama"):
+            return OllamaModel(
+                model=model_name,
+                cost_per_input_token=0,
+                cost_per_output_token=0,
+            )
+        else:
+            # Default to GPTModel for GPT and unknown families
+            return GPTModel(
+                model=model_name,
+                cost_per_input_token=0,
+                cost_per_output_token=0,
+            )
 
     def __init__(self, config: JudgeConfig):
         """
@@ -113,13 +176,19 @@ class DeepEvalJudge(Judge):
                     or 0.5
                 )
 
-                # Require explicit model - no silent defaults
-                model = metric_config.get("model") or self.config.model
-                if not model:
+                # Get model name and family from config
+                model_name = metric_config.get("model") or self.config.model
+                if not model_name:
                     raise JudgeError(
                         f"GEval judge '{judge_id}' requires 'model' in config - "
                         f"Specify model in judge configuration (e.g., 'claude-sonnet-4-5-20250929')"
                     )
+
+                # Get family if available (from agents.json resolution)
+                model_family = metric_config.get("model_family")
+
+                # Create family-specific model with cost tracking disabled
+                model = self._create_model_instance(model_name, model_family)
 
                 return metric_class(
                     name=metric_config.get("name", judge_id),
@@ -138,34 +207,20 @@ class DeepEvalJudge(Judge):
             elif self.config.threshold is not None:
                 kwargs["threshold"] = self.config.threshold
 
-            if metric_config.get("model"):
-                kwargs["model"] = metric_config["model"]
-            elif self.config.model:
-                kwargs["model"] = self.config.model
+            # Handle model parameter with cost=0
+            if metric_config.get("model") or self.config.model:
+                model_name = metric_config.get("model") or self.config.model
+                model_family = metric_config.get("model_family")
+                kwargs["model"] = self._create_model_instance(model_name, model_family)
 
             return metric_class(**kwargs)
 
         except Exception as e:
             judge_type = self.config.type
-            judge_id = self.config.name
-            error_msg = str(e)
-
-            # Provide helpful error messages for common issues
-            if "No pricing available" in error_msg:
-                # DeepEval doesn't have pricing info for this model
-                model_in_error = self.config.model or "unknown"
-                raise JudgeError(
-                    f"GEval judge '{judge_id}' failed: DeepEval does not have pricing information for model '{model_in_error}'.\n\n"
-                    f"Solutions:\n"
-                    f"1. Set pricing environment variables (see error below for variable names)\n"
-                    f"2. Use a model with known pricing (e.g., 'gpt-4o' in agents.json)\n\n"
-                    f"Original error:\n{e}"
-                ) from e
-            else:
-                raise JudgeError(
-                    f"Failed to create DeepEval metric '{judge_type}': {e} - "
-                    f"Check judge configuration and API credentials"
-                ) from e
+            raise JudgeError(
+                f"Failed to create DeepEval metric '{judge_type}': {e} - "
+                f"Check judge configuration and API credentials"
+            ) from e
 
     async def evaluate(
         self, scenario: Scenario, subject_output: str

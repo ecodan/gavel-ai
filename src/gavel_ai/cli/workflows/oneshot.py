@@ -7,6 +7,7 @@ from typing import Optional
 import typer
 
 from gavel_ai.cli.scaffolding import generate_all_templates
+from gavel_ai.core.config_loader import get_model_definition
 from gavel_ai.core.exceptions import ConfigError, ValidationError
 from gavel_ai.log_config import get_application_logger
 from gavel_ai.telemetry import (
@@ -261,14 +262,21 @@ def run(
 
                 if model_to_resolve:
                     try:
-                        resolved_model = resolve_model_id(agents_config, model_to_resolve)
+                        # Get full model definition with family info
+                        model_def = get_model_definition(agents_config, model_to_resolve)
+                        resolved_model = model_def["model_version"]
+                        model_family = model_def["model_family"]
+
                         # Update both locations for consistency
                         judge_config.model = resolved_model
                         if judge_config.config:
                             judge_config.config["model"] = resolved_model
+                            # Also store family for DeepEval model selection
+                            judge_config.config["model_family"] = model_family
+
                         run_logger.info(
                             f"Resolved judge '{judge_config.name}' model ID '{model_to_resolve}' "
-                            f"to '{resolved_model}'"
+                            f"to '{resolved_model}' (family: {model_family})"
                         )
                     except ConfigError as e:
                         run_logger.error(
