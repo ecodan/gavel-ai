@@ -147,10 +147,25 @@ class DeepEvalJudge(Judge):
 
         except Exception as e:
             judge_type = self.config.type
-            raise JudgeError(
-                f"Failed to create DeepEval metric '{judge_type}': {e} - "
-                f"Check judge configuration and API credentials"
-            ) from e
+            judge_id = self.config.name
+            error_msg = str(e)
+
+            # Provide helpful error messages for common issues
+            if "No pricing available" in error_msg:
+                # DeepEval doesn't have pricing info for this model
+                model_in_error = self.config.model or "unknown"
+                raise JudgeError(
+                    f"GEval judge '{judge_id}' failed: DeepEval does not have pricing information for model '{model_in_error}'.\n\n"
+                    f"Solutions:\n"
+                    f"1. Set pricing environment variables (see error below for variable names)\n"
+                    f"2. Use a model with known pricing (e.g., 'gpt-4o' in agents.json)\n\n"
+                    f"Original error:\n{e}"
+                ) from e
+            else:
+                raise JudgeError(
+                    f"Failed to create DeepEval metric '{judge_type}': {e} - "
+                    f"Check judge configuration and API credentials"
+                ) from e
 
     async def evaluate(
         self, scenario: Scenario, subject_output: str
