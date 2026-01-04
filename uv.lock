@@ -1071,6 +1071,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "rich" },
     { name = "toml" },
+    { name = "tqdm" },
     { name = "typer" },
 ]
 
@@ -1102,6 +1103,7 @@ requires-dist = [
     { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "toml", specifier = ">=0.10.0" },
+    { name = "tqdm", specifier = ">=4.65.0" },
     { name = "typer", specifier = ">=0.9.0" },
 ]
 provides-extras = ["dev"]

@@ -101,15 +101,15 @@ def get_application_logger(
     level: Optional[int] = None,
 ) -> logging.Logger:
     """
-    Get application-level logger with rotating file handler.
+    Get application-level logger with file and console handlers.
 
     Creates a logger that writes to {base_dir}/gavel.log with automatic
-    log rotation (10MB max, 5 backups). Use for top-level lifecycle events
-    like application startup, eval creation, and shutdown.
+    log rotation (10MB max, 5 backups) and console output. Use for top-level
+    lifecycle events like application startup, eval creation, and shutdown.
 
     Args:
         base_dir: Base directory for logs (default: .gavel)
-        level: Log level (default: DEBUG if GAVEL_DEBUG=true, else INFO)
+        level: Log level (default: read from LOG_LEVEL_APP env var, or INFO)
 
     Returns:
         Configured application logger
@@ -139,12 +139,43 @@ def get_application_logger(
     path_hash = hashlib.md5(resolved_path.encode()).hexdigest()[:8]
     app_logger_name = f"{LOGGER_NAME}.app.{path_hash}"
 
-    # Use create_logger with file handler (already has rotation)
-    logger = create_logger(
-        name=app_logger_name,
-        level=level,
-        log_file=str(log_file),
-    )
+    # Get logger instance
+    logger = logging.getLogger(app_logger_name)
+
+    # Only configure if not already configured (avoid duplicate handlers)
+    if logger.handlers:
+        return logger
+
+    # Determine log level from environment (LOG_LEVEL_APP) or parameter
+    if level is None:
+        level_str = os.getenv("LOG_LEVEL_APP", "INFO").upper()
+        try:
+            level = getattr(logging, level_str)
+        except AttributeError:
+            level = logging.INFO
+    logger.setLevel(level)
+
+    # Create formatter
+    formatter = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
+
+    # Add stdout handler (console output)
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setLevel(level)
+    stdout_handler.setFormatter(formatter)
+    logger.addHandler(stdout_handler)
+
+    # Add file handler (with rotation)
+    try:
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=5,
+        )
+        file_handler.setLevel(level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except (OSError, IOError) as e:
+        logger.warning(f"Could not create file logger at {log_file}: {e}")
 
     # Disable propagation to prevent duplicate logs from parent loggers
     logger.propagate = False
@@ -159,10 +190,10 @@ def get_run_logger(
     level: Optional[int] = None,
 ) -> logging.Logger:
     """
-    Get run-specific logger with single file handler (no rotation).
+    Get run-specific logger with file and console handlers.
 
     Creates a logger that writes to
-    {base_dir}/evaluations/{eval_name}/runs/{run_id}/run.log.
+    {base_dir}/evaluations/{eval_name}/runs/{run_id}/run.log and console.
     Use for run-specific operations like config loading, scenario execution,
     and judge results.
 
@@ -170,7 +201,7 @@ def get_run_logger(
         run_id: Run identifier (e.g., "run-20251231-120000")
         eval_name: Evaluation name (e.g., "test_os")
         base_dir: Base directory for logs (default: .gavel)
-        level: Log level (default: DEBUG if GAVEL_DEBUG=true, else INFO)
+        level: Log level (default: read from LOG_LEVEL_RUN env var, or INFO)
 
     Returns:
         Configured run-specific logger
@@ -201,13 +232,23 @@ def get_run_logger(
     if logger.handlers:
         return logger
 
-    # Set log level
+    # Determine log level from environment (LOG_LEVEL_RUN) or parameter
     if level is None:
-        level = logging.DEBUG if DEBUG_MODE else logging.INFO
+        level_str = os.getenv("LOG_LEVEL_RUN", "INFO").upper()
+        try:
+            level = getattr(logging, level_str)
+        except AttributeError:
+            level = logging.INFO
     logger.setLevel(level)
 
     # Create formatter
     formatter = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
+
+    # Add stdout handler (console output)
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setLevel(level)
+    stdout_handler.setFormatter(formatter)
+    logger.addHandler(stdout_handler)
 
     # Add file handler (no rotation for run logs - single file per run)
     try:

@@ -229,16 +229,17 @@ def run(
 
             # 5. Execute scenarios
             typer.echo(f"Executing {len(inputs)} scenarios...")
-            run_logger.info(f"Processing {len(inputs)} scenarios with test_subject={test_subject}, variant_id={model_variant}")
+            run_logger.info(f"Scenario START: test_subject={test_subject} | variant_id={model_variant}")
 
             executor = Executor(
                 processor=processor,
                 parallelism=async_config.num_workers,
                 error_handling="fail_fast",  # Use default error handling
+                test_subject=test_subject,
+                variant_id=model_variant,
             )
 
             processor_results = asyncio.run(executor.execute(inputs))
-            run_logger.debug(f"Completed execution of {len(processor_results)} scenarios")
             typer.echo(f"✓ Executed {len(processor_results)} scenarios")
 
             # 6. Execute judges (if configured)
@@ -278,7 +279,7 @@ def run(
             if judges_list:
                 typer.echo(f"Running {len(judges_list)} judges...")
                 run_logger.info(
-                    f"Judging {len(processor_results)} results with {len(judges_list)} judges"
+                    f"Judge START: test_subject={test_subject} | variant_id=subject_agent | judges={len(judges_list)}"
                 )
 
                 judge_executor = JudgeExecutor(
@@ -286,25 +287,25 @@ def run(
                     error_handling="fail_fast",  # Use default error handling
                 )
 
-                # Execute judges on each result
-                evaluation_results = []
-                for idx, (scenario, proc_result) in enumerate(zip(scenarios_list, processor_results, strict=True), 1):
-                    eval_result = asyncio.run(
-                        judge_executor.execute(
-                            scenario=scenario,
-                            subject_output=str(proc_result.output),
-                            variant_id="subject_agent",
-                            subject_id="PUT",
-                        )
-                    )
-                    evaluation_results.append(eval_result)
-                    run_logger.info(f"Judged scenario {idx}/{len(scenarios_list)} with test_subject={test_subject}, variant_id=subject_agent")
+                # Prepare batch evaluations
+                evaluations_batch = [
+                    (scenario, str(proc_result.output), "subject_agent")
+                    for scenario, proc_result in zip(scenarios_list, processor_results, strict=True)
+                ]
 
-                run_logger.debug(f"Completed judging {len(evaluation_results)} results")
+                # Execute judges on all results with TQDM progress
+                evaluation_results = asyncio.run(
+                    judge_executor.execute_batch(
+                        evaluations=evaluations_batch,
+                        subject_id="PUT",
+                        test_subject=test_subject,
+                    )
+                )
+
                 typer.echo("✓ Completed judging")
             else:
                 evaluation_results = []
-                run_logger.debug("No judges configured - skipping judging")
+                run_logger.info("Judge: No judges configured - skipping judging")
                 typer.echo("⚠ No judges configured - skipping judging")
 
             # 7. Store results (two-file design: results_raw.jsonl and results_judged.jsonl)

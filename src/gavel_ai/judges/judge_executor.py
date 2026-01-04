@@ -9,6 +9,8 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from tqdm import tqdm
+
 from gavel_ai.core.config.models import JudgeConfig
 from gavel_ai.core.exceptions import JudgeError
 from gavel_ai.core.models import (
@@ -156,6 +158,7 @@ class JudgeExecutor:
         evaluations: List[tuple[Scenario, str, str]],
         subject_id: str = "put",
         metadata: Optional[dict] = None,
+        test_subject: Optional[str] = None,
     ) -> List[EvaluationResult]:
         """
         Execute all judges on a batch of outputs.
@@ -167,6 +170,7 @@ class JudgeExecutor:
             evaluations: List of (scenario, subject_output, variant_id) tuples
             subject_id: Subject identifier (PUT or SUT)
             metadata: Optional additional metadata
+            test_subject: Optional test subject for TQDM display
 
         Returns:
             List of EvaluationResults, one per input
@@ -179,16 +183,23 @@ class JudgeExecutor:
             span.set_attribute("judges.count", len(self.judges))
 
             results: List[EvaluationResult] = []
+            test_subject_display = test_subject or "unknown"
 
-            for scenario, subject_output, variant_id in evaluations:
-                result = await self.execute(
-                    scenario=scenario,
-                    subject_output=subject_output,
-                    variant_id=variant_id,
-                    subject_id=subject_id,
-                    metadata=metadata,
-                )
-                results.append(result)
+            with tqdm(total=len(evaluations), desc="Running judges", unit="scenario") as pbar:
+                for scenario, subject_output, variant_id in evaluations:
+                    result = await self.execute(
+                        scenario=scenario,
+                        subject_output=subject_output,
+                        variant_id=variant_id,
+                        subject_id=subject_id,
+                        metadata=metadata,
+                    )
+                    results.append(result)
+
+                    # Update progress bar with latest scenario info
+                    pbar.update(1)
+                    desc = f"Running judges | {scenario.id} | {test_subject_display} | {variant_id}"
+                    pbar.set_description(desc)
 
             span.set_attribute("results.count", len(results))
             return results
