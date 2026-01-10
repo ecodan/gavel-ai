@@ -57,9 +57,7 @@ class RunArchiver:
             # Search for run across all evaluations
             run_dirs = list(self.base_dir.glob(f"evaluations/*/runs/{run_id}"))
             if not run_dirs:
-                raise StorageError(
-                    f"StorageError: Run {run_id} not found - Check run ID"
-                )
+                raise StorageError(f"StorageError: Run {run_id} not found - Check run ID")
             run_dir = run_dirs[0]
 
         if not run_dir.exists():
@@ -77,9 +75,7 @@ class RunArchiver:
             return output_path
 
         except Exception as e:
-            raise StorageError(
-                f"StorageError: Failed to export run {run_id} - {e}"
-            ) from e
+            raise StorageError(f"StorageError: Failed to export run {run_id} - {e}") from e
 
     async def import_run(self, zip_path: str) -> str:
         """

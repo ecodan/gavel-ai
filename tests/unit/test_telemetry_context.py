@@ -32,7 +32,12 @@ class TestConfigureRunTelemetry:
             )
 
             expected_path = (
-                tmp_path / "evaluations" / "test_eval" / "runs" / "run-20251231-120000" / "telemetry.jsonl"
+                tmp_path
+                / "evaluations"
+                / "test_eval"
+                / "runs"
+                / "run-20251231-120000"
+                / "telemetry.jsonl"
             )
             assert telemetry_path == expected_path
         finally:

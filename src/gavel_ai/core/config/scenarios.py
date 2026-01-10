@@ -1,4 +1,5 @@
 """Scenarios configuration schema with JSON and CSV loaders."""
+
 import csv
 import json
 import re
@@ -20,8 +21,12 @@ class Scenario(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)  # Forward compatible
 
     scenario_id: str = Field(..., validation_alias="id", description="Unique scenario identifier")
-    input: Union[str, Dict[str, Any]] = Field(..., description="Scenario input (prompt/question or dict)")
-    expected: Optional[str] = Field(None, validation_alias="expected_behavior", description="Expected output")
+    input: Union[str, Dict[str, Any]] = Field(
+        ..., description="Scenario input (prompt/question or dict)"
+    )
+    expected: Optional[str] = Field(
+        None, validation_alias="expected_behavior", description="Expected output"
+    )
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
 
     @field_validator("input", mode="before")
@@ -78,40 +83,36 @@ def load_scenarios_json(file_path: Path) -> List[Scenario]:
         ConfigError: If file not found or invalid JSON
         ValidationError: If scenarios don't match schema
     """
-    with tracer.start_as_current_span("scenarios.load_scenarios_json") as span:
-        span.set_attribute("file_path", str(file_path))
+    span.set_attribute("file_path", str(file_path))
 
-        if not file_path.exists():
-            raise ConfigError(
-                f"Scenarios file not found: {file_path} - "
-                f"Create scenarios.json or check path"
-            )
+    if not file_path.exists():
+        raise ConfigError(
+            f"Scenarios file not found: {file_path} - Create scenarios.json or check path"
+        )
 
-        content = file_path.read_text()
+    content = file_path.read_text()
 
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError as e:
-            raise ConfigError(
-                f"Invalid JSON in {file_path} - Fix JSON syntax: {e}"
-            ) from None
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError as e:
+        raise ConfigError(f"Invalid JSON in {file_path} - Fix JSON syntax: {e}") from None
 
-        try:
-            # Handle both formats:
-            # 1. Root-level array: [{ scenario_id, input, expected, ... }, ...]
-            # 2. Wrapped object: { scenarios: [...] }
-            if isinstance(data, list):
-                # Root-level array format (new)
-                scenarios = [Scenario.model_validate(item) for item in data]
-                return scenarios
-            else:
-                # Wrapped object format (legacy)
-                scenario_set = ScenarioSet.model_validate(data)
-                return scenario_set.scenarios
-        except PydanticValidationError as e:
-            raise ValidationError(
-                f"Invalid scenarios format in {file_path} - Fix validation errors: {e}"
-            ) from None
+    try:
+        # Handle both formats:
+        # 1. Root-level array: [{ scenario_id, input, expected, ... }, ...]
+        # 2. Wrapped object: { scenarios: [...] }
+        if isinstance(data, list):
+            # Root-level array format (new)
+            scenarios = [Scenario.model_validate(item) for item in data]
+            return scenarios
+        else:
+            # Wrapped object format (legacy)
+            scenario_set = ScenarioSet.model_validate(data)
+            return scenario_set.scenarios
+    except PydanticValidationError as e:
+        raise ValidationError(
+            f"Invalid scenarios format in {file_path} - Fix validation errors: {e}"
+        ) from None
 
 
 def load_scenarios_csv(file_path: Path) -> List[Scenario]:
@@ -133,49 +134,45 @@ def load_scenarios_csv(file_path: Path) -> List[Scenario]:
         ConfigError: If file not found
         ValidationError: If CSV missing required columns
     """
-    with tracer.start_as_current_span("scenarios.load_scenarios_csv") as span:
-        span.set_attribute("file_path", str(file_path))
+    span.set_attribute("file_path", str(file_path))
 
-        if not file_path.exists():
-            raise ConfigError(
-                f"Scenarios file not found: {file_path} - "
-                f"Create scenarios.csv or check path"
-            )
+    if not file_path.exists():
+        raise ConfigError(
+            f"Scenarios file not found: {file_path} - Create scenarios.csv or check path"
+        )
 
-        scenarios: List[Scenario] = []
+    scenarios: List[Scenario] = []
 
-        with open(file_path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
+    with open(file_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
 
-            for row_num, row in enumerate(reader, start=2):  # Header is row 1
-                # Get scenario ID from either 'scenario_id' or 'id' (legacy) column
-                scenario_id = row.get("scenario_id") or row.get("id")
-                if not scenario_id:
-                    raise ValidationError(
-                        f"Missing 'scenario_id' in row {row_num} - "
-                        f"Add scenario_id column to CSV"
-                    )
-
-                # Get input/prompt
-                input_text = row.get("input")
-                if not input_text:
-                    raise ValidationError(
-                        f"Missing 'input' in row {row_num} - "
-                        f"Add input column to CSV"
-                    )
-
-                # Get expected output from either column name
-                expected = row.get("expected") or row.get("expected_behavior")
-
-                scenario = Scenario(
-                    scenario_id=scenario_id,
-                    input=input_text,
-                    expected=expected,
-                    metadata=None,
+        for row_num, row in enumerate(reader, start=2):  # Header is row 1
+            # Get scenario ID from either 'scenario_id' or 'id' (legacy) column
+            scenario_id = row.get("scenario_id") or row.get("id")
+            if not scenario_id:
+                raise ValidationError(
+                    f"Missing 'scenario_id' in row {row_num} - Add scenario_id column to CSV"
                 )
-                scenarios.append(scenario)
 
-        return scenarios
+            # Get input/prompt
+            input_text = row.get("input")
+            if not input_text:
+                raise ValidationError(
+                    f"Missing 'input' in row {row_num} - Add input column to CSV"
+                )
+
+            # Get expected output from either column name
+            expected = row.get("expected") or row.get("expected_behavior")
+
+            scenario = Scenario(
+                scenario_id=scenario_id,
+                input=input_text,
+                expected=expected,
+                metadata=None,
+            )
+            scenarios.append(scenario)
+
+    return scenarios
 
 
 def load_scenarios(file_path: Path) -> List[Scenario]:
@@ -190,17 +187,16 @@ def load_scenarios(file_path: Path) -> List[Scenario]:
     Raises:
         ConfigError: If format unsupported or file not found
     """
-    with tracer.start_as_current_span("scenarios.load_scenarios") as span:
-        span.set_attribute("file_path", str(file_path))
+    span.set_attribute("file_path", str(file_path))
 
-        if file_path.suffix == ".json":
-            return load_scenarios_json(file_path)
-        elif file_path.suffix == ".csv":
-            return load_scenarios_csv(file_path)
-        else:
-            raise ConfigError(
-                f"Unsupported scenarios format: {file_path.suffix} - Use .json or .csv"
-            )
+    if file_path.suffix == ".json":
+        return load_scenarios_json(file_path)
+    elif file_path.suffix == ".csv":
+        return load_scenarios_csv(file_path)
+    else:
+        raise ConfigError(
+            f"Unsupported scenarios format: {file_path.suffix} - Use .json or .csv"
+        )
 
 
 def substitute_placeholders(template: str, data: Dict[str, Any]) -> str:
@@ -239,16 +235,15 @@ def process_scenario_input(scenario: Scenario) -> str:
     Returns:
         Processed input string with placeholders substituted
     """
-    with tracer.start_as_current_span("scenarios.process_scenario_input"):
-        if "{{" not in scenario.input:
-            return scenario.input
+    if "{{" not in scenario.input:
+        return scenario.input
 
-        # Build substitution context from scenario metadata and fields
-        context: Dict[str, Any] = {}
-        if scenario.metadata:
-            context.update(scenario.metadata)
-        context["input"] = scenario.input
-        if scenario.expected:
-            context["expected"] = scenario.expected
+    # Build substitution context from scenario metadata and fields
+    context: Dict[str, Any] = {}
+    if scenario.metadata:
+        context.update(scenario.metadata)
+    context["input"] = scenario.input
+    if scenario.expected:
+        context["expected"] = scenario.expected
 
-        return substitute_placeholders(scenario.input, context)
+    return substitute_placeholders(scenario.input, context)

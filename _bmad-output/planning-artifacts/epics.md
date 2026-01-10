@@ -943,6 +943,81 @@ So that I can run scenarios, judge results, and generate reports with a single c
 
 ---
 
+### Story 3.9: Refactor OneShot Run Method for Maintainability
+
+As a developer,
+I want the oneshot `run()` method refactored from a 400-line monolithic function into isolated, testable steps,
+So that the codebase is easier to maintain, extend, and test.
+
+**Acceptance Criteria:**
+
+- **Given** EvalContext class exists
+  **When** examined
+  **Then**:
+  - It loads eval_config, agents_config, scenarios on demand (lazy-loading)
+  - It caches prompt templates
+  - It is immutable (no setters, read-only properties)
+
+- **Given** RunContext class exists
+  **When** examined
+  **Then**:
+  - It wraps LocalFilesystemRun for artifact persistence
+  - It holds validation_result, processor_results, evaluation_results, report_content, run_metadata
+  - It provides type-safe property getters/setters for step outputs
+
+- **Given** Step abstract base class exists
+  **When** examined
+  **Then**:
+  - It has abstract `execute(context: RunContext)` method
+  - It has `_safe_execute(context: RunContext)` wrapper with error handling
+  - It has `phase: StepPhase` property identifying the step
+
+- **Given** four concrete Step implementations exist (Validator, ScenarioProcessor, JudgeRunner, ReportRunner)
+  **When** examined
+  **Then**:
+  - ValidatorStep validates eval_config, agents_config, scenarios
+  - ScenarioProcessorStep executes scenarios through processor
+  - JudgeRunnerStep executes judges on results
+  - ReportRunnerStep exports results and generates reports
+
+- **Given** the refactored run() method is invoked
+  **When** it executes
+  **Then**:
+  - It creates EvalContext and RunContext
+  - It iterates through steps in order (validator → processor → judge → reporter)
+  - It calls step._safe_execute() for each step
+  - It exits on first failure (fail-fast)
+
+- **Given** all existing tests are run
+  **When** they execute
+  **Then**:
+  - All 387+ existing tests pass
+  - No regressions in functionality
+
+- **Given** unit tests are written for the refactored code
+  **When** executed
+  **Then**:
+  - Each Step is tested in isolation with mock contexts
+  - EvalContext lazy-loading is tested
+  - RunContext state management is tested
+  - Step error handling is tested
+
+**Technical Notes:**
+- Resolves complexity violation (current run() is C901=11, max=10)
+- Enables future workflow variants (Conversational, Autotune) via Step inheritance
+- Provides type-safe step output contracts via properties
+- Extracted logic maps to current run() line ranges:
+  - ValidatorStep: lines 126-143
+  - ScenarioProcessorStep: lines 173-244
+  - JudgeRunnerStep: lines 247-318
+  - ReportRunnerStep: lines 320-444
+
+**Related Requirements:** FR-6.1, NFR-M1, NFR-T1, NFR-M2
+
+**Tech Spec:** `_bmad-output/planning-artifacts/tech-specs/3-9-refactor-oneshot-run-method.md`
+
+---
+
 ## Epic 4: Judging & Result Evaluation
 
 **Epic Goal:** Build the judging system that evaluates outputs from processors and produces scored results.

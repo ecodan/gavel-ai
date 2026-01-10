@@ -24,9 +24,7 @@ class TestProjectStructure:
 
         for module_name in required_modules:
             module_dir = src_dir / module_name
-            assert (
-                module_dir.exists()
-            ), f"{module_name}/ submodule does not exist at {module_dir}"
+            assert module_dir.exists(), f"{module_name}/ submodule does not exist at {module_dir}"
             assert module_dir.is_dir(), f"{module_name}/ is not a directory"
 
     def test_test_directories_exist(self):
@@ -36,9 +34,7 @@ class TestProjectStructure:
 
         for dir_name in required_dirs:
             test_dir = tests_dir / dir_name
-            assert (
-                test_dir.exists()
-            ), f"tests/{dir_name}/ directory does not exist at {test_dir}"
+            assert test_dir.exists(), f"tests/{dir_name}/ directory does not exist at {test_dir}"
             assert test_dir.is_dir(), f"tests/{dir_name}/ is not a directory"
 
     def test_docs_directories_exist(self):
@@ -52,17 +48,17 @@ class TestProjectStructure:
         expected_subdirs = ["quickstart", "cli-reference", "examples"]
         for subdir in expected_subdirs:
             subdir_path = docs_dir / subdir
-            assert (
-                subdir_path.exists()
-            ), f"docs/{subdir}/ subdirectory does not exist at {subdir_path}"
+            assert subdir_path.exists(), (
+                f"docs/{subdir}/ subdirectory does not exist at {subdir_path}"
+            )
 
     def test_github_workflows_directory_exists(self):
         """Test that .github/workflows/ directory exists."""
         project_root = Path(__file__).parent.parent
         workflows_dir = project_root / ".github" / "workflows"
-        assert (
-            workflows_dir.exists()
-        ), f".github/workflows/ directory does not exist at {workflows_dir}"
+        assert workflows_dir.exists(), (
+            f".github/workflows/ directory does not exist at {workflows_dir}"
+        )
         assert workflows_dir.is_dir(), ".github/workflows/ is not a directory"
 
 
@@ -82,9 +78,9 @@ class TestPythonPackageInitialization:
 
         for module_name in required_modules:
             init_file = src_dir / module_name / "__init__.py"
-            assert (
-                init_file.exists()
-            ), f"src/gavel_ai/{module_name}/__init__.py does not exist at {init_file}"
+            assert init_file.exists(), (
+                f"src/gavel_ai/{module_name}/__init__.py does not exist at {init_file}"
+            )
             assert init_file.is_file(), f"{module_name}/__init__.py is not a file"
 
     def test_imports_work_from_src_layout(self):
@@ -103,9 +99,7 @@ class TestPythonPackageInitialization:
 
             assert gavel_ai is not None, "Failed to import gavel_ai"
         except ImportError as e:
-            raise AssertionError(
-                f"Cannot import gavel_ai from src-layout: {e}"
-            ) from e
+            raise AssertionError(f"Cannot import gavel_ai from src-layout: {e}") from e
 
     def test_no_circular_dependencies(self):
         """Test that core submodules can be imported without circular dependency issues."""
@@ -151,16 +145,12 @@ class TestRootProjectFiles:
         """Test that CHANGELOG.md file exists."""
         project_root = Path(__file__).parent.parent
         changelog_file = project_root / "CHANGELOG.md"
-        assert (
-            changelog_file.exists()
-        ), f"CHANGELOG.md file does not exist at {changelog_file}"
+        assert changelog_file.exists(), f"CHANGELOG.md file does not exist at {changelog_file}"
         assert changelog_file.is_file(), "CHANGELOG.md is not a file"
 
     def test_pyproject_toml_exists(self):
         """Test that pyproject.toml file exists."""
         project_root = Path(__file__).parent.parent
         pyproject_file = project_root / "pyproject.toml"
-        assert (
-            pyproject_file.exists()
-        ), f"pyproject.toml file does not exist at {pyproject_file}"
+        assert pyproject_file.exists(), f"pyproject.toml file does not exist at {pyproject_file}"
         assert pyproject_file.is_file(), "pyproject.toml is not a file"

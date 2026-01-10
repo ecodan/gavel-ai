@@ -1,4 +1,5 @@
 """Tests for automatic .env loading in CLI."""
+
 import os
 from pathlib import Path
 from unittest.mock import patch
@@ -27,7 +28,9 @@ class TestDotenvLoading:
             # Verify load_dotenv was called with correct parameters
             mock_load_dotenv.assert_called_with(verbose=False, override=False)
 
-    def test_env_vars_substituted_in_config(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_env_vars_substituted_in_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify environment variables are substituted in config files."""
         from gavel_ai.core.config.loader import substitute_env_vars
 
@@ -40,7 +43,9 @@ class TestDotenvLoading:
 
         assert result == '{"api_key": "sk-test-key-12345"}'
 
-    def test_missing_env_var_raises_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_missing_env_var_raises_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify missing environment variables raise ConfigError."""
         from gavel_ai.core.config.loader import substitute_env_vars
         from gavel_ai.core.exceptions import ConfigError

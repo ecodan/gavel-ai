@@ -25,9 +25,7 @@ from gavel_ai.judges import ReJudge
 @pytest.fixture
 def temp_results_file():
     """Create a temporary results file with sample data."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".jsonl", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
         temp_path = Path(f.name)
 
     yield temp_path
@@ -83,14 +81,10 @@ def sample_stored_results():
 class TestReJudgeBasics:
     """Test basic ReJudge functionality."""
 
-    def test_rejudge_initialization(
-        self, temp_results_file, mock_deepeval_metrics
-    ):
+    def test_rejudge_initialization(self, temp_results_file, mock_deepeval_metrics):
         """Test initializing ReJudge engine."""
         configs = [
-            JudgeConfig(
-                name="faithfulness", type="deepeval.faithfulness"
-            ),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
 
         rejudge = ReJudge(temp_results_file, configs)
@@ -99,14 +93,10 @@ class TestReJudgeBasics:
         assert len(rejudge.judge_executor.judges) == 1
 
     @pytest.mark.asyncio
-    async def test_rejudge_all_empty_file(
-        self, temp_results_file, mock_deepeval_metrics
-    ):
+    async def test_rejudge_all_empty_file(self, temp_results_file, mock_deepeval_metrics):
         """Test re-judging with no existing results."""
         configs = [
-            JudgeConfig(
-                name="faithfulness", type="deepeval.faithfulness"
-            ),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
 
         rejudge = ReJudge(temp_results_file, configs)
@@ -137,9 +127,7 @@ class TestReJudgeAll:
 
         # Re-judge with new judge
         configs = [
-            JudgeConfig(
-                name="faithfulness", type="deepeval.faithfulness"
-            ),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         rejudge = ReJudge(temp_results_file, configs)
         results = await rejudge.rejudge_all(preserve_existing=True)
@@ -175,9 +163,7 @@ class TestReJudgeAll:
 
         # Re-judge with same judge (should update)
         configs = [
-            JudgeConfig(
-                name="relevancy", type="deepeval.answer_relevancy"
-            ),
+            JudgeConfig(name="relevancy", type="deepeval.answer_relevancy"),
         ]
         rejudge = ReJudge(temp_results_file, configs)
         results = await rejudge.rejudge_all(preserve_existing=True)
@@ -206,9 +192,7 @@ class TestReJudgeAll:
 
         # Re-judge with new judge, not preserving old
         configs = [
-            JudgeConfig(
-                name="faithfulness", type="deepeval.faithfulness"
-            ),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         rejudge = ReJudge(temp_results_file, configs)
         results = await rejudge.rejudge_all(preserve_existing=False)
@@ -237,9 +221,7 @@ class TestReJudgeAll:
 
         # Re-judge
         configs = [
-            JudgeConfig(
-                name="faithfulness", type="deepeval.faithfulness"
-            ),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         rejudge = ReJudge(temp_results_file, configs)
         await rejudge.rejudge_all(preserve_existing=True)
@@ -273,9 +255,7 @@ class TestReJudgeFiltering:
 
         # Re-judge only scenario-1
         configs = [
-            JudgeConfig(
-                name="faithfulness", type="deepeval.faithfulness"
-            ),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         rejudge = ReJudge(temp_results_file, configs)
         results = await rejudge.rejudge_by_scenario("scenario-1")
@@ -304,9 +284,7 @@ class TestReJudgeFiltering:
 
         # Re-judge only claude-sonnet variant
         configs = [
-            JudgeConfig(
-                name="faithfulness", type="deepeval.faithfulness"
-            ),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         rejudge = ReJudge(temp_results_file, configs)
         results = await rejudge.rejudge_by_variant("claude-sonnet")
@@ -330,9 +308,7 @@ class TestReJudgeFiltering:
 
         # Re-judge non-existent scenario
         configs = [
-            JudgeConfig(
-                name="faithfulness", type="deepeval.faithfulness"
-            ),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         rejudge = ReJudge(temp_results_file, configs)
         results = await rejudge.rejudge_by_scenario("nonexistent")
@@ -366,9 +342,7 @@ class TestReJudgeMultipleJudges:
 
         # Re-judge with two new judges
         configs = [
-            JudgeConfig(
-                name="faithfulness", type="deepeval.faithfulness"
-            ),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
             JudgeConfig(
                 name="quality",
                 type="deepeval.geval",

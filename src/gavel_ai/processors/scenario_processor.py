@@ -41,43 +41,37 @@ class ScenarioProcessor(InputProcessor):
         Returns:
             ProcessorResult with full conversation output
         """
-        with self.tracer.start_as_current_span("processor.execute") as span:
-            span.set_attribute("processor.type", "scenario")
-            span.set_attribute("turn.count", len(inputs))
+        conversation_history: List[Dict[str, Any]] = []
+        all_outputs: List[str] = []
+        aggregated_metadata: Dict[str, Any] = {"turns": len(inputs)}
 
-            conversation_history: List[Dict[str, Any]] = []
-            all_outputs: List[str] = []
-            aggregated_metadata: Dict[str, Any] = {"turns": len(inputs)}
+        for turn_idx, input_item in enumerate(inputs):
+            # Add context from previous turns to current input
+            if conversation_history:
+                input_item.metadata["conversation_history"] = conversation_history
 
-            for turn_idx, input_item in enumerate(inputs):
-                span.set_attribute("turn.current", turn_idx + 1)
+            # Process current turn
+            result = await self.inner_processor.process([input_item])
 
-                # Add context from previous turns to current input
-                if conversation_history:
-                    input_item.metadata["conversation_history"] = conversation_history
-
-                # Process current turn
-                result = await self.inner_processor.process([input_item])
-
-                # Store turn in conversation history
-                conversation_history.append(
-                    {"turn": turn_idx + 1, "input": input_item.text, "output": result.output}
-                )
-
-                all_outputs.append(f"Turn {turn_idx + 1}: {result.output}")
-
-                # Merge metadata
-                if result.metadata:
-                    for key, value in result.metadata.items():
-                        if key.startswith("total_"):
-                            aggregated_metadata[key] = aggregated_metadata.get(key, 0) + value
-                        else:
-                            aggregated_metadata[f"turn_{turn_idx + 1}_{key}"] = value
-
-            # Combine all turn outputs
-            combined_output = "\n\n".join(all_outputs)
-
-            return ProcessorResult(
-                output=combined_output,
-                metadata=aggregated_metadata,
+            # Store turn in conversation history
+            conversation_history.append(
+                {"turn": turn_idx + 1, "input": input_item.text, "output": result.output}
             )
+
+            all_outputs.append(f"Turn {turn_idx + 1}: {result.output}")
+
+            # Merge metadata
+            if result.metadata:
+                for key, value in result.metadata.items():
+                    if key.startswith("total_"):
+                        aggregated_metadata[key] = aggregated_metadata.get(key, 0) + value
+                    else:
+                        aggregated_metadata[f"turn_{turn_idx + 1}_{key}"] = value
+
+        # Combine all turn outputs
+        combined_output = "\n\n".join(all_outputs)
+
+        return ProcessorResult(
+            output=combined_output,
+            metadata=aggregated_metadata,
+        )

@@ -72,64 +72,59 @@ class ReJudge:
         Raises:
             IOError: If unable to read/write results
         """
-        with self.tracer.start_as_current_span("rejudge.rejudge_all") as span:
-            logger.info("Starting re-judging of all stored results")
+        logger.info("Starting re-judging of all stored results")
 
-            # Load existing results
-            existing_results = self.storage.load_all()
-            span.set_attribute("results.count", len(existing_results))
+        # Load existing results
+        existing_results = self.storage.load_all()
 
-            if not existing_results:
-                logger.warning("No existing results found to re-judge")
-                return []
+        if not existing_results:
+            logger.warning("No existing results found to re-judge")
+            return []
 
-            # Re-judge each result
-            rejudged_results: List[EvaluationResult] = []
+        # Re-judge each result
+        rejudged_results: List[EvaluationResult] = []
 
-            for existing_result in existing_results:
-                logger.debug(
-                    f"Re-judging scenario '{existing_result.scenario_id}' "
-                    f"variant '{existing_result.variant_id}'"
-                )
-
-                # Reconstruct scenario from stored data
-                scenario = self._reconstruct_scenario(existing_result)
-
-                # Execute judges on stored output
-                new_result = await self.judge_executor.execute(
-                    scenario=scenario,
-                    subject_output=existing_result.processor_output,
-                    variant_id=existing_result.variant_id,
-                    subject_id=existing_result.subject_id,
-                    metadata=existing_result.metadata,
-                )
-
-                # Merge results
-                if preserve_existing:
-                    merged_result = self._merge_results(
-                        existing_result, new_result
-                    )
-                else:
-                    merged_result = new_result
-
-                rejudged_results.append(merged_result)
-
-            logger.info(
-                f"Re-judged {len(rejudged_results)} results with "
-                f"{len(self.judge_executor.judges)} judges"
+        for existing_result in existing_results:
+            logger.debug(
+                f"Re-judging scenario '{existing_result.scenario_id}' "
+                f"variant '{existing_result.variant_id}'"
             )
 
-            # Write to output file
-            output_path = output_file or self.storage.results_file
-            output_storage = ResultStorage(output_path)
+            # Reconstruct scenario from stored data
+            scenario = self._reconstruct_scenario(existing_result)
 
-            # Clear and write new results
-            if output_path.exists():
-                output_storage.clear()
-            output_storage.append_batch(rejudged_results)
+            # Execute judges on stored output
+            new_result = await self.judge_executor.execute(
+                scenario=scenario,
+                subject_output=existing_result.processor_output,
+                variant_id=existing_result.variant_id,
+                subject_id=existing_result.subject_id,
+                metadata=existing_result.metadata,
+            )
 
-            span.set_attribute("rejudged.count", len(rejudged_results))
-            return rejudged_results
+            # Merge results
+            if preserve_existing:
+                merged_result = self._merge_results(existing_result, new_result)
+            else:
+                merged_result = new_result
+
+            rejudged_results.append(merged_result)
+
+        logger.info(
+            f"Re-judged {len(rejudged_results)} results with "
+            f"{len(self.judge_executor.judges)} judges"
+        )
+
+        # Write to output file
+        output_path = output_file or self.storage.results_file
+        output_storage = ResultStorage(output_path)
+
+        # Clear and write new results
+        if output_path.exists():
+            output_storage.clear()
+        output_storage.append_batch(rejudged_results)
+
+        return rejudged_results
 
     async def rejudge_by_scenario(
         self,
@@ -146,45 +141,37 @@ class ReJudge:
         Returns:
             List of updated EvaluationResults for the scenario
         """
-        with self.tracer.start_as_current_span("rejudge.rejudge_by_scenario") as span:
-            span.set_attribute("scenario.id", scenario_id)
+        # Filter existing results
+        existing_results = self.storage.filter_by_scenario(scenario_id)
 
-            # Filter existing results
-            existing_results = self.storage.filter_by_scenario(scenario_id)
+        if not existing_results:
+            logger.warning(f"No results found for scenario '{scenario_id}'")
+            return []
 
-            if not existing_results:
-                logger.warning(f"No results found for scenario '{scenario_id}'")
-                return []
+        logger.info(f"Re-judging {len(existing_results)} results for scenario '{scenario_id}'")
 
-            logger.info(
-                f"Re-judging {len(existing_results)} results for scenario '{scenario_id}'"
+        # Re-judge each result
+        rejudged_results: List[EvaluationResult] = []
+
+        for existing_result in existing_results:
+            scenario = self._reconstruct_scenario(existing_result)
+
+            new_result = await self.judge_executor.execute(
+                scenario=scenario,
+                subject_output=existing_result.processor_output,
+                variant_id=existing_result.variant_id,
+                subject_id=existing_result.subject_id,
+                metadata=existing_result.metadata,
             )
 
-            # Re-judge each result
-            rejudged_results: List[EvaluationResult] = []
+            if preserve_existing:
+                merged_result = self._merge_results(existing_result, new_result)
+            else:
+                merged_result = new_result
 
-            for existing_result in existing_results:
-                scenario = self._reconstruct_scenario(existing_result)
+            rejudged_results.append(merged_result)
 
-                new_result = await self.judge_executor.execute(
-                    scenario=scenario,
-                    subject_output=existing_result.processor_output,
-                    variant_id=existing_result.variant_id,
-                    subject_id=existing_result.subject_id,
-                    metadata=existing_result.metadata,
-                )
-
-                if preserve_existing:
-                    merged_result = self._merge_results(
-                        existing_result, new_result
-                    )
-                else:
-                    merged_result = new_result
-
-                rejudged_results.append(merged_result)
-
-            span.set_attribute("rejudged.count", len(rejudged_results))
-            return rejudged_results
+        return rejudged_results
 
     async def rejudge_by_variant(
         self,
@@ -201,45 +188,37 @@ class ReJudge:
         Returns:
             List of updated EvaluationResults for the variant
         """
-        with self.tracer.start_as_current_span("rejudge.rejudge_by_variant") as span:
-            span.set_attribute("variant.id", variant_id)
+        # Filter existing results
+        existing_results = self.storage.filter_by_variant(variant_id)
 
-            # Filter existing results
-            existing_results = self.storage.filter_by_variant(variant_id)
+        if not existing_results:
+            logger.warning(f"No results found for variant '{variant_id}'")
+            return []
 
-            if not existing_results:
-                logger.warning(f"No results found for variant '{variant_id}'")
-                return []
+        logger.info(f"Re-judging {len(existing_results)} results for variant '{variant_id}'")
 
-            logger.info(
-                f"Re-judging {len(existing_results)} results for variant '{variant_id}'"
+        # Re-judge each result
+        rejudged_results: List[EvaluationResult] = []
+
+        for existing_result in existing_results:
+            scenario = self._reconstruct_scenario(existing_result)
+
+            new_result = await self.judge_executor.execute(
+                scenario=scenario,
+                subject_output=existing_result.processor_output,
+                variant_id=existing_result.variant_id,
+                subject_id=existing_result.subject_id,
+                metadata=existing_result.metadata,
             )
 
-            # Re-judge each result
-            rejudged_results: List[EvaluationResult] = []
+            if preserve_existing:
+                merged_result = self._merge_results(existing_result, new_result)
+            else:
+                merged_result = new_result
 
-            for existing_result in existing_results:
-                scenario = self._reconstruct_scenario(existing_result)
+            rejudged_results.append(merged_result)
 
-                new_result = await self.judge_executor.execute(
-                    scenario=scenario,
-                    subject_output=existing_result.processor_output,
-                    variant_id=existing_result.variant_id,
-                    subject_id=existing_result.subject_id,
-                    metadata=existing_result.metadata,
-                )
-
-                if preserve_existing:
-                    merged_result = self._merge_results(
-                        existing_result, new_result
-                    )
-                else:
-                    merged_result = new_result
-
-                rejudged_results.append(merged_result)
-
-            span.set_attribute("rejudged.count", len(rejudged_results))
-            return rejudged_results
+        return rejudged_results
 
     def _reconstruct_scenario(self, result: EvaluationResult) -> Scenario:
         """

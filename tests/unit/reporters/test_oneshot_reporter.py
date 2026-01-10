@@ -28,56 +28,60 @@ class MockRun:
             "variant_count": 2,
             "eval_type": "oneshot",
         }
-        self.results = results if results is not None else [
-            {
-                "scenario_id": "scenario-1",
-                "variant_id": "claude",
-                "processor_output": "Paris is the capital of France.",
-                "scenario_input": {"prompt": "What is the capital of France?"},
-                "judges": [
-                    {
-                        "judge_id": "similarity",
-                        "score": 9,
-                        "reasoning": "Accurate and concise.",
-                        "evidence": "Direct answer to question",
-                    }
-                ],
-            },
-            {
-                "scenario_id": "scenario-1",
-                "variant_id": "gpt",
-                "processor_output": "The capital of France is Paris.",
-                "scenario_input": {"prompt": "What is the capital of France?"},
-                "judges": [
-                    {
-                        "judge_id": "similarity",
-                        "score": 8,
-                        "reasoning": "Accurate but slightly wordy.",
-                        "evidence": None,
-                    }
-                ],
-            },
-            {
-                "scenario_id": "scenario-2",
-                "variant_id": "claude",
-                "processor_output": "London",
-                "scenario_input": {"prompt": "Capital of UK?"},
-                "judges": [{"judge_id": "similarity", "score": 10, "reasoning": "Perfect."}],
-            },
-            {
-                "scenario_id": "scenario-2",
-                "variant_id": "gpt",
-                "processor_output": "London is the capital.",
-                "scenario_input": {"prompt": "Capital of UK?"},
-                "judges": [
-                    {
-                        "judge_id": "similarity",
-                        "score": 9,
-                        "reasoning": "Correct but verbose.",
-                    }
-                ],
-            },
-        ]
+        self.results = (
+            results
+            if results is not None
+            else [
+                {
+                    "scenario_id": "scenario-1",
+                    "variant_id": "claude",
+                    "processor_output": "Paris is the capital of France.",
+                    "scenario_input": {"prompt": "What is the capital of France?"},
+                    "judges": [
+                        {
+                            "judge_id": "similarity",
+                            "score": 9,
+                            "reasoning": "Accurate and concise.",
+                            "evidence": "Direct answer to question",
+                        }
+                    ],
+                },
+                {
+                    "scenario_id": "scenario-1",
+                    "variant_id": "gpt",
+                    "processor_output": "The capital of France is Paris.",
+                    "scenario_input": {"prompt": "What is the capital of France?"},
+                    "judges": [
+                        {
+                            "judge_id": "similarity",
+                            "score": 8,
+                            "reasoning": "Accurate but slightly wordy.",
+                            "evidence": None,
+                        }
+                    ],
+                },
+                {
+                    "scenario_id": "scenario-2",
+                    "variant_id": "claude",
+                    "processor_output": "London",
+                    "scenario_input": {"prompt": "Capital of UK?"},
+                    "judges": [{"judge_id": "similarity", "score": 10, "reasoning": "Perfect."}],
+                },
+                {
+                    "scenario_id": "scenario-2",
+                    "variant_id": "gpt",
+                    "processor_output": "London is the capital.",
+                    "scenario_input": {"prompt": "Capital of UK?"},
+                    "judges": [
+                        {
+                            "judge_id": "similarity",
+                            "score": 9,
+                            "reasoning": "Correct but verbose.",
+                        }
+                    ],
+                },
+            ]
+        )
         self.telemetry = {
             "total_duration_seconds": 45,
             "llm_calls": {

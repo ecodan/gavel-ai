@@ -20,9 +20,7 @@ from gavel_ai.core.result_storage import ResultStorage
 @pytest.fixture
 def temp_results_file():
     """Create a temporary results file."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".jsonl", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
         temp_path = Path(f.name)
 
     yield temp_path
@@ -162,9 +160,7 @@ class TestResultStorageLoading:
         assert loaded_results[1].scenario_id == "scenario-2"
         assert loaded_results[2].scenario_id == "scenario-3"
 
-    def test_load_preserves_judge_evaluations(
-        self, temp_results_file, sample_result
-    ):
+    def test_load_preserves_judge_evaluations(self, temp_results_file, sample_result):
         """Test that loading preserves judge evaluations."""
         storage = ResultStorage(temp_results_file)
         storage.append(sample_result)
@@ -193,9 +189,7 @@ class TestResultStorageLoading:
 
         # Store multiple results
         for i in range(5):
-            result = sample_result.model_copy(
-                update={"scenario_id": f"scenario-{i}"}
-            )
+            result = sample_result.model_copy(update={"scenario_id": f"scenario-{i}"})
             storage.append(result)
 
         # Iterate and collect
@@ -305,9 +299,7 @@ class TestResultStorageJSONLFormat:
             assert "variant_id" in data
             assert "judges" in data
 
-    def test_jsonl_contains_all_required_fields(
-        self, temp_results_file, sample_result
-    ):
+    def test_jsonl_contains_all_required_fields(self, temp_results_file, sample_result):
         """Test that JSONL contains all required fields per spec."""
         storage = ResultStorage(temp_results_file)
         storage.append(sample_result)

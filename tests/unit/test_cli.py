@@ -1,4 +1,5 @@
 """Unit tests for CLI entry point and command structure."""
+
 from typer.testing import CliRunner
 
 from gavel_ai.cli.main import app

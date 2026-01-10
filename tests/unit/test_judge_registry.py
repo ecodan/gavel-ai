@@ -131,12 +131,8 @@ class TestJudgeRegistryFactory:
     def test_create_multiple_judge_types(self, mock_deepeval_metrics):
         """Test creating different judge types from registry."""
         configs = [
-            JudgeConfig(
-                name="relevancy", type="deepeval.answer_relevancy"
-            ),
-            JudgeConfig(
-                name="faithfulness", type="deepeval.faithfulness"
-            ),
+            JudgeConfig(name="relevancy", type="deepeval.answer_relevancy"),
+            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
             JudgeConfig(name="geval", type="deepeval.geval"),
         ]
 

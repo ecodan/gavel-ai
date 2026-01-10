@@ -107,10 +107,7 @@ def simple_template(temp_template_dir):
 @pytest.mark.asyncio
 async def test_jinja2_reporter_renders_template(temp_template_dir, mock_run, simple_template):
     """Jinja2Reporter renders template with context variables."""
-    config = ReporterConfig(
-        template_path=str(temp_template_dir),
-        output_format="html"
-    )
+    config = ReporterConfig(template_path=str(temp_template_dir), output_format="html")
 
     reporter = Jinja2Reporter(config)
     output = await reporter.generate(mock_run, simple_template)
@@ -129,10 +126,7 @@ async def test_jinja2_reporter_uses_default_base_html_template(mock_run):
     reporters_dir = Path(gavel_ai.reporters.__file__).parent
     templates_dir = reporters_dir / "templates"
 
-    config = ReporterConfig(
-        template_path=str(templates_dir),
-        output_format="html"
-    )
+    config = ReporterConfig(template_path=str(templates_dir), output_format="html")
 
     reporter = Jinja2Reporter(config)
     output = await reporter.generate(mock_run, "base.html")
@@ -154,10 +148,7 @@ async def test_jinja2_reporter_uses_default_base_md_template(mock_run):
     reporters_dir = Path(gavel_ai.reporters.__file__).parent
     templates_dir = reporters_dir / "templates"
 
-    config = ReporterConfig(
-        template_path=str(templates_dir),
-        output_format="markdown"
-    )
+    config = ReporterConfig(template_path=str(templates_dir), output_format="markdown")
 
     reporter = Jinja2Reporter(config)
     output = await reporter.generate(mock_run, "base.md")
@@ -172,10 +163,7 @@ async def test_jinja2_reporter_uses_default_base_md_template(mock_run):
 @pytest.mark.asyncio
 async def test_jinja2_reporter_template_not_found_error(temp_template_dir, mock_run):
     """Jinja2Reporter raises ReporterError when template not found."""
-    config = ReporterConfig(
-        template_path=str(temp_template_dir),
-        output_format="html"
-    )
+    config = ReporterConfig(template_path=str(temp_template_dir), output_format="html")
 
     reporter = Jinja2Reporter(config)
 
@@ -190,10 +178,7 @@ async def test_jinja2_reporter_template_syntax_error(temp_template_dir, mock_run
     bad_template = temp_template_dir / "bad.html"
     bad_template.write_text("{{ title {% endfor %}")  # Invalid syntax
 
-    config = ReporterConfig(
-        template_path=str(temp_template_dir),
-        output_format="html"
-    )
+    config = ReporterConfig(template_path=str(temp_template_dir), output_format="html")
 
     reporter = Jinja2Reporter(config)
 
@@ -208,10 +193,7 @@ async def test_jinja2_reporter_undefined_variable_error(temp_template_dir, mock_
     template = temp_template_dir / "undefined.html"
     template.write_text("{{ undefined_var }}")
 
-    config = ReporterConfig(
-        template_path=str(temp_template_dir),
-        output_format="html"
-    )
+    config = ReporterConfig(template_path=str(temp_template_dir), output_format="html")
 
     reporter = Jinja2Reporter(config)
 
@@ -230,7 +212,7 @@ async def test_jinja2_reporter_custom_variables(temp_template_dir, mock_run):
     config = ReporterConfig(
         template_path=str(temp_template_dir),
         output_format="html",
-        custom_vars={"company_name": "Acme Corp", "version": "1.0"}
+        custom_vars={"company_name": "Acme Corp", "version": "1.0"},
     )
 
     reporter = Jinja2Reporter(config)
@@ -248,10 +230,7 @@ async def test_jinja2_reporter_builds_summary_table(mock_run):
     reporters_dir = Path(gavel_ai.reporters.__file__).parent
     templates_dir = reporters_dir / "templates"
 
-    config = ReporterConfig(
-        template_path=str(templates_dir),
-        output_format="html"
-    )
+    config = ReporterConfig(template_path=str(templates_dir), output_format="html")
 
     reporter = Jinja2Reporter(config)
 
@@ -280,10 +259,7 @@ async def test_jinja2_reporter_builds_results_details(mock_run):
     reporters_dir = Path(gavel_ai.reporters.__file__).parent
     templates_dir = reporters_dir / "templates"
 
-    config = ReporterConfig(
-        template_path=str(templates_dir),
-        output_format="html"
-    )
+    config = ReporterConfig(template_path=str(templates_dir), output_format="html")
 
     reporter = Jinja2Reporter(config)
     context = reporter._build_context(mock_run)
@@ -298,10 +274,7 @@ async def test_jinja2_reporter_builds_results_details(mock_run):
 
 def test_jinja2_reporter_invalid_template_path():
     """Jinja2Reporter raises error with invalid template path."""
-    config = ReporterConfig(
-        template_path="/nonexistent/path",
-        output_format="html"
-    )
+    config = ReporterConfig(template_path="/nonexistent/path", output_format="html")
 
     # Should not raise during initialization (lazy loading)
     reporter = Jinja2Reporter(config)
@@ -311,21 +284,14 @@ def test_jinja2_reporter_invalid_template_path():
 @pytest.mark.asyncio
 async def test_jinja2_reporter_empty_run_data():
     """Jinja2Reporter handles empty run data gracefully."""
-    empty_run = MockRun(
-        metadata={"eval_name": "Empty Test"},
-        results=[],
-        telemetry={}
-    )
+    empty_run = MockRun(metadata={"eval_name": "Empty Test"}, results=[], telemetry={})
 
     import gavel_ai.reporters
 
     reporters_dir = Path(gavel_ai.reporters.__file__).parent
     templates_dir = reporters_dir / "templates"
 
-    config = ReporterConfig(
-        template_path=str(templates_dir),
-        output_format="html"
-    )
+    config = ReporterConfig(template_path=str(templates_dir), output_format="html")
 
     reporter = Jinja2Reporter(config)
     output = await reporter.generate(empty_run, "base.html")
@@ -335,12 +301,11 @@ async def test_jinja2_reporter_empty_run_data():
 
 
 @pytest.mark.asyncio
-async def test_jinja2_reporter_telemetry_span_emission(temp_template_dir, mock_run, simple_template):
+async def test_jinja2_reporter_telemetry_span_emission(
+    temp_template_dir, mock_run, simple_template
+):
     """Jinja2Reporter emits OpenTelemetry spans."""
-    config = ReporterConfig(
-        template_path=str(temp_template_dir),
-        output_format="html"
-    )
+    config = ReporterConfig(template_path=str(temp_template_dir), output_format="html")
 
     reporter = Jinja2Reporter(config)
 

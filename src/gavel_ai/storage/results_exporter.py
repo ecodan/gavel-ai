@@ -75,7 +75,9 @@ class ResultsExporter:
             timing_ms = metadata.get("latency_ms", 0)
             tokens_info = metadata.get("tokens", {})
             tokens_prompt = tokens_info.get("prompt", 0) if isinstance(tokens_info, dict) else 0
-            tokens_completion = tokens_info.get("completion", 0) if isinstance(tokens_info, dict) else 0
+            tokens_completion = (
+                tokens_info.get("completion", 0) if isinstance(tokens_info, dict) else 0
+            )
 
             entry = {
                 "test_subject": test_subject,
@@ -145,7 +147,9 @@ class ResultsExporter:
             timing_ms = metadata.get("latency_ms", 0)
             tokens_info = metadata.get("tokens", {})
             tokens_prompt = tokens_info.get("prompt", 0) if isinstance(tokens_info, dict) else 0
-            tokens_completion = tokens_info.get("completion", 0) if isinstance(tokens_info, dict) else 0
+            tokens_completion = (
+                tokens_info.get("completion", 0) if isinstance(tokens_info, dict) else 0
+            )
 
             # Base entry with processor data (same schema as results_raw.jsonl)
             entry = {

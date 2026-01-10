@@ -97,7 +97,9 @@ class TestTelemetryPerformance:
         avg_batch_time_ms = (export_time / iterations) * 1000
 
         # Target: <1ms per batch of 10 spans
-        assert avg_batch_time_ms < 1.0, f"Average batch export time {avg_batch_time_ms:.3f}ms exceeds 1ms"
+        assert avg_batch_time_ms < 1.0, (
+            f"Average batch export time {avg_batch_time_ms:.3f}ms exceeds 1ms"
+        )
 
         print(f"\nBatch export overhead: {avg_batch_time_ms:.4f}ms per batch of 10 spans")
         print(f"Total exports: {iterations * 10} spans in {export_time:.3f}s")

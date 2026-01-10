@@ -108,12 +108,8 @@ class JudgeResult(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     score: int = Field(..., ge=1, le=10, description="Score from 1-10")
-    reasoning: Optional[str] = Field(
-        None, description="Optional explanation of the score"
-    )
-    evidence: Optional[str] = Field(
-        None, description="Optional evidence supporting the score"
-    )
+    reasoning: Optional[str] = Field(None, description="Optional explanation of the score")
+    evidence: Optional[str] = Field(None, description="Optional evidence supporting the score")
 
 
 class JudgeEvaluation(BaseModel):
@@ -148,17 +144,11 @@ class EvaluationResult(BaseModel):
     scenario_input: Union[str, Dict[str, Any]] = Field(
         ..., description="Original scenario input for re-judging"
     )
-    expected_behavior: Optional[str] = Field(
-        None, description="Expected behavior from scenario"
-    )
+    expected_behavior: Optional[str] = Field(None, description="Expected behavior from scenario")
     processor_output: str = Field(..., description="Output from processor")
-    judges: list[JudgeEvaluation] = Field(
-        default_factory=list, description="Judge evaluations"
-    )
+    judges: list[JudgeEvaluation] = Field(default_factory=list, description="Judge evaluations")
     timestamp: str = Field(..., description="ISO 8601 timestamp")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 class ArtifactRef(BaseModel):
@@ -190,14 +180,10 @@ class Manifest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     timestamp: datetime = Field(..., description="Run start time (ISO 8601)")
-    config_hash: str = Field(
-        ..., description="SHA-256 hash of all configs for reproducibility"
-    )
+    config_hash: str = Field(..., description="SHA-256 hash of all configs for reproducibility")
     scenario_count: int = Field(..., description="Number of scenarios executed")
     variant_count: int = Field(..., description="Number of variants tested")
-    judge_versions: List[Dict[str, str]] = Field(
-        ..., description="List of judge versions used"
-    )
+    judge_versions: List[Dict[str, str]] = Field(..., description="List of judge versions used")
     status: Literal["completed", "failed", "partial"] = Field(
         ..., description="Run completion status"
     )
@@ -228,12 +214,8 @@ class ReporterConfig(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    template_path: str = Field(
-        ..., description="Path to template directory or file"
-    )
-    output_format: str = Field(
-        ..., description="Output format: html, markdown, or json"
-    )
+    template_path: str = Field(..., description="Path to template directory or file")
+    output_format: str = Field(..., description="Output format: html, markdown, or json")
     custom_vars: Optional[Dict[str, Any]] = Field(
         None, description="Custom variables for template rendering"
     )

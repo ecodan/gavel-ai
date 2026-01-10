@@ -258,3 +258,4 @@ cython_debug/
 /docs/.private/
 /.deepeval/
 /.github/
+/.local_scripts/

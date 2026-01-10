@@ -139,9 +139,7 @@ class TestGetApplicationLogger:
         logger = get_application_logger(base_dir=str(tmp_path))
 
         # Find RotatingFileHandler in handlers
-        rotating_handlers = [
-            h for h in logger.handlers if isinstance(h, RotatingFileHandler)
-        ]
+        rotating_handlers = [h for h in logger.handlers if isinstance(h, RotatingFileHandler)]
 
         assert len(rotating_handlers) > 0
         handler = rotating_handlers[0]
@@ -228,14 +226,14 @@ class TestGetRunLogger:
         )
 
         # Should NOT have RotatingFileHandler
-        rotating_handlers = [
-            h for h in logger.handlers if isinstance(h, RotatingFileHandler)
-        ]
+        rotating_handlers = [h for h in logger.handlers if isinstance(h, RotatingFileHandler)]
         assert len(rotating_handlers) == 0
 
         # Should have regular FileHandler
         file_handlers = [
-            h for h in logger.handlers if isinstance(h, logging.FileHandler) and not isinstance(h, RotatingFileHandler)
+            h
+            for h in logger.handlers
+            if isinstance(h, logging.FileHandler) and not isinstance(h, RotatingFileHandler)
         ]
         assert len(file_handlers) > 0
 

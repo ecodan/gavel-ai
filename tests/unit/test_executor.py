@@ -90,9 +90,7 @@ class TestExecutorExecution:
         """Execute batches inputs according to parallelism setting."""
         config = ProcessorConfig(processor_type="test")
         processor = MockProcessor(config)
-        processor.process = AsyncMock(
-            return_value=ProcessorResult(output="test", metadata={})
-        )
+        processor.process = AsyncMock(return_value=ProcessorResult(output="test", metadata={}))
 
         executor = Executor(processor, parallelism=2)
 

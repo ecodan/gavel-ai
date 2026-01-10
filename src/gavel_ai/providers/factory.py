@@ -97,6 +97,7 @@ class ProviderFactory:
                 resolved_key = os.getenv(env_var_name)
                 if not resolved_key:
                     from gavel_ai.core.exceptions import ConfigError
+
                     raise ConfigError(
                         f"Environment variable '{env_var_name}' not set - "
                         f"Set {env_var_name} or provide api_key directly in provider_auth"

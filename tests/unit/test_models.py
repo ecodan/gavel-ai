@@ -24,9 +24,7 @@ class TestInputModel:
         """Input model accepts metadata dict."""
         from gavel_ai.core.models import Input
 
-        input_data = Input(
-            id="test-2", text="Test input", metadata={"key": "value", "count": 42}
-        )
+        input_data = Input(id="test-2", text="Test input", metadata={"key": "value", "count": 42})
         assert input_data.metadata["key"] == "value"
         assert input_data.metadata["count"] == 42
 

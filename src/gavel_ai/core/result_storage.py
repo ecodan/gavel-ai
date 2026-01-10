@@ -80,15 +80,11 @@ class ResultStorage:
                     json_line = result.model_dump_json() + "\n"
                     f.write(json_line)
 
-            logger.info(
-                f"Stored {len(results)} results to {self.results_file}"
-            )
+            logger.info(f"Stored {len(results)} results to {self.results_file}")
 
         except Exception as e:
             logger.error(f"Failed to write batch results to {self.results_file}: {e}")
-            raise IOError(
-                f"Failed to write batch results to {self.results_file}: {e}"
-            ) from e
+            raise IOError(f"Failed to write batch results to {self.results_file}: {e}") from e
 
     def load_all(self) -> List[EvaluationResult]:
         """
@@ -188,9 +184,7 @@ class ResultStorage:
             return
         except Exception as e:
             logger.error(f"Failed to iterate results from {self.results_file}: {e}")
-            raise IOError(
-                f"Failed to iterate results from {self.results_file}: {e}"
-            ) from e
+            raise IOError(f"Failed to iterate results from {self.results_file}: {e}") from e
 
     def filter_by_scenario(self, scenario_id: str) -> List[EvaluationResult]:
         """

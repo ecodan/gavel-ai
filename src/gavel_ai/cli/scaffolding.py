@@ -1,34 +1,31 @@
 """Scaffolding functions for gavel oneshot create command."""
+
 import json
 from pathlib import Path
 from typing import Any, Dict
-
-from gavel_ai.telemetry import get_tracer
-
-tracer = get_tracer(__name__)
 
 
 def generate_agents_config(eval_root: Path, eval_name: str) -> None:
     """Generate agents.json template with sensible defaults."""
     agents_config: Dict[str, Any] = {
         "_models": {
-            "claude-standard": {
+            "claude-haiku": {
                 "model_provider": "anthropic",
                 "model_family": "claude",
-                "model_version": "claude-sonnet-4-5-20250929",
-                "model_parameters": {"temperature": 0.7, "max_tokens": 4096},
+                "model_version": "claude-haiku-4-5-20251001",
+                "model_parameters": {"temperature": 0.3, "max_tokens": 4096},
                 "provider_auth": {"api_key": "{{ANTHROPIC_API_KEY}}"},
             },
-            "gpt-standard": {
+            "gpt-5-mini": {
                 "model_provider": "openai",
                 "model_family": "gpt",
-                "model_version": "gpt-4o",
+                "model_version": "gpt-5-mini-2025-08-07",
                 "model_parameters": {"temperature": 0.7, "max_tokens": 4096},
                 "provider_auth": {"api_key": "{{OPENAI_API_KEY}}"},
             },
         },
-        "subject_agent": {"model_id": "claude-standard", "prompt": "assistant:v1"},
-        "baseline_agent": {"model_id": "gpt-standard", "prompt": "assistant:v1"},
+        "claude_haiku": {"model_id": "claude-haiku", "prompt": "assistant:v1"},
+        "assistant_agent": {"model_id": "claude-haiku", "prompt": "assistant:v1"},
     }
 
     output_file = eval_root / eval_name / "config" / "agents.json"
@@ -47,13 +44,13 @@ def generate_eval_config(eval_root: Path, eval_name: str, eval_type: str) -> Non
         "description": "Evaluation scaffolded by gavel oneshot create",
         "test_subjects": [
             {
-                "prompt_name": "default",
+                "prompt_name": "assistant",
                 "judges": [
                     {
                         "name": "quality",
                         "type": "deepeval.geval",
                         "config": {
-                            "model": "gpt-4",
+                            "model": "gpt-5-mini",
                             "criteria": "Evaluate the quality and accuracy of the response",
                             "evaluation_steps": [
                                 "Check if the response is accurate",
@@ -65,9 +62,9 @@ def generate_eval_config(eval_root: Path, eval_name: str, eval_type: str) -> Non
                 ],
             }
         ],
-        "variants": ["claude_standard"],
+        "variants": ["claude_haiku"],
         "scenarios": {"source": "file.local", "name": "scenarios.json"},
-        "execution": {"max_concurrent": 5},
+        "execution": {"max_concurrent": 10},
         "async": {
             "num_workers": 8,
             "arrival_rate_per_sec": 20.0,
@@ -90,13 +87,13 @@ def generate_scenarios_json(eval_root: Path, eval_name: str) -> None:
     """Generate scenarios.json template with sample scenarios."""
     scenarios_data = [
         {
-            "scenario_id": "scenario-1",
+            "scenario_id": "1",
             "input": "What is the capital of France?",
             "expected": "Paris",
             "metadata": {"category": "geography", "difficulty": "easy"},
         },
         {
-            "scenario_id": "scenario-2",
+            "scenario_id": "2",
             "input": "Explain quantum computing in simple terms",
             "expected": "",
             "metadata": {"category": "technology", "difficulty": "medium"},
@@ -117,11 +114,11 @@ You are a helpful AI assistant.
 
 User question: {{input}}
 
-Please provide a clear, accurate answer.
+Provide a short, clear, accurate answer.
 '''
 """
 
-    output_file = eval_root / eval_name / "config" / "prompts" / "default.toml"
+    output_file = eval_root / eval_name / "config" / "prompts" / "assistant.toml"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_file, "w") as f:
@@ -144,12 +141,8 @@ def create_directory_structure(eval_root: Path, eval_name: str) -> None:
 
 def generate_all_templates(eval_root: Path, eval_name: str, eval_type: str) -> None:
     """Generate all template files for an evaluation."""
-    with tracer.start_as_current_span("scaffolding.generate_all_templates") as span:
-        span.set_attribute("eval_name", eval_name)
-        span.set_attribute("eval_type", eval_type)
-
-        create_directory_structure(eval_root, eval_name)
-        generate_agents_config(eval_root, eval_name)
-        generate_eval_config(eval_root, eval_name, eval_type)
-        generate_scenarios_json(eval_root, eval_name)
-        generate_prompts_toml(eval_root, eval_name)
+    create_directory_structure(eval_root, eval_name)
+    generate_agents_config(eval_root, eval_name)
+    generate_eval_config(eval_root, eval_name, eval_type)
+    generate_scenarios_json(eval_root, eval_name)
+    generate_prompts_toml(eval_root, eval_name)

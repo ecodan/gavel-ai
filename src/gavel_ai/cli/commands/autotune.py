@@ -1,4 +1,5 @@
 """Autotune evaluation workflow CLI commands (v3+)."""
+
 import typer
 
 from gavel_ai.telemetry import get_tracer
@@ -15,14 +16,12 @@ app = typer.Typer(
 @app.command()
 def create() -> None:
     """Create autotune evaluation scaffold."""
-    with tracer.start_as_current_span("cli.autotune.create"):
-        typer.echo("Autotune evaluation workflow (v3+)")
-        typer.echo("Implementation pending")
+    typer.echo("Autotune evaluation workflow (v3+)")
+    typer.echo("Implementation pending")
 
 
 @app.command()
 def run() -> None:
     """Run autotune evaluation."""
-    with tracer.start_as_current_span("cli.autotune.run"):
-        typer.echo("Autotune evaluation workflow (v3+)")
-        typer.echo("Implementation pending")
+    typer.echo("Autotune evaluation workflow (v3+)")
+    typer.echo("Implementation pending")

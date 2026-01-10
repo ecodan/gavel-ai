@@ -5,6 +5,7 @@ configuration files needed for a OneShot evaluation run.
 
 Uses existing config infrastructure from Epic 2.
 """
+
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -138,8 +139,7 @@ class ConfigLoader:
             scenarios_file = csv_file
         else:
             raise ConfigError(
-                f"Scenarios file not found in {self.data_dir} - "
-                f"Add scenarios.json or scenarios.csv"
+                f"Scenarios file not found in {self.data_dir} - Add scenarios.json or scenarios.csv"
             )
 
         return load_scenarios(scenarios_file)
@@ -179,9 +179,7 @@ class ConfigLoader:
             with open(prompt_file, "r") as f:
                 prompt_data = toml.load(f)
         except Exception as e:
-            raise ConfigError(
-                f"Invalid TOML in {prompt_file} - Fix TOML syntax: {e}"
-            ) from None
+            raise ConfigError(f"Invalid TOML in {prompt_file} - Fix TOML syntax: {e}") from None
 
         # Get version
         if version not in prompt_data:
@@ -243,9 +241,7 @@ def resolve_model_id(agents_config: Dict[str, Any], model_id: str) -> str:
     return model_id
 
 
-def get_model_definition(
-    agents_config: Dict[str, Any], model_id: str
-) -> Dict[str, Any]:
+def get_model_definition(agents_config: Dict[str, Any], model_id: str) -> Dict[str, Any]:
     """
     Get the full model definition including provider and family info.
 

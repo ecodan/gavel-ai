@@ -1,4 +1,5 @@
 """Unit tests for agents configuration schema."""
+
 import json
 from pathlib import Path
 from typing import Any, Dict

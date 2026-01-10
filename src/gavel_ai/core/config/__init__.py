@@ -1,4 +1,5 @@
 """Configuration loading and validation module."""
+
 from gavel_ai.core.config.agents import (
     AgentConfig,
     AgentsFile,

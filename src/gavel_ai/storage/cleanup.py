@@ -60,8 +60,7 @@ class RunCleaner:
         match = re.match(r"^(\d+)([dwmy])$", expr.lower())
         if not match:
             raise ValueError(
-                f"Invalid time expression: '{expr}'. "
-                f"Use format like '30d', '1w', '2m', '1y'"
+                f"Invalid time expression: '{expr}'. Use format like '30d', '1w', '2m', '1y'"
             )
 
         value = int(match.group(1))

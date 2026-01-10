@@ -1,4 +1,5 @@
 """Unit tests for judges configuration."""
+
 import json
 from pathlib import Path
 from typing import Any, Dict, List

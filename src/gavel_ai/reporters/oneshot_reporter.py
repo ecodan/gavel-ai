@@ -76,9 +76,7 @@ class OneShotReporter(Jinja2Reporter):
             }
 
         # Sort by total score descending
-        sorted_summary = sorted(
-            summary, key=lambda x: x["total_score"], reverse=True
-        )
+        sorted_summary = sorted(summary, key=lambda x: x["total_score"], reverse=True)
 
         winner = sorted_summary[0]
 
@@ -119,10 +117,12 @@ class OneShotReporter(Jinja2Reporter):
                 judge_id = judge.get("judge_id", "unknown")
                 if judge_id not in judge_ids:
                     judge_ids.add(judge_id)
-                    judges.append({
-                        "judge_id": judge_id,
-                        "judge_name": judge_id,  # For now, name == id
-                    })
+                    judges.append(
+                        {
+                            "judge_id": judge_id,
+                            "judge_name": judge_id,  # For now, name == id
+                        }
+                    )
 
         return judges
 

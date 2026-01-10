@@ -1,4 +1,5 @@
 """Unit tests for gavel oneshot create scaffolding command."""
+
 import json
 import tempfile
 from pathlib import Path
@@ -51,9 +52,7 @@ class TestOneshotCreateCommand:
     def test_agents_config_valid_json(self, tmp_path: Path) -> None:
         """Test that generated agents.json is valid JSON with correct structure."""
         eval_name = "test_eval"
-        runner.invoke(
-            app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)]
-        )
+        runner.invoke(app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)])
 
         agents_file = tmp_path / eval_name / "config" / "agents.json"
         with open(agents_file) as f:
@@ -78,9 +77,7 @@ class TestOneshotCreateCommand:
     def test_eval_config_valid_json(self, tmp_path: Path) -> None:
         """Test that generated eval_config.json is valid JSON with correct structure."""
         eval_name = "my_test_eval"
-        runner.invoke(
-            app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)]
-        )
+        runner.invoke(app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)])
 
         eval_config_file = tmp_path / eval_name / "config" / "eval_config.json"
         with open(eval_config_file) as f:
@@ -135,9 +132,7 @@ class TestOneshotCreateCommand:
     def test_async_config_nested_in_eval_config(self, tmp_path: Path) -> None:
         """Test that async config is nested inside eval_config.json."""
         eval_name = "test_eval"
-        runner.invoke(
-            app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)]
-        )
+        runner.invoke(app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)])
 
         eval_config_file = tmp_path / eval_name / "config" / "eval_config.json"
         with open(eval_config_file) as f:
@@ -157,9 +152,7 @@ class TestOneshotCreateCommand:
     def test_scenarios_json_valid(self, tmp_path: Path) -> None:
         """Test that generated scenarios.json is valid JSON with sample scenarios."""
         eval_name = "test_eval"
-        runner.invoke(
-            app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)]
-        )
+        runner.invoke(app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)])
 
         scenarios_file = tmp_path / eval_name / "data" / "scenarios.json"
         with open(scenarios_file) as f:
@@ -179,9 +172,7 @@ class TestOneshotCreateCommand:
     def test_prompts_toml_valid(self, tmp_path: Path) -> None:
         """Test that generated config/prompts/default.toml is valid TOML."""
         eval_name = "test_eval"
-        runner.invoke(
-            app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)]
-        )
+        runner.invoke(app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)])
 
         prompts_file = tmp_path / eval_name / "config" / "prompts" / "default.toml"
         with open(prompts_file) as f:
@@ -270,9 +261,7 @@ class TestOneshotCreateCommand:
     def test_json_files_use_snake_case(self, tmp_path: Path) -> None:
         """Test that all JSON config files use snake_case for keys (not camelCase)."""
         eval_name = "test_eval"
-        runner.invoke(
-            app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)]
-        )
+        runner.invoke(app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)])
 
         eval_dir = tmp_path / eval_name
 

@@ -121,3 +121,8 @@ markers = [
     "slow: Slow running tests",
     "asyncio: Async tests",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.0.0",
+]

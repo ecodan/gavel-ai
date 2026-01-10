@@ -1,4 +1,5 @@
 """Unit tests for scenarios configuration."""
+
 import csv
 import json
 import time
@@ -140,15 +141,9 @@ class TestCSVLoader:
         scenarios_file = tmp_path / "scenarios.csv"
         with open(scenarios_file, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(
-                ["scenario_id", "input", "expected"]
-            )
-            writer.writerow(
-                ["scenario-1", "What is the capital of France?", "Paris"]
-            )
-            writer.writerow(
-                ["scenario-2", "Explain quantum computing", ""]
-            )
+            writer.writerow(["scenario_id", "input", "expected"])
+            writer.writerow(["scenario-1", "What is the capital of France?", "Paris"])
+            writer.writerow(["scenario-2", "Explain quantum computing", ""])
 
         scenarios = load_scenarios_csv(scenarios_file)
 

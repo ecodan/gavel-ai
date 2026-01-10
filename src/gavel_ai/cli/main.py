@@ -1,11 +1,11 @@
 """Main Typer CLI application for Gavel-AI."""
-from pathlib import Path
+
 from typing import Optional
 
 import typer
 from dotenv import load_dotenv
 
-from gavel_ai.cli.workflows import autotune, conv, oneshot
+from gavel_ai.cli.commands import autotune, conv, oneshot
 from gavel_ai.log_config import get_application_logger
 from gavel_ai.telemetry import get_tracer
 
@@ -48,9 +48,7 @@ def main(
 # Register workflow subcommands
 app.add_typer(oneshot.app, name="oneshot", help="OneShot evaluation workflow commands")
 app.add_typer(conv.app, name="conv", help="Conversational evaluation workflow commands (v2+)")
-app.add_typer(
-    autotune.app, name="autotune", help="Autotune evaluation workflow commands (v3+)"
-)
+app.add_typer(autotune.app, name="autotune", help="Autotune evaluation workflow commands (v3+)")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ This module provides the command-line interface for gavel-ai, with hierarchical 
 for different evaluation workflows (OneShot, Conversational, Autotune).
 
 """
+
 from gavel_ai.cli.main import app
 
 # Export public API

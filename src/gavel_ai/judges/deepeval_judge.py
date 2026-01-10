@@ -46,9 +46,7 @@ class DeepEvalJudge(Judge):
         "deepeval.geval": GEval,
     }
 
-    def _create_model_instance(
-        self, model_name: str, model_family: Optional[str] = None
-    ) -> Any:
+    def _create_model_instance(self, model_name: str, model_family: Optional[str] = None) -> Any:
         """
         Create appropriate DeepEval model instance with cost tracking disabled.
 
@@ -153,9 +151,7 @@ class DeepEvalJudge(Judge):
             if judge_type == "deepeval.geval":
                 # GEval requires name, criteria, evaluation_steps, evaluation_params, model
                 # Get from nested config dict
-                criteria = metric_config.get(
-                    "criteria", "Evaluate the quality of the response"
-                )
+                criteria = metric_config.get("criteria", "Evaluate the quality of the response")
                 evaluation_steps = metric_config.get(
                     "evaluation_steps",
                     [
@@ -170,11 +166,7 @@ class DeepEvalJudge(Judge):
                     LLMTestCaseParams.EXPECTED_OUTPUT,
                 ]
                 # Use threshold from config dict, then fall back to top-level threshold
-                threshold = (
-                    metric_config.get("threshold")
-                    or self.config.threshold
-                    or 0.5
-                )
+                threshold = metric_config.get("threshold") or self.config.threshold or 0.5
 
                 # Get model name and family from config
                 model_name = metric_config.get("model") or self.config.model
@@ -222,9 +214,7 @@ class DeepEvalJudge(Judge):
                 f"Check judge configuration and API credentials"
             ) from e
 
-    async def evaluate(
-        self, scenario: Scenario, subject_output: str
-    ) -> JudgeResult:
+    async def evaluate(self, scenario: Scenario, subject_output: str) -> JudgeResult:
         """
         Evaluate subject output using DeepEval metric.
 
@@ -278,9 +268,7 @@ class DeepEvalJudge(Judge):
                     f"Check API credentials and judge configuration"
                 ) from e
 
-    def _create_test_case(
-        self, scenario: Scenario, subject_output: str
-    ) -> LLMTestCase:
+    def _create_test_case(self, scenario: Scenario, subject_output: str) -> LLMTestCase:
         """
         Create DeepEval test case from scenario and output.
 
@@ -297,9 +285,9 @@ class DeepEvalJudge(Judge):
         """
         # Extract input text from scenario (support both dict and string formats)
         if isinstance(scenario.input, dict):
-            input_text = scenario.input.get("text") or scenario.input.get(
-                "query"
-            ) or str(scenario.input)
+            input_text = (
+                scenario.input.get("text") or scenario.input.get("query") or str(scenario.input)
+            )
         else:
             input_text = str(scenario.input)
 
@@ -320,9 +308,7 @@ class DeepEvalJudge(Judge):
 
         # Add retrieval context if available (for dict format)
         if isinstance(scenario.input, dict) and "retrieval_context" in scenario.input:
-            test_case_kwargs["retrieval_context"] = scenario.input[
-                "retrieval_context"
-            ]
+            test_case_kwargs["retrieval_context"] = scenario.input["retrieval_context"]
 
         return LLMTestCase(**test_case_kwargs)
 
@@ -374,6 +360,7 @@ class DeepEvalJudge(Judge):
             except Exception as e:
                 # Fall through to scenario.expected on template error
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.warning(
                     f"Failed to render expected_output_template: {e} - "

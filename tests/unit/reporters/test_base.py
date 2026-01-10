@@ -18,10 +18,7 @@ from gavel_ai.reporters.base import Reporter
 
 def test_reporter_abc_cannot_be_instantiated():
     """Reporter ABC cannot be instantiated directly."""
-    config = ReporterConfig(
-        template_path="templates/",
-        output_format="html"
-    )
+    config = ReporterConfig(template_path="templates/", output_format="html")
 
     with pytest.raises(TypeError, match="Can't instantiate abstract class Reporter"):
         Reporter(config)  # type: ignore
@@ -32,12 +29,10 @@ def test_concrete_reporter_must_implement_generate():
 
     class BadReporter(Reporter):
         """Reporter implementation that doesn't implement generate."""
+
         pass
 
-    config = ReporterConfig(
-        template_path="templates/",
-        output_format="html"
-    )
+    config = ReporterConfig(template_path="templates/", output_format="html")
 
     with pytest.raises(TypeError, match="Can't instantiate abstract class BadReporter"):
         BadReporter(config)  # type: ignore
@@ -53,10 +48,7 @@ def test_concrete_reporter_can_be_instantiated():
             """Generate report."""
             return "<html>Report</html>"
 
-    config = ReporterConfig(
-        template_path="templates/",
-        output_format="html"
-    )
+    config = ReporterConfig(template_path="templates/", output_format="html")
 
     reporter = GoodReporter(config)
     assert reporter.config == config
@@ -74,10 +66,7 @@ async def test_concrete_reporter_generate_method():
             """Generate report."""
             return f"<html>Report for {template}</html>"
 
-    config = ReporterConfig(
-        template_path="templates/",
-        output_format="html"
-    )
+    config = ReporterConfig(template_path="templates/", output_format="html")
 
     reporter = TestReporter(config)
     result = await reporter.generate(run=None, template="test.html")
@@ -86,10 +75,7 @@ async def test_concrete_reporter_generate_method():
 
 def test_reporter_config_valid():
     """ReporterConfig validates with required fields."""
-    config = ReporterConfig(
-        template_path="templates/",
-        output_format="html"
-    )
+    config = ReporterConfig(template_path="templates/", output_format="html")
 
     assert config.template_path == "templates/"
     assert config.output_format == "html"
@@ -101,7 +87,7 @@ def test_reporter_config_with_custom_vars():
     config = ReporterConfig(
         template_path="templates/",
         output_format="markdown",
-        custom_vars={"company_name": "Acme Corp", "version": "1.0"}
+        custom_vars={"company_name": "Acme Corp", "version": "1.0"},
     )
 
     assert config.template_path == "templates/"
@@ -124,7 +110,7 @@ def test_reporter_config_extra_fields_ignored():
         template_path="templates/",
         output_format="html",
         unknown_field="this should be ignored",  # type: ignore
-        future_feature=42  # type: ignore
+        future_feature=42,  # type: ignore
     )
 
     assert config.template_path == "templates/"
@@ -160,9 +146,7 @@ def test_reporter_error_message_format():
 def test_reporter_error_can_be_raised():
     """ReporterError can be raised and caught."""
     with pytest.raises(ReporterError, match="Template rendering failed"):
-        raise ReporterError(
-            "Template rendering failed - Check template syntax and context data"
-        )
+        raise ReporterError("Template rendering failed - Check template syntax and context data")
 
 
 def test_reporter_error_with_chaining():
@@ -172,6 +156,4 @@ def test_reporter_error_with_chaining():
         raise ValueError("Undefined variable 'title'")
     except ValueError as e:
         with pytest.raises(ReporterError, match="Template rendering failed"):
-            raise ReporterError(
-                "Template rendering failed - Check context variables"
-            ) from e
+            raise ReporterError("Template rendering failed - Check context variables") from e

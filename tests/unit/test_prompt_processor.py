@@ -38,6 +38,7 @@ def mock_processor(mock_model_def):
         # Mock the call_agent method to return test data
         async def mock_call_agent(agent, prompt):
             from gavel_ai.providers.factory import ProviderResult
+
             return ProviderResult(
                 output=f"Mock response to: {prompt}",
                 metadata={
@@ -234,6 +235,7 @@ class TestProcessMethod:
         processor = mock_processor
 
         with patch.object(processor, "_call_llm", new_callable=AsyncMock) as mock_llm:
+
             async def slow_call(*args, **kwargs):
                 await asyncio.sleep(0.01)  # 10ms delay
                 return ("Output", {"tokens": 100})
@@ -519,9 +521,7 @@ class TestErrorHandling:
         from gavel_ai.core.exceptions import ProcessorError
 
         # Create sample error
-        error = ProcessorError(
-            "LLM call timed out after 30s - Increase timeout_seconds in config"
-        )
+        error = ProcessorError("LLM call timed out after 30s - Increase timeout_seconds in config")
 
         error_msg = str(error)
         assert "-" in error_msg  # Contains recovery guidance

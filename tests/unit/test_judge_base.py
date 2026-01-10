@@ -184,9 +184,7 @@ class TestJudgeBaseClass:
         """Test that a concrete Judge implementation works correctly."""
 
         class ConcreteJudge(Judge):
-            async def evaluate(
-                self, scenario: Scenario, subject_output: str
-            ) -> JudgeResult:
+            async def evaluate(self, scenario: Scenario, subject_output: str) -> JudgeResult:
                 return JudgeResult(
                     score=8,
                     reasoning="Test evaluation",

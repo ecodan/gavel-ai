@@ -188,8 +188,6 @@ def test_artifact_ref_model():
 
 def test_artifact_ref_extra_fields_ignored():
     """ArtifactRef ignores extra fields per ConfigDict(extra='ignore')."""
-    ref = ArtifactRef(
-        path="results.jsonl", type="jsonl", size=1024, unknown_field="ignored"
-    )
+    ref = ArtifactRef(path="results.jsonl", type="jsonl", size=1024, unknown_field="ignored")
     assert ref.path == "results.jsonl"
     # unknown_field should be ignored, not raise ValidationError

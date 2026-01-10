@@ -20,9 +20,7 @@ class TestJudgeExecutorInitialization:
     def test_create_executor_with_judges(self, mock_deepeval_metrics):
         """Test creating executor with valid judge configs."""
         configs = [
-            JudgeConfig(
-                name="relevancy", type="deepeval.answer_relevancy"
-            ),
+            JudgeConfig(name="relevancy", type="deepeval.answer_relevancy"),
             JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
 
@@ -31,9 +29,7 @@ class TestJudgeExecutorInitialization:
         assert len(executor.judges) == 2
         assert executor.error_handling == "fail_fast"
 
-    def test_create_executor_with_custom_error_handling(
-        self, mock_deepeval_metrics
-    ):
+    def test_create_executor_with_custom_error_handling(self, mock_deepeval_metrics):
         """Test creating executor with custom error handling."""
         configs = [
             JudgeConfig(name="test", type="deepeval.answer_relevancy"),
@@ -50,9 +46,7 @@ class TestJudgeExecutorInitialization:
 
         assert "at least one judge" in str(exc_info.value)
 
-    def test_create_executor_with_invalid_judge_raises_error(
-        self, mock_deepeval_metrics
-    ):
+    def test_create_executor_with_invalid_judge_raises_error(self, mock_deepeval_metrics):
         """Test that invalid judge config raises error during initialization."""
         configs = [
             JudgeConfig(name="invalid", type="invalid.type"),
@@ -77,9 +71,7 @@ class TestJudgeExecutorSingleExecution:
         mock_metric.reason = "Highly relevant"
 
         # Create executor
-        config = JudgeConfig(
-            name="relevancy", type="deepeval.answer_relevancy"
-        )
+        config = JudgeConfig(name="relevancy", type="deepeval.answer_relevancy")
         executor = JudgeExecutor([config])
 
         # Execute
@@ -107,9 +99,7 @@ class TestJudgeExecutorSingleExecution:
         assert result.timestamp  # Should have timestamp
 
     @pytest.mark.asyncio
-    async def test_execute_multiple_judges_sequentially(
-        self, mock_deepeval_metrics
-    ):
+    async def test_execute_multiple_judges_sequentially(self, mock_deepeval_metrics):
         """Test executing multiple judges sequentially."""
         # Setup mocks
         mock_relevancy = mock_deepeval_metrics["relevancy_instance"]
@@ -122,9 +112,7 @@ class TestJudgeExecutorSingleExecution:
 
         # Create executor with two judges
         configs = [
-            JudgeConfig(
-                name="relevancy", type="deepeval.answer_relevancy"
-            ),
+            JudgeConfig(name="relevancy", type="deepeval.answer_relevancy"),
             JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         executor = JudgeExecutor(configs)
@@ -158,9 +146,7 @@ class TestJudgeExecutorSingleExecution:
         mock_metric.score = 0.5
         mock_metric.reason = "Okay"
 
-        config = JudgeConfig(
-            name="test", type="deepeval.answer_relevancy"
-        )
+        config = JudgeConfig(name="test", type="deepeval.answer_relevancy")
         executor = JudgeExecutor([config])
 
         scenario = Scenario(id="test", input={"text": "test"})
@@ -180,9 +166,7 @@ class TestJudgeExecutorSingleExecution:
         mock_metric.score = 0.5
         mock_metric.reason = "Okay"
 
-        config = JudgeConfig(
-            name="test", type="deepeval.answer_relevancy"
-        )
+        config = JudgeConfig(name="test", type="deepeval.answer_relevancy")
         executor = JudgeExecutor([config])
 
         scenario = Scenario(id="test", input={"text": "test"})
@@ -213,9 +197,7 @@ class TestJudgeExecutorErrorHandling:
         mock_faithfulness.measure.side_effect = Exception("API error")
 
         configs = [
-            JudgeConfig(
-                name="relevancy", type="deepeval.answer_relevancy"
-            ),
+            JudgeConfig(name="relevancy", type="deepeval.answer_relevancy"),
             JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         executor = JudgeExecutor(configs, error_handling="fail_fast")
@@ -233,9 +215,7 @@ class TestJudgeExecutorErrorHandling:
         assert "failed" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_continue_on_error_skips_failed_judge(
-        self, mock_deepeval_metrics
-    ):
+    async def test_continue_on_error_skips_failed_judge(self, mock_deepeval_metrics):
         """Test that continue_on_error skips failed judge and continues."""
         # Setup: first judge fails, second judge succeeds
         mock_relevancy = mock_deepeval_metrics["relevancy_instance"]
@@ -246,9 +226,7 @@ class TestJudgeExecutorErrorHandling:
         mock_faithfulness.reason = "Good"
 
         configs = [
-            JudgeConfig(
-                name="relevancy", type="deepeval.answer_relevancy"
-            ),
+            JudgeConfig(name="relevancy", type="deepeval.answer_relevancy"),
             JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
         ]
         executor = JudgeExecutor(configs, error_handling="continue_on_error")
@@ -277,9 +255,7 @@ class TestJudgeExecutorBatchExecution:
         mock_metric.score = 0.9
         mock_metric.reason = "Good"
 
-        config = JudgeConfig(
-            name="test", type="deepeval.answer_relevancy"
-        )
+        config = JudgeConfig(name="test", type="deepeval.answer_relevancy")
         executor = JudgeExecutor([config])
 
         # Create batch of evaluations
@@ -319,9 +295,7 @@ class TestJudgeExecutorBatchExecution:
         mock_metric.score = 0.5
         mock_metric.reason = "Okay"
 
-        config = JudgeConfig(
-            name="test", type="deepeval.answer_relevancy"
-        )
+        config = JudgeConfig(name="test", type="deepeval.answer_relevancy")
         executor = JudgeExecutor([config])
 
         evaluations = [

@@ -164,12 +164,13 @@ def mock_deepeval_metrics():
 
     Returns a dict of mocked metric instances that can be configured per test.
     """
-    with patch("gavel_ai.judges.deepeval_judge.AnswerRelevancyMetric") as mock_relevancy, \
-         patch("gavel_ai.judges.deepeval_judge.ContextualRelevancyMetric") as mock_contextual, \
-         patch("gavel_ai.judges.deepeval_judge.FaithfulnessMetric") as mock_faithfulness, \
-         patch("gavel_ai.judges.deepeval_judge.HallucinationMetric") as mock_hallucination, \
-         patch("gavel_ai.judges.deepeval_judge.GEval") as mock_geval:
-
+    with (
+        patch("gavel_ai.judges.deepeval_judge.AnswerRelevancyMetric") as mock_relevancy,
+        patch("gavel_ai.judges.deepeval_judge.ContextualRelevancyMetric") as mock_contextual,
+        patch("gavel_ai.judges.deepeval_judge.FaithfulnessMetric") as mock_faithfulness,
+        patch("gavel_ai.judges.deepeval_judge.HallucinationMetric") as mock_hallucination,
+        patch("gavel_ai.judges.deepeval_judge.GEval") as mock_geval,
+    ):
         # Create mock instances that will be returned
         mock_relevancy_instance = MagicMock()
         mock_contextual_instance = MagicMock()
@@ -242,6 +243,7 @@ def ensure_telemetry_initialized():
 
     # Reset telemetry after all tests
     from gavel_ai.telemetry import reset_telemetry
+
     reset_telemetry()
 
 

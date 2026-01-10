@@ -1,4 +1,5 @@
 """Judges configuration schema for DeepEval integration."""
+
 import json
 from pathlib import Path
 from typing import List
@@ -34,29 +35,28 @@ def load_judge_config(judge: JudgeConfig, eval_root: Path) -> JudgeConfig:
     Raises:
         JudgeError: If config file not found
     """
-    with tracer.start_as_current_span("judges.load_judge_config"):
-        if not judge.config_ref:
-            return judge
+    if not judge.config_ref:
+        return judge
 
-        # Load external config file
-        config_file = eval_root / judge.config_ref
-        if not config_file.exists():
-            raise JudgeError(
-                f"Judge config file not found: {judge.config_ref} - "
-                f"Create file or fix config_ref path"
-            )
-
-        external_config = json.loads(config_file.read_text())
-
-        # Merge configs (external overrides inline)
-        merged_config = {**(judge.config or {}), **external_config}
-
-        return JudgeConfig(
-            name=judge.name,
-            type=judge.type,
-            config=merged_config,
-            config_ref=judge.config_ref,
+    # Load external config file
+    config_file = eval_root / judge.config_ref
+    if not config_file.exists():
+        raise JudgeError(
+            f"Judge config file not found: {judge.config_ref} - "
+            f"Create file or fix config_ref path"
         )
+
+    external_config = json.loads(config_file.read_text())
+
+    # Merge configs (external overrides inline)
+    merged_config = {**(judge.config or {}), **external_config}
+
+    return JudgeConfig(
+        name=judge.name,
+        type=judge.type,
+        config=merged_config,
+        config_ref=judge.config_ref,
+    )
 
 
 def validate_judge_ids(judges: List[JudgeConfig]) -> None:
@@ -68,21 +68,19 @@ def validate_judge_ids(judges: List[JudgeConfig]) -> None:
     Raises:
         JudgeError: If duplicate judge names found
     """
-    with tracer.start_as_current_span("judges.validate_judge_ids"):
-        judge_names = [j.name for j in judges]
-        seen = set()
-        duplicates = []
+    judge_names = [j.name for j in judges]
+    seen = set()
+    duplicates = []
 
-        for judge_name in judge_names:
-            if judge_name in seen:
-                duplicates.append(judge_name)
-            seen.add(judge_name)
+    for judge_name in judge_names:
+        if judge_name in seen:
+            duplicates.append(judge_name)
+        seen.add(judge_name)
 
-        if duplicates:
-            raise JudgeError(
-                f"Duplicate judge names found: {', '.join(duplicates)} - "
-                f"Judge names must be unique"
-            )
+    if duplicates:
+        raise JudgeError(
+            f"Duplicate judge names found: {', '.join(duplicates)} - Judge names must be unique"
+        )
 
 
 def validate_judge_type(judge_type: str) -> None:
@@ -97,6 +95,5 @@ def validate_judge_type(judge_type: str) -> None:
     if judge_type not in SUPPORTED_DEEPEVAL_JUDGES:
         supported_list = ", ".join(sorted(SUPPORTED_DEEPEVAL_JUDGES))
         raise JudgeError(
-            f"Unsupported judge type: {judge_type} - "
-            f"Supported judges: {supported_list}"
+            f"Unsupported judge type: {judge_type} - Supported judges: {supported_list}"
         )

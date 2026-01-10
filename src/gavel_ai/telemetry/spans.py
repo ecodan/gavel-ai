@@ -378,7 +378,9 @@ def configure_run_telemetry(
         _tracer_provider = _initialize_tracer_provider()
 
     # Create telemetry file path
-    telemetry_path = Path(base_dir) / "evaluations" / eval_name / "runs" / run_id / "telemetry.jsonl"
+    telemetry_path = (
+        Path(base_dir) / "evaluations" / eval_name / "runs" / run_id / "telemetry.jsonl"
+    )
     _current_telemetry_path = telemetry_path
     _current_run_id = run_id
 
@@ -499,6 +501,38 @@ def start_span(name: str) -> trace.Span:
 
 # Initialize tracer provider on module import
 _tracer_provider = _initialize_tracer_provider()
+
+
+def _fast_shutdown() -> None:
+    """
+    Fast shutdown for CLI - prevents ~11s delay from OpenTelemetry atexit handlers.
+
+    This forces TracerProvider to shutdown with a 100ms timeout instead of the
+    default 30-second timeout from deepeval/logfire's OpenTelemetry setup.
+    """
+    global _tracer_provider, _dynamic_processor
+
+    try:
+        # Flush our processor quickly
+        if _dynamic_processor is not None:
+            _dynamic_processor.force_flush(timeout_millis=100)
+
+        # Force shutdown the global tracer provider with short timeout
+        provider = trace.get_tracer_provider()
+        if hasattr(provider, "shutdown"):
+            provider.shutdown()
+        elif hasattr(provider, "force_flush"):
+            provider.force_flush(timeout_millis=100)
+    except Exception:
+        # Ignore errors during shutdown
+        pass
+
+
+# Register fast shutdown for CLI execution (prevents long atexit delays)
+import atexit
+
+atexit.register(_fast_shutdown)
+
 
 __all__ = [
     "get_tracer",

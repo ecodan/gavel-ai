@@ -8,6 +8,7 @@ Tests verify that all components are correctly wired together:
 
 Note: These tests mock the actual LLM calls to avoid needing API keys.
 """
+
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -222,9 +223,7 @@ class TestErrorHandling:
 
     def test_config_error_message_format(self) -> None:
         """Test ConfigError messages follow required format."""
-        error = ConfigError(
-            "Config file not found: agents.json - Run 'gavel oneshot create' first"
-        )
+        error = ConfigError("Config file not found: agents.json - Run 'gavel oneshot create' first")
 
         error_str = str(error)
         assert "Config file not found" in error_str
@@ -232,9 +231,7 @@ class TestErrorHandling:
 
     def test_validation_error_message_format(self) -> None:
         """Test ValidationError messages follow required format."""
-        error = ValidationError(
-            "Invalid agents.json - Field 'model_provider' is required"
-        )
+        error = ValidationError("Invalid agents.json - Field 'model_provider' is required")
 
         error_str = str(error)
         assert "Invalid agents.json" in error_str

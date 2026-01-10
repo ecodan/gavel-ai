@@ -94,64 +94,55 @@ class JudgeExecutor:
         Raises:
             JudgeError: If error_handling is "fail_fast" and a judge fails
         """
-        with self.tracer.start_as_current_span("judge_executor.execute") as span:
-            span.set_attribute("scenario.id", scenario.id)
-            span.set_attribute("variant.id", variant_id)
-            span.set_attribute("subject.id", subject_id)
-            span.set_attribute("judges.count", len(self.judges))
+        judge_evaluations: List[JudgeEvaluation] = []
 
-            judge_evaluations: List[JudgeEvaluation] = []
+        # Execute judges sequentially
+        for judge in self.judges:
+            try:
+                logger.info(f"Executing judge '{judge.config.name}' for scenario '{scenario.id}'")
 
-            # Execute judges sequentially
-            for judge in self.judges:
-                try:
-                    logger.info(
-                        f"Executing judge '{judge.config.name}' for scenario '{scenario.id}'"
-                    )
+                # Evaluate with the judge
+                result = await judge.evaluate(scenario, subject_output)
 
-                    # Evaluate with the judge
-                    result = await judge.evaluate(scenario, subject_output)
+                # Store evaluation
+                evaluation = JudgeEvaluation(
+                    judge_id=judge.config.name,
+                    score=result.score,
+                    reasoning=result.reasoning,
+                    evidence=result.evidence,
+                )
+                judge_evaluations.append(evaluation)
 
-                    # Store evaluation
-                    evaluation = JudgeEvaluation(
-                        judge_id=judge.config.name,
-                        score=result.score,
-                        reasoning=result.reasoning,
-                        evidence=result.evidence,
-                    )
-                    judge_evaluations.append(evaluation)
+                logger.info(
+                    f"Judge '{judge.config.name}' scored {result.score}/10 for scenario '{scenario.id}'"
+                )
 
-                    logger.info(
-                        f"Judge '{judge.config.name}' scored {result.score}/10 for scenario '{scenario.id}'"
-                    )
+            except Exception as e:
+                error_msg = f"Judge '{judge.config.name}' failed for scenario '{scenario.id}': {e}"
 
-                except Exception as e:
-                    error_msg = f"Judge '{judge.config.name}' failed for scenario '{scenario.id}': {e}"
+                if self.error_handling == "fail_fast":
+                    logger.error(error_msg)
+                    raise JudgeError(error_msg) from e
+                else:
+                    # Continue on error - log and skip this judge
+                    logger.warning(f"{error_msg} - Continuing with next judge")
+                    continue
 
-                    if self.error_handling == "fail_fast":
-                        logger.error(error_msg)
-                        raise JudgeError(error_msg) from e
-                    else:
-                        # Continue on error - log and skip this judge
-                        logger.warning(f"{error_msg} - Continuing with next judge")
-                        continue
+        # Create evaluation result
+        timestamp = datetime.now(timezone.utc).isoformat()
+        result = EvaluationResult(
+            scenario_id=scenario.id,
+            variant_id=variant_id,
+            subject_id=subject_id,
+            scenario_input=scenario.input,
+            expected_behavior=scenario.expected_behavior,
+            processor_output=subject_output,
+            judges=judge_evaluations,
+            timestamp=timestamp,
+            metadata=metadata or {},
+        )
 
-            # Create evaluation result
-            timestamp = datetime.now(timezone.utc).isoformat()
-            result = EvaluationResult(
-                scenario_id=scenario.id,
-                variant_id=variant_id,
-                subject_id=subject_id,
-                scenario_input=scenario.input,
-                expected_behavior=scenario.expected_behavior,
-                processor_output=subject_output,
-                judges=judge_evaluations,
-                timestamp=timestamp,
-                metadata=metadata or {},
-            )
-
-            span.set_attribute("judges.completed", len(judge_evaluations))
-            return result
+        return result
 
     async def execute_batch(
         self,
@@ -178,28 +169,23 @@ class JudgeExecutor:
         Raises:
             JudgeError: If error_handling is "fail_fast" and a judge fails
         """
-        with self.tracer.start_as_current_span("judge_executor.execute_batch") as span:
-            span.set_attribute("batch.size", len(evaluations))
-            span.set_attribute("judges.count", len(self.judges))
+        results: List[EvaluationResult] = []
+        test_subject_display = test_subject or "unknown"
 
-            results: List[EvaluationResult] = []
-            test_subject_display = test_subject or "unknown"
+        with tqdm(total=len(evaluations), desc="Running judges", unit="scenario") as pbar:
+            for scenario, subject_output, variant_id in evaluations:
+                result = await self.execute(
+                    scenario=scenario,
+                    subject_output=subject_output,
+                    variant_id=variant_id,
+                    subject_id=subject_id,
+                    metadata=metadata,
+                )
+                results.append(result)
 
-            with tqdm(total=len(evaluations), desc="Running judges", unit="scenario") as pbar:
-                for scenario, subject_output, variant_id in evaluations:
-                    result = await self.execute(
-                        scenario=scenario,
-                        subject_output=subject_output,
-                        variant_id=variant_id,
-                        subject_id=subject_id,
-                        metadata=metadata,
-                    )
-                    results.append(result)
+                # Update progress bar with latest scenario info
+                pbar.update(1)
+                desc = f"Running judges | {scenario.id} | {test_subject_display} | {variant_id}"
+                pbar.set_description(desc)
 
-                    # Update progress bar with latest scenario info
-                    pbar.update(1)
-                    desc = f"Running judges | {scenario.id} | {test_subject_display} | {variant_id}"
-                    pbar.set_description(desc)
-
-            span.set_attribute("results.count", len(results))
-            return results
+        return results

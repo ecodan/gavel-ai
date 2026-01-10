@@ -1,4 +1,5 @@
 """Configuration file loader with environment variable substitution."""
+
 import json
 import os
 import re
@@ -63,9 +64,7 @@ def load_config(
     """
     # Check if file exists
     if not config_path.exists():
-        raise ConfigError(
-            f"Config file not found: {config_path} - Create file or check path"
-        )
+        raise ConfigError(f"Config file not found: {config_path} - Create file or check path")
 
     # Read file content
     content = config_path.read_text()
@@ -84,21 +83,14 @@ def load_config(
             data = toml.loads(content)
         else:
             raise ConfigError(
-                f"Unsupported config format: {config_path.suffix} - "
-                f"Use .json, .yaml, or .toml"
+                f"Unsupported config format: {config_path.suffix} - Use .json, .yaml, or .toml"
             )
     except json.JSONDecodeError as e:
-        raise ConfigError(
-            f"Invalid JSON in {config_path} - Fix JSON syntax: {e}"
-        ) from None
+        raise ConfigError(f"Invalid JSON in {config_path} - Fix JSON syntax: {e}") from None
     except yaml.YAMLError as e:
-        raise ConfigError(
-            f"Invalid YAML in {config_path} - Fix YAML syntax: {e}"
-        ) from None
+        raise ConfigError(f"Invalid YAML in {config_path} - Fix YAML syntax: {e}") from None
     except toml.TomlDecodeError as e:
-        raise ConfigError(
-            f"Invalid TOML in {config_path} - Fix TOML syntax: {e}"
-        ) from None
+        raise ConfigError(f"Invalid TOML in {config_path} - Fix TOML syntax: {e}") from None
 
     # Validate with Pydantic
     try:

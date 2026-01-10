@@ -24,7 +24,9 @@ class ScenarioTimingStats(BaseModel):
     median_ms: float = Field(..., ge=0, description="Median scenario duration in milliseconds")
     min_ms: float = Field(..., ge=0, description="Minimum scenario duration in milliseconds")
     max_ms: float = Field(..., ge=0, description="Maximum scenario duration in milliseconds")
-    std_ms: float = Field(..., ge=0, description="Standard deviation of scenario duration in milliseconds")
+    std_ms: float = Field(
+        ..., ge=0, description="Standard deviation of scenario duration in milliseconds"
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -44,9 +46,7 @@ class LLMMetrics(BaseModel):
     """Aggregated LLM call metrics."""
 
     total: int = Field(..., ge=0, description="Total number of LLM calls")
-    by_model: Dict[str, int] = Field(
-        ..., description="Count of calls per model name"
-    )
+    by_model: Dict[str, int] = Field(..., description="Count of calls per model name")
     tokens: Dict[str, Any] = Field(
         ...,
         description="Token counts with structure: {prompt_total, completion_total, by_model: {model_name: {prompt, completion}}}",
@@ -86,12 +86,8 @@ class RunMetadataSchema(BaseModel):
     eval_name: str = Field(..., description="Evaluation name")
     start_time_iso: str = Field(..., description="Run start time in ISO 8601 format")
     end_time_iso: str = Field(..., description="Run end time in ISO 8601 format")
-    total_duration_seconds: float = Field(
-        ..., ge=0, description="Total run duration in seconds"
-    )
-    scenario_timing: ScenarioTimingStats = Field(
-        ..., description="Scenario timing statistics"
-    )
+    total_duration_seconds: float = Field(..., ge=0, description="Total run duration in seconds")
+    scenario_timing: ScenarioTimingStats = Field(..., description="Scenario timing statistics")
     llm_calls: LLMMetrics = Field(..., description="LLM call metrics")
     execution: Dict[str, Any] = Field(
         ...,
@@ -145,7 +141,9 @@ class RunMetadataCollector:
     def __init__(self) -> None:
         """Initialize collector with empty data structures."""
         self.scenario_timings: Dict[str, Dict[str, float]] = {}  # scenario_id -> {start, end}
-        self.llm_calls: List[Dict[str, Any]] = []  # List of {model, prompt_tokens, completion_tokens}
+        self.llm_calls: List[
+            Dict[str, Any]
+        ] = []  # List of {model, prompt_tokens, completion_tokens}
         self.retries: Dict[str, int] = {}  # scenario_id -> count
         self.scenario_success: Dict[str, bool] = {}  # scenario_id -> success status
         self.run_start_time: Optional[float] = None
@@ -189,9 +187,7 @@ class RunMetadataCollector:
         self.scenario_timings[scenario_id]["end"] = time.time()
         self.scenario_success[scenario_id] = success
 
-    def record_llm_call(
-        self, model: str, prompt_tokens: int, completion_tokens: int
-    ) -> None:
+    def record_llm_call(self, model: str, prompt_tokens: int, completion_tokens: int) -> None:
         """Record an LLM call with token counts.
 
         Args:
@@ -292,12 +288,8 @@ class RunMetadataCollector:
         )
 
         # Compute execution summary
-        completed_count = sum(
-            1 for success in self.scenario_success.values() if success
-        )
-        failed_count = sum(
-            1 for success in self.scenario_success.values() if not success
-        )
+        completed_count = sum(1 for success in self.scenario_success.values() if success)
+        failed_count = sum(1 for success in self.scenario_success.values() if not success)
         total_retries = sum(self.retries.values())
         retry_details = [
             {"scenario_id": scenario_id, "retry_count": count}

@@ -88,9 +88,7 @@ def mock_scenario():
 class TestDeepEvalJudgeInitialization:
     """Test DeepEvalJudge initialization."""
 
-    def test_answer_relevancy_judge_creation(
-        self, mock_deepeval_metrics, answer_relevancy_config
-    ):
+    def test_answer_relevancy_judge_creation(self, mock_deepeval_metrics, answer_relevancy_config):
         """Test creating answer relevancy judge."""
         judge = DeepEvalJudge(answer_relevancy_config)
 
@@ -100,17 +98,13 @@ class TestDeepEvalJudgeInitialization:
             threshold=0.7, model="gpt-4"
         )
 
-    def test_faithfulness_judge_creation(
-        self, mock_deepeval_metrics, faithfulness_config
-    ):
+    def test_faithfulness_judge_creation(self, mock_deepeval_metrics, faithfulness_config):
         """Test creating faithfulness judge."""
         judge = DeepEvalJudge(faithfulness_config)
 
         assert judge.config == faithfulness_config
         assert judge.metric == mock_deepeval_metrics["faithfulness_instance"]
-        mock_deepeval_metrics["FaithfulnessMetric"].assert_called_once_with(
-            threshold=0.8
-        )
+        mock_deepeval_metrics["FaithfulnessMetric"].assert_called_once_with(threshold=0.8)
 
     def test_geval_judge_creation(self, mock_deepeval_metrics, geval_config):
         """Test creating GEval judge."""
@@ -207,9 +201,7 @@ class TestDeepEvalJudgeEvaluation:
         assert "Not relevant" in result.reasoning
 
     @pytest.mark.asyncio
-    async def test_evaluate_with_geval(
-        self, mock_deepeval_metrics, geval_config, mock_scenario
-    ):
+    async def test_evaluate_with_geval(self, mock_deepeval_metrics, geval_config, mock_scenario):
         """Test evaluation with custom GEval judge."""
         # Setup mock metric behavior
         mock_metric = mock_deepeval_metrics["geval_instance"]
@@ -265,25 +257,23 @@ class TestDeepEvalJudgeScoreNormalization:
         assert judge._normalize_score(1.0) == 10
         assert judge._normalize_score(0.5) == 6
 
-    def test_score_normalization_range(
-        self, mock_deepeval_metrics, answer_relevancy_config
-    ):
+    def test_score_normalization_range(self, mock_deepeval_metrics, answer_relevancy_config):
         """Test score normalization across range."""
         judge = DeepEvalJudge(answer_relevancy_config)
 
         # Test various scores
         # Formula: round(1 + raw_score * 9)
         test_cases = [
-            (0.0, 1),   # round(1 + 0*9) = 1
-            (0.1, 2),   # round(1 + 0.9) = 2
-            (0.2, 3),   # round(1 + 1.8) = 3
-            (0.3, 4),   # round(1 + 2.7) = 4
-            (0.4, 5),   # round(1 + 3.6) = 5
-            (0.5, 6),   # round(1 + 4.5) = 6
-            (0.6, 6),   # round(1 + 5.4) = 6
-            (0.7, 7),   # round(1 + 6.3) = 7
-            (0.8, 8),   # round(1 + 7.2) = 8
-            (0.9, 9),   # round(1 + 8.1) = 9
+            (0.0, 1),  # round(1 + 0*9) = 1
+            (0.1, 2),  # round(1 + 0.9) = 2
+            (0.2, 3),  # round(1 + 1.8) = 3
+            (0.3, 4),  # round(1 + 2.7) = 4
+            (0.4, 5),  # round(1 + 3.6) = 5
+            (0.5, 6),  # round(1 + 4.5) = 6
+            (0.6, 6),  # round(1 + 5.4) = 6
+            (0.7, 7),  # round(1 + 6.3) = 7
+            (0.8, 8),  # round(1 + 7.2) = 8
+            (0.9, 9),  # round(1 + 8.1) = 9
             (1.0, 10),  # round(1 + 9.0) = 10
         ]
 
@@ -353,9 +343,7 @@ class TestGEvalExpectedOutputTemplate:
         assert expected == mock_scenario.expected_behavior
         assert expected == "Paris"
 
-    def test_geval_without_template(
-        self, mock_deepeval_metrics, geval_config, mock_scenario
-    ):
+    def test_geval_without_template(self, mock_deepeval_metrics, geval_config, mock_scenario):
         """Test GEval judge works without expected_output_template."""
         judge = DeepEvalJudge(geval_config)
         expected = judge._get_expected_output(mock_scenario)

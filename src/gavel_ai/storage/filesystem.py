@@ -78,38 +78,31 @@ class LocalFilesystemRun(Run):
         Raises:
             StorageError: On directory creation or save failures
         """
-        with self.tracer.start_as_current_span("storage.save") as span:
-            span.set_attribute("storage.type", "filesystem")
-            span.set_attribute("run.id", self.run_id)
-            span.set_attribute("run.directory", str(self.run_dir))
+        try:
+            # Create directory structure
+            self.run_dir.mkdir(parents=True, exist_ok=True)
+            (self.run_dir / "config").mkdir(exist_ok=True)
 
-            try:
-                # Create directory structure
-                self.run_dir.mkdir(parents=True, exist_ok=True)
-                (self.run_dir / "config").mkdir(exist_ok=True)
+            # Save all artifacts (only if data is set)
+            if self.manifest_data is not None:
+                await self.save_manifest()
+            if self.config_data is not None:
+                await self.save_config()
+            if self.telemetry_data is not None:
+                await self.save_telemetry()
+            if self.results_data is not None:
+                await self.save_results()
+            if self.metadata_data is not None:
+                await self.save_metadata()
+            if self.log_data is not None:
+                await self.save_log()
+            if self.report_data is not None:
+                await self.save_report()
 
-                # Save all artifacts (only if data is set)
-                if self.manifest_data is not None:
-                    await self.save_manifest()
-                if self.config_data is not None:
-                    await self.save_config()
-                if self.telemetry_data is not None:
-                    await self.save_telemetry()
-                if self.results_data is not None:
-                    await self.save_results()
-                if self.metadata_data is not None:
-                    await self.save_metadata()
-                if self.log_data is not None:
-                    await self.save_log()
-                if self.report_data is not None:
-                    await self.save_report()
+            return str(self.run_dir)
 
-                return str(self.run_dir)
-
-            except (OSError, PermissionError) as e:
-                raise StorageError(
-                    f"StorageError: Failed to save run {self.run_id} - {e}"
-                ) from e
+        except (OSError, PermissionError) as e:
+            raise StorageError(f"StorageError: Failed to save run {self.run_id} - {e}") from e
 
     @staticmethod
     async def load(run_id: str, base_dir: str = ".gavel") -> "LocalFilesystemRun":
@@ -131,9 +124,7 @@ class LocalFilesystemRun(Run):
         eval_dirs = list(base_path.glob(f"evaluations/*/runs/{run_id}"))
 
         if not eval_dirs:
-            raise StorageError(
-                f"StorageError: Run {run_id} not found - Check run ID"
-            )
+            raise StorageError(f"StorageError: Run {run_id} not found - Check run ID")
 
         run_dir = eval_dirs[0]
 
@@ -364,9 +355,7 @@ class LocalFilesystemRun(Run):
                 full_manifest = json.load(f)
 
             # Separate constructor metadata from manifest data
-            self.manifest_data = {
-                k: v for k, v in full_manifest.items() if k != "metadata"
-            }
+            self.manifest_data = {k: v for k, v in full_manifest.items() if k != "metadata"}
 
             self._artifacts["manifest"] = ArtifactRef(
                 path=str(manifest_path), type="json", size=manifest_path.stat().st_size

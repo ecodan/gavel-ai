@@ -34,9 +34,7 @@ class Judge(ABC):
         self.tracer = get_tracer(__name__)
 
     @abstractmethod
-    async def evaluate(
-        self, scenario: Scenario, subject_output: str
-    ) -> JudgeResult:
+    async def evaluate(self, scenario: Scenario, subject_output: str) -> JudgeResult:
         """
         Evaluate a subject's output against a scenario.
 

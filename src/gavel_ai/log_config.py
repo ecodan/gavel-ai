@@ -136,6 +136,7 @@ def get_application_logger(
     resolved_path = str(log_dir.resolve())
     # Use hash to keep name short but unique
     import hashlib
+
     path_hash = hashlib.md5(resolved_path.encode()).hexdigest()[:8]
     app_logger_name = f"{LOGGER_NAME}.app.{path_hash}"
 

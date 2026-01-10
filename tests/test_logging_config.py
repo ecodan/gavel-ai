@@ -119,9 +119,7 @@ class TestLoggerUsage:
         # Verify all messages were logged
         assert len(caplog.records) == 4
 
-    def test_logger_exception_handling(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_logger_exception_handling(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that exceptions can be logged."""
         logger = create_logger("exception_test")
         caplog.set_level(logging.ERROR)

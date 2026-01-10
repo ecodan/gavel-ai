@@ -1,4 +1,5 @@
 """Common CLI utilities and error handling."""
+
 from typing import NoReturn
 
 import typer

@@ -71,40 +71,33 @@ class Jinja2Reporter(Reporter):
         Raises:
             ReporterError: On template loading or rendering failures
         """
-        with self.tracer.start_as_current_span("reporter.generate") as span:
-            span.set_attribute("reporter.type", "jinja2")
-            span.set_attribute("run.id", getattr(run, "run_id", "unknown"))
-            span.set_attribute("template.name", str(template))
-            span.set_attribute("output.format", self.config.output_format)
+        # Build context from run data
+        context = self._build_context(run)
 
-            # Build context from run data
-            context = self._build_context(run)
-
-            # Render template
-            try:
-                tmpl = self.env.get_template(template)
-                output: str = tmpl.render(**context)
-                return output
-            except jinja2.TemplateNotFound as e:
-                raise ReporterError(
-                    f"Template '{template}' not found in {self.config.template_path} - "
-                    f"Check template_path in config or create template file"
-                ) from e
-            except jinja2.TemplateSyntaxError as e:
-                raise ReporterError(
-                    f"Template syntax error in '{template}' at line {e.lineno}: {e.message} - "
-                    f"Fix template syntax errors"
-                ) from e
-            except jinja2.UndefinedError as e:
-                raise ReporterError(
-                    f"Undefined variable in template '{template}': {e} - "
-                    f"Check context variables match template requirements"
-                ) from e
-            except Exception as e:
-                raise ReporterError(
-                    f"Template rendering failed for '{template}': {e} - "
-                    f"Check template and context data"
-                ) from e
+        # Render template
+        try:
+            tmpl = self.env.get_template(template)
+            output: str = tmpl.render(**context)
+            return output
+        except jinja2.TemplateNotFound as e:
+            raise ReporterError(
+                f"Template '{template}' not found in {self.config.template_path} - "
+                f"Check template_path in config or create template file"
+            ) from e
+        except jinja2.TemplateSyntaxError as e:
+            raise ReporterError(
+                f"Template syntax error in '{template}' at line {e.lineno}: {e.message} - "
+                f"Fix template syntax errors"
+            ) from e
+        except jinja2.UndefinedError as e:
+            raise ReporterError(
+                f"Undefined variable in template '{template}': {e} - "
+                f"Check context variables match template requirements"
+            ) from e
+        except Exception as e:
+            raise ReporterError(
+                f"Template rendering failed for '{template}': {e} - Check template and context data"
+            ) from e
 
     def _build_context(self, run: Any) -> Dict[str, Any]:
         """
@@ -201,12 +194,16 @@ class Jinja2Reporter(Reporter):
                 avg_score = 0
                 total_score = 0
 
-            summary.append({
-                "variant_id": variant_id,
-                "avg_score": avg_score,
-                "total_score": total_score,
-                "scenario_count": len({r.get("scenario_id") for r in results if r.get("variant_id") == variant_id}),
-            })
+            summary.append(
+                {
+                    "variant_id": variant_id,
+                    "avg_score": avg_score,
+                    "total_score": total_score,
+                    "scenario_count": len(
+                        {r.get("scenario_id") for r in results if r.get("variant_id") == variant_id}
+                    ),
+                }
+            )
 
         return summary
 
@@ -239,22 +236,28 @@ class Jinja2Reporter(Reporter):
 
         for scenario_id, scenario_results in scenarios.items():
             # Get scenario input from first result
-            scenario_input = scenario_results[0].get("scenario_input", {}) if scenario_results else {}
+            scenario_input = (
+                scenario_results[0].get("scenario_input", {}) if scenario_results else {}
+            )
 
             # Build variant outputs for this scenario
             variant_outputs = []
             for result in scenario_results:
-                variant_outputs.append({
-                    "variant_id": result.get("variant_id", "unknown"),
-                    "output": result.get("processor_output", ""),
-                    "judge_results": result.get("judges", []),
-                })
+                variant_outputs.append(
+                    {
+                        "variant_id": result.get("variant_id", "unknown"),
+                        "output": result.get("processor_output", ""),
+                        "judge_results": result.get("judges", []),
+                    }
+                )
 
-            detailed_results.append({
-                "scenario_id": scenario_id,
-                "input": scenario_input,
-                "variant_outputs": variant_outputs,
-            })
+            detailed_results.append(
+                {
+                    "scenario_id": scenario_id,
+                    "input": scenario_input,
+                    "variant_outputs": variant_outputs,
+                }
+            )
 
         return detailed_results
 

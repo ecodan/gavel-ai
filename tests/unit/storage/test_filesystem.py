@@ -36,9 +36,7 @@ def test_filesystem_run_init(tmp_path: Path):
 
 def test_filesystem_run_default_base_dir():
     """LocalFilesystemRun uses .gavel as default base_dir."""
-    run = LocalFilesystemRun(
-        run_id="run-test", eval_name="test", metadata={}
-    )
+    run = LocalFilesystemRun(run_id="run-test", eval_name="test", metadata={})
     assert run.base_dir == Path(".gavel")
 
 

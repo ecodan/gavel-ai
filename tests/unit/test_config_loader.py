@@ -1,4 +1,5 @@
 """Unit tests for config loading and validation."""
+
 import json
 import os
 from pathlib import Path
@@ -94,9 +95,7 @@ class TestLoadConfig:
         with pytest.raises(ConfigError) as exc_info:
             load_config(config_file, EvalConfig)
 
-        assert "invalid" in str(exc_info.value).lower() or "parse" in str(
-            exc_info.value
-        ).lower()
+        assert "invalid" in str(exc_info.value).lower() or "parse" in str(exc_info.value).lower()
 
     def test_missing_required_field(self, tmp_path: Path) -> None:
         """Test that ValidationError is raised for missing required fields."""
@@ -327,15 +326,16 @@ class TestResolveModelId:
 
         # Standard model names should pass through
         assert resolve_model_id(agents_config, "gpt-4o") == "gpt-4o"
-        assert resolve_model_id(agents_config, "claude-sonnet-4-5-20250929") == "claude-sonnet-4-5-20250929"
+        assert (
+            resolve_model_id(agents_config, "claude-sonnet-4-5-20250929")
+            == "claude-sonnet-4-5-20250929"
+        )
         assert resolve_model_id(agents_config, "gemini-2.0-flash") == "gemini-2.0-flash"
 
     def test_pass_through_when_not_in_models(self) -> None:
         """Test that model IDs not in _models are passed through."""
         agents_config: Dict[str, Any] = {
-            "_models": {
-                "claude_standard": {"model_version": "claude-sonnet-4-5-20250929"}
-            }
+            "_models": {"claude_standard": {"model_version": "claude-sonnet-4-5-20250929"}}
         }
 
         # Unknown custom ID should be passed through (assumed to be standard name)
@@ -435,9 +435,7 @@ class TestResolveModelId:
     def test_case_sensitive_model_id_lookup(self) -> None:
         """Test that model ID lookup is case-sensitive."""
         agents_config: Dict[str, Any] = {
-            "_models": {
-                "claude_standard": {"model_version": "claude-sonnet-4-5-20250929"}
-            }
+            "_models": {"claude_standard": {"model_version": "claude-sonnet-4-5-20250929"}}
         }
 
         # Different case should not match

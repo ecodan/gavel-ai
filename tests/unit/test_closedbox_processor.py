@@ -93,6 +93,7 @@ class TestHTTPExecution:
         inputs = [Input(id="1", text="query", metadata={})]
 
         import httpx
+
         with patch("httpx.AsyncClient") as MockClient:
             mock_client_instance = MagicMock()
             mock_client_instance.post = AsyncMock(

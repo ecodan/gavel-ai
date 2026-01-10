@@ -1,4 +1,5 @@
 """Pydantic models for configuration schemas."""
+
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,7 +12,9 @@ class JudgeConfig(BaseModel):
 
     # Standard fields
     name: str = Field(..., description="Judge identifier (e.g., 'similarity', 'custom_accuracy')")
-    type: str = Field(..., description="Judge type (e.g., 'deepeval.similarity', 'custom.my_judge')")
+    type: str = Field(
+        ..., description="Judge type (e.g., 'deepeval.similarity', 'custom.my_judge')"
+    )
 
     # Configuration fields
     config: Optional[Dict[str, Any]] = Field(None, description="Judge-specific config dict")
@@ -21,7 +24,9 @@ class JudgeConfig(BaseModel):
 
     # GEval-specific fields
     criteria: Optional[str] = Field(None, description="Evaluation criteria (for GEval judges)")
-    evaluation_steps: Optional[List[str]] = Field(None, description="Evaluation steps (for GEval judges)")
+    evaluation_steps: Optional[List[str]] = Field(
+        None, description="Evaluation steps (for GEval judges)"
+    )
 
 
 class ScenariosConfig(BaseModel):
@@ -41,7 +46,7 @@ class ExecutionConfig(BaseModel):
     max_concurrent: int = Field(5, description="Maximum concurrent executions")
 
 
-class AsyncConfigNew(BaseModel):
+class AsyncConfig(BaseModel):
     """Async execution configuration (new schema)."""
 
     model_config = ConfigDict(extra="ignore")  # Forward compatible
@@ -87,28 +92,11 @@ class EvalConfig(BaseModel):
     eval_type: str = Field(..., description="Evaluation type (oneshot, conversational, autotune)")
     eval_name: str = Field(..., description="Evaluation name")
     description: Optional[str] = Field(None, description="Evaluation description")
-    # New schema fields (all optional for backward compatibility)
-    test_subject_type: Optional[str] = Field(None, description="Test subject type (local or remote)")
-    test_subjects: Optional[List[TestSubject]] = Field(None, description="Test subjects")
-    variants: Optional[List[str]] = Field(None, description="Variants to test")
-    scenarios: Optional[ScenariosConfig] = Field(None, description="Scenarios configuration")
+    test_subject_type: str = Field(..., description="Test subject type (local or remote)")
+    test_subjects: List[TestSubject] = Field(..., description="Test subjects")
+    variants: List[str] = Field(..., description="Variants to test")
+    scenarios: ScenariosConfig = Field(..., description="Scenarios configuration")
     execution: Optional[ExecutionConfig] = Field(None, description="Execution configuration")
-    async_config: Optional[AsyncConfigNew] = Field(None, alias="async", description="Async configuration")
-    # Keep old fields optional for backward compatibility
-    processor_type: Optional[str] = Field(None, description="[DEPRECATED] Processor type")
-    scenarios_file: Optional[str] = Field(None, description="[DEPRECATED] Scenarios file")
-    agents_file: Optional[str] = Field(None, description="[DEPRECATED] Agents file")
-    judges_config: Optional[str] = Field(None, description="[DEPRECATED] Judges config")
-    output_dir: Optional[str] = Field(None, description="[DEPRECATED] Output directory")
-    judges: Optional[List[JudgeConfig]] = Field(None, description="[DEPRECATED] Judge configurations")
-
-
-class AsyncConfig(BaseModel):
-    """Async execution configuration model (legacy schema)."""
-
-    model_config = ConfigDict(extra="ignore")  # Forward compatible
-
-    max_workers: int = 4
-    timeout_seconds: int = 30
-    retry_count: int = 3
-    error_handling: str = "fail_fast"  # or "continue"
+    async_config: Optional[AsyncConfig] = Field(
+        None, alias="async", description="Async configuration"
+    )

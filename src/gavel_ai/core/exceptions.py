@@ -65,3 +65,21 @@ class StorageError(GavelError):
     """
 
     pass
+
+
+class ResourceNotFoundError(StorageError):
+    """
+    Resource not found in storage (storage-agnostic).
+
+    Use this exception when a requested resource does not exist:
+    - Prompt template not found
+    - Configuration file not found
+    - Scenario data not found
+    - Judge configuration not found
+
+    This is storage-agnostic - applies to filesystem, database, API, etc.
+
+    Follow format: "<ErrorType>: <What happened> - <Recovery step>"
+    """
+
+    pass

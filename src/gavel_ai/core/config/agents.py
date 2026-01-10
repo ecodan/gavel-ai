@@ -1,4 +1,5 @@
 """Agents configuration schema with provider and model definitions."""
+
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -53,7 +54,9 @@ class AgentsFile(BaseModel):
             ConfigError: If agent name not found
         """
         # Get raw dict for agent (stored as extra field)
-        agent_dict = self.__pydantic_extra__.get(agent_name) if hasattr(self, "__pydantic_extra__") else None
+        agent_dict = (
+            self.__pydantic_extra__.get(agent_name) if hasattr(self, "__pydantic_extra__") else None
+        )
 
         if agent_dict is None:
             raise ConfigError(
@@ -78,21 +81,20 @@ def validate_agent_references(agents_file: AgentsFile) -> None:
     Raises:
         ConfigError: If any agent references a non-existent model_id
     """
-    with tracer.start_as_current_span("agents.validate_agent_references"):
-        # Get all extra fields (agent definitions)
-        if not hasattr(agents_file, "__pydantic_extra__"):
-            return
+    # Get all extra fields (agent definitions)
+    if not hasattr(agents_file, "__pydantic_extra__"):
+        return
 
-        for agent_name, agent_data in agents_file.__pydantic_extra__.items():
-            if not isinstance(agent_data, dict):
-                continue
+    for agent_name, agent_data in agents_file.__pydantic_extra__.items():
+        if not isinstance(agent_data, dict):
+            continue
 
-            model_id = agent_data.get("model_id")
-            if model_id and model_id not in agents_file._models:
-                raise ConfigError(
-                    f"Agent '{agent_name}' references unknown model_id '{model_id}' - "
-                    f"Add '{model_id}' to _models section or fix model_id reference"
-                )
+        model_id = agent_data.get("model_id")
+        if model_id and model_id not in agents_file._models:
+            raise ConfigError(
+                f"Agent '{agent_name}' references unknown model_id '{model_id}' - "
+                f"Add '{model_id}' to _models section or fix model_id reference"
+            )
 
 
 def merge_parameters(
@@ -110,12 +112,11 @@ def merge_parameters(
     Returns:
         Merged parameter dictionary
     """
-    with tracer.start_as_current_span("agents.merge_parameters"):
-        # Start with model parameters
-        params = model_def.model_parameters.copy()
+    # Start with model parameters
+    params = model_def.model_parameters.copy()
 
-        # Override with agent parameters
-        if agent_config.model_parameters:
-            params.update(agent_config.model_parameters)
+    # Override with agent parameters
+    if agent_config.model_parameters:
+        params.update(agent_config.model_parameters)
 
-        return params
+    return params
