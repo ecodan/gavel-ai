@@ -1,7 +1,8 @@
 """Tests for retry logic utilities."""
 
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from gavel_ai.core.exceptions import ProcessorError
 from gavel_ai.core.retry import RetryConfig, retry_with_backoff

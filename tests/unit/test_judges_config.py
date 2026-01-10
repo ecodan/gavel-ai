@@ -2,14 +2,14 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pytest
 
 from gavel_ai.core.config.judges import (
     load_judge_config,
-    validate_judge_type,
     validate_judge_ids,
+    validate_judge_type,
 )
 from gavel_ai.core.config.models import EvalConfig, GEvalConfig, JudgeConfig
 from gavel_ai.core.exceptions import JudgeError

@@ -4,8 +4,9 @@ Unit tests for provider factory.
 Tests Pydantic-AI integration and provider abstraction.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from gavel_ai.core.config.agents import ModelDefinition
 from gavel_ai.core.exceptions import ProcessorError

@@ -7,8 +7,6 @@ Per Story 7.2 Task 9: End-to-end tests for metadata system.
 import json
 from pathlib import Path
 
-import pytest
-
 from gavel_ai.telemetry.metadata import (
     get_metadata_collector,
     reset_metadata_collector,

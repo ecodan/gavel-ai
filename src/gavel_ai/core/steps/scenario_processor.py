@@ -14,11 +14,11 @@ import logging
 from typing import List
 
 from gavel_ai.core.config.agents import ModelDefinition
+from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError
 from gavel_ai.core.executor import Executor
 from gavel_ai.core.models import Input, ProcessorConfig
 from gavel_ai.core.steps.base import Step, StepPhase
-from gavel_ai.core.contexts import RunContext
 from gavel_ai.processors.closedbox_processor import ClosedBoxInputProcessor
 from gavel_ai.processors.prompt_processor import PromptInputProcessor
 

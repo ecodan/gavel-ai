@@ -4,8 +4,9 @@ Unit tests for Executor.
 Tests concurrent execution, batching, and error handling modes.
 """
 
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 from gavel_ai.core.executor import Executor
 from gavel_ai.core.models import Input, ProcessorConfig, ProcessorResult

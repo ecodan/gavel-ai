@@ -14,9 +14,9 @@ import logging
 from typing import Any, Dict, List
 
 from gavel_ai.core.config_loader import get_model_definition
+from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError
 from gavel_ai.core.steps.base import Step, StepPhase
-from gavel_ai.core.contexts import RunContext
 from gavel_ai.judges.judge_executor import JudgeExecutor
 
 

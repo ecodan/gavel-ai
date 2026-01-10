@@ -6,7 +6,6 @@ Per Architecture Decision 5: DeepEval-native judges with sequential execution.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from gavel_ai.core.models import JudgeConfig, JudgeResult, Scenario
 from gavel_ai.telemetry import get_tracer

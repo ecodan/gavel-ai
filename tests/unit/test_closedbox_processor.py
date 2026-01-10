@@ -4,8 +4,9 @@ Unit tests for ClosedBoxInputProcessor.
 Tests HTTP endpoint evaluation for in-situ systems.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from gavel_ai.core.exceptions import ProcessorError
 from gavel_ai.core.models import Input, ProcessorConfig, ProcessorResult

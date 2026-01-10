@@ -5,9 +5,6 @@ Per Story 7.2 Task 9: Comprehensive tests for metadata collection.
 """
 
 import time
-from datetime import datetime, timezone
-
-import pytest
 
 from gavel_ai.telemetry.metadata import RunMetadataCollector, RunMetadataSchema
 

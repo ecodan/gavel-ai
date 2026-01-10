@@ -3,7 +3,6 @@ Tests for gavel-ai logging configuration (Story 1.5).
 """
 
 import logging
-import os
 from pathlib import Path
 
 import pytest

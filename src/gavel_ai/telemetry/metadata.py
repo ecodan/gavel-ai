@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from statistics import mean, median, stdev
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ScenarioTimingStats(BaseModel):

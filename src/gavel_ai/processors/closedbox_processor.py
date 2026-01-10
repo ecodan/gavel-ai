@@ -12,7 +12,7 @@ import httpx
 from gavel_ai.core.exceptions import ProcessorError
 from gavel_ai.core.models import Input, ProcessorConfig, ProcessorResult
 from gavel_ai.processors.base import InputProcessor
-from gavel_ai.telemetry import get_current_run_id, get_tracer
+from gavel_ai.telemetry import get_tracer
 
 
 class ClosedBoxInputProcessor(InputProcessor):

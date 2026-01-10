@@ -7,8 +7,8 @@ from typing import Optional
 import typer
 
 from gavel_ai.cli.scaffolding import generate_all_templates
-from gavel_ai.core.exceptions import ConfigError, ValidationError
 from gavel_ai.core.contexts import LocalFileSystemEvalContext
+from gavel_ai.core.exceptions import ConfigError, ValidationError
 from gavel_ai.core.workflows.oneshot import OneShotWorkflow
 from gavel_ai.log_config import get_application_logger
 from gavel_ai.telemetry import get_tracer
@@ -82,10 +82,7 @@ def run(
     app_logger.info(f"OneShot Evaluation '{eval_name}' started")
 
     # Create evaluation context
-    eval_ctx = LocalFileSystemEvalContext(
-        eval_name=eval_name,
-        eval_root=DEFAULT_EVAL_ROOT
-    )
+    eval_ctx = LocalFileSystemEvalContext(eval_name=eval_name, eval_root=DEFAULT_EVAL_ROOT)
 
     try:
         # Call business logic (core tier) - run async workflow

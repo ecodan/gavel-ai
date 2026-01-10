@@ -14,7 +14,6 @@ from typing import List, Optional
 from gavel_ai.core.models import (
     EvaluationResult,
     JudgeConfig,
-    JudgeEvaluation,
     Scenario,
 )
 from gavel_ai.core.result_storage import ResultStorage

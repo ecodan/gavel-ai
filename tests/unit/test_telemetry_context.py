@@ -6,11 +6,8 @@ Per Story 7.1: Tests for configure_run_telemetry and reset_telemetry.
 
 from pathlib import Path
 
-import pytest
-
 from gavel_ai.telemetry import (
     NoOpSpanExporter,
-    TelemetryFileExporter,
     configure_run_telemetry,
     get_current_run_id,
     get_current_telemetry_path,

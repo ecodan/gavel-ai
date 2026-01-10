@@ -18,14 +18,13 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Dict, Optional
 
-from gavel_ai.core.adapters.backends import LocalStorageBackend, StorageBackend
+from gavel_ai.core.adapters.backends import LocalStorageBackend
 from gavel_ai.core.adapters.data_sources import (
     MultiFormatDataSource,
     RecordDataSource,
     StructDataSource,
-    TextDataSource,
 )
-from gavel_ai.core.config import EvalConfig, AgentConfig, Scenario
+from gavel_ai.core.config import EvalConfig, Scenario
 from gavel_ai.core.exceptions import ResourceNotFoundError
 
 
@@ -91,6 +90,7 @@ class EvalContext(ABC):
         Raises:
             ResourceNotFoundError: If judge definition not found
         """
+
 
 class RunContext(ABC):
     """
@@ -226,9 +226,7 @@ class LocalFileSystemEvalContext(EvalContext):
         """
         if self._eval_config_source is None:
             self._eval_config_source = StructDataSource(
-                self._storage,
-                "config/eval_config.json",
-                schema=EvalConfig
+                self._storage, "config/eval_config.json", schema=EvalConfig
             )
         return self._eval_config_source
 
@@ -244,7 +242,7 @@ class LocalFileSystemEvalContext(EvalContext):
             self._agents_source = StructDataSource(
                 self._storage,
                 "config/agents.json",
-                schema=None  # Use dict for now - can add AgentsConfig schema later
+                schema=None,  # Use dict for now - can add AgentsConfig schema later
             )
         return self._agents_source
 
@@ -265,9 +263,7 @@ class LocalFileSystemEvalContext(EvalContext):
                 scenarios_path = "data/scenarios.csv"
 
             self._scenarios_source = RecordDataSource(
-                self._storage,
-                scenarios_path,
-                schema=Scenario
+                self._storage, scenarios_path, schema=Scenario
             )
         return self._scenarios_source
 
@@ -290,10 +286,7 @@ class LocalFileSystemEvalContext(EvalContext):
                 name, version = prompt_ref.split(":")
 
                 # Read TOML file
-                prompt_source = StructDataSource(
-                    self._storage,
-                    f"config/prompts/{name}.toml"
-                )
+                prompt_source = StructDataSource(self._storage, f"config/prompts/{name}.toml")
                 prompt_data = prompt_source.read()  # dict
 
                 # Get specific version or latest
@@ -341,10 +334,7 @@ class LocalFileSystemEvalContext(EvalContext):
         if judge_name not in self._judge_cache:
             try:
                 # Read JSON file
-                judge_source = StructDataSource(
-                    self._storage,
-                    f"config/judges/{judge_name}.json"
-                )
+                judge_source = StructDataSource(self._storage, f"config/judges/{judge_name}.json")
                 judge_data = judge_source.read()  # dict
                 self._judge_cache[judge_name] = judge_data
 
@@ -381,7 +371,7 @@ class LocalRunContext(RunContext):
         self,
         eval_ctx: EvalContext,
         base_dir: Path = Path(".gavel/runs"),
-        run_id: Optional[str] = None
+        run_id: Optional[str] = None,
     ):
         """
         Initialize run context.
@@ -440,37 +430,35 @@ class LocalRunContext(RunContext):
 
         # Raw results - JSONL with schema validation
         self._results_raw = RecordDataSource(
-            self._storage,
-            f"{self._run_id}/results_raw.jsonl",
-            schema=OutputRecord
+            self._storage, f"{self._run_id}/results_raw.jsonl", schema=OutputRecord
         )
 
         # Judged results - JSONL (no schema validation for now)
         self._results_judged = RecordDataSource(
             self._storage,
             f"{self._run_id}/results_judged.jsonl",
-            schema=None  # Use dict for now
+            schema=None,  # Use dict for now
         )
 
         # Telemetry - JSONL (no schema validation for now)
         self._telemetry = RecordDataSource(
             self._storage,
             f"{self._run_id}/telemetry.jsonl",
-            schema=None  # Use dict for now
+            schema=None,  # Use dict for now
         )
 
         # Run metadata - JSON (no schema validation for now)
         self._run_metadata = StructDataSource(
             self._storage,
             f"{self._run_id}/run_metadata.json",
-            schema=None  # Use dict for now
+            schema=None,  # Use dict for now
         )
 
         # Reports - multiple formats (html, md, pdf)
         self._reports = MultiFormatDataSource(
             self._storage,
             f"{self._run_id}",  # Base directory
-            "report"  # Base filename
+            "report",  # Base filename
         )
 
     def _configure_logger(self) -> None:
@@ -482,12 +470,10 @@ class LocalRunContext(RunContext):
         handler = RotatingFileHandler(
             log_file,
             maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5
+            backupCount=5,
         )
         handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s [%(levelname)s] <%(filename)s:%(lineno)s> %(message)s"
-            )
+            logging.Formatter("%(asctime)s [%(levelname)s] <%(filename)s:%(lineno)s> %(message)s")
         )
 
         # Create run-specific logger

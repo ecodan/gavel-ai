@@ -14,7 +14,7 @@ from gavel_ai.core.config.agents import (
     merge_parameters,
     validate_agent_references,
 )
-from gavel_ai.core.exceptions import ConfigError, ValidationError
+from gavel_ai.core.exceptions import ConfigError
 
 
 class TestModelDefinition:

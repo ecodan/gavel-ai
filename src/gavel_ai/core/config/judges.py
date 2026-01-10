@@ -42,8 +42,7 @@ def load_judge_config(judge: JudgeConfig, eval_root: Path) -> JudgeConfig:
     config_file = eval_root / judge.config_ref
     if not config_file.exists():
         raise JudgeError(
-            f"Judge config file not found: {judge.config_ref} - "
-            f"Create file or fix config_ref path"
+            f"Judge config file not found: {judge.config_ref} - Create file or fix config_ref path"
         )
 
     external_config = json.loads(config_file.read_text())

@@ -157,9 +157,7 @@ def load_scenarios_csv(file_path: Path) -> List[Scenario]:
             # Get input/prompt
             input_text = row.get("input")
             if not input_text:
-                raise ValidationError(
-                    f"Missing 'input' in row {row_num} - Add input column to CSV"
-                )
+                raise ValidationError(f"Missing 'input' in row {row_num} - Add input column to CSV")
 
             # Get expected output from either column name
             expected = row.get("expected") or row.get("expected_behavior")
@@ -194,9 +192,7 @@ def load_scenarios(file_path: Path) -> List[Scenario]:
     elif file_path.suffix == ".csv":
         return load_scenarios_csv(file_path)
     else:
-        raise ConfigError(
-            f"Unsupported scenarios format: {file_path.suffix} - Use .json or .csv"
-        )
+        raise ConfigError(f"Unsupported scenarios format: {file_path.suffix} - Use .json or .csv")
 
 
 def substitute_placeholders(template: str, data: Dict[str, Any]) -> str:

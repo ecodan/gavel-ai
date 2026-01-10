@@ -6,12 +6,11 @@ Per Story 7.1: Tests for telemetry span export functionality.
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 
-import pytest
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExportResult
-from opentelemetry.trace import SpanContext, SpanKind, Status, StatusCode, TraceFlags
+from opentelemetry.trace import SpanKind, StatusCode, TraceFlags
 
 from gavel_ai.telemetry import TelemetryFileExporter
 

@@ -11,10 +11,8 @@ Note: These tests mock the actual LLM calls to avoid needing API keys.
 
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import toml
 
 from gavel_ai.core.config_loader import ConfigLoader
 from gavel_ai.core.exceptions import ConfigError, ValidationError

@@ -7,12 +7,10 @@ Tests two-level logging architecture:
 """
 
 import logging
-from pathlib import Path
 
 import pytest
 
 from gavel_ai.log_config import (
-    LOG_FORMAT,
     LOGGER_NAME,
     create_logger,
     get_application_logger,

@@ -4,8 +4,9 @@ Unit tests for ScenarioProcessor.
 Tests multi-turn conversation handling and context accumulation.
 """
 
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from gavel_ai.core.models import Input, ProcessorConfig, ProcessorResult
 from gavel_ai.processors.base import InputProcessor

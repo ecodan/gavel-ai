@@ -5,14 +5,12 @@ Validates manifest metadata capture and deterministic config hashing
 for run reproducibility.
 """
 
-import json
 from datetime import datetime
 
 import pytest
 
 from gavel_ai.core.models import Manifest
 from gavel_ai.storage.manifest import create_config_hash
-
 
 # Manifest Model Tests
 

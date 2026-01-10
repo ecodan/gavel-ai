@@ -13,7 +13,7 @@ Per Tech Spec 3.9: Refactors OneShot run() into clean, testable architecture.
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional, List
+from typing import List, Optional
 
 from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError, ValidationError

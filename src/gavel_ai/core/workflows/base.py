@@ -1,9 +1,10 @@
-from abc import ABCMeta, abstractmethod
 import logging
-from gavel_ai.core.contexts import RunContext, EvalContext
+from abc import ABCMeta, abstractmethod
+
+from gavel_ai.core.contexts import EvalContext, RunContext
+
 
 class GavelWorkflow(metaclass=ABCMeta):
-
     def __init__(self, eval_context: EvalContext, app_logger: logging.Logger) -> None:
         self.logger: logging.Logger = app_logger
         self.eval_context: EvalContext = eval_context

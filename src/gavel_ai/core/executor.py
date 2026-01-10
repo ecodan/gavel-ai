@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from gavel_ai.core.models import Input, ProcessorResult
 from gavel_ai.processors.base import InputProcessor
-from gavel_ai.telemetry import get_current_run_id, get_metadata_collector, get_tracer
+from gavel_ai.telemetry import get_metadata_collector, get_tracer
 
 
 class Executor:
@@ -83,7 +83,7 @@ class Executor:
                         success = result.error is None
                         metadata_collector.record_scenario_complete(scenario_id, success)
                         return result
-                    except Exception as e:
+                    except Exception:
                         # Record failure
                         metadata_collector.record_scenario_complete(scenario_id, False)
                         raise

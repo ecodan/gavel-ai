@@ -1,6 +1,5 @@
 """Tests for automatic .env loading in CLI."""
 
-import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,7 +14,6 @@ class TestDotenvLoading:
         # Mock load_dotenv before importing main module
         with patch("dotenv.load_dotenv") as mock_load_dotenv:
             # Import main module - this should trigger load_dotenv at module level
-            import importlib
             import sys
 
             # Remove module from cache to force re-import
@@ -23,7 +21,6 @@ class TestDotenvLoading:
                 del sys.modules["gavel_ai.cli.main"]
 
             # Import will trigger module-level load_dotenv
-            import gavel_ai.cli.main
 
             # Verify load_dotenv was called with correct parameters
             mock_load_dotenv.assert_called_with(verbose=False, override=False)

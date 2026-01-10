@@ -5,6 +5,15 @@ Provides OpenTelemetry span collection and run metadata aggregation.
 """
 
 # Import from spans module
+# Import from metadata module
+from gavel_ai.telemetry.metadata import (
+    LLMMetrics,
+    RunMetadataCollector,
+    RunMetadataSchema,
+    ScenarioTimingStats,
+    get_metadata_collector,
+    reset_metadata_collector,
+)
 from gavel_ai.telemetry.spans import (
     DynamicSpanProcessor,
     NoOpSpanExporter,
@@ -16,16 +25,6 @@ from gavel_ai.telemetry.spans import (
     reset_telemetry,
     start_span,
     trace,
-)
-
-# Import from metadata module
-from gavel_ai.telemetry.metadata import (
-    LLMMetrics,
-    RunMetadataCollector,
-    RunMetadataSchema,
-    ScenarioTimingStats,
-    get_metadata_collector,
-    reset_metadata_collector,
 )
 
 __all__ = [

@@ -2,10 +2,7 @@
 Tests for gavel-ai OpenTelemetry setup (Story 1.6).
 """
 
-import logging
-from typing import Any
 
-import pytest
 from opentelemetry import trace
 
 from gavel_ai.telemetry import get_tracer, start_span

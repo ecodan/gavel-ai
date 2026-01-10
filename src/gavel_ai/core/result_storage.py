@@ -12,7 +12,7 @@ Per Epic 4 Story 4.6: Results stored in JSONL format for analysis and re-judging
 import json
 import logging
 from pathlib import Path
-from typing import Iterator, List, Optional
+from typing import Iterator, List
 
 from gavel_ai.core.models import EvaluationResult
 

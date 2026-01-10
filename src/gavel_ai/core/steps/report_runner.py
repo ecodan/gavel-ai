@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict
 
+from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError
 from gavel_ai.core.models import ReporterConfig
 from gavel_ai.core.steps.base import (
@@ -25,7 +26,6 @@ from gavel_ai.core.steps.base import (
     Step,
     StepPhase,
 )
-from gavel_ai.core.contexts import RunContext
 from gavel_ai.reporters.oneshot_reporter import OneShotReporter
 from gavel_ai.storage.results_exporter import ResultsExporter
 from gavel_ai.telemetry import get_metadata_collector

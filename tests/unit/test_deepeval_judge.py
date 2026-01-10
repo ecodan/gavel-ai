@@ -8,7 +8,6 @@ Tests Story 4.2 acceptance criteria:
 - Errors are wrapped in JudgeError with recovery guidance
 """
 
-from unittest.mock import MagicMock
 
 import pytest
 from deepeval.test_case import LLMTestCaseParams

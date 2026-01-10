@@ -6,8 +6,6 @@ Per Story 7.2 Task 10: Validate performance and accuracy.
 
 import time
 
-import pytest
-
 from gavel_ai.telemetry.metadata import (
     get_metadata_collector,
     reset_metadata_collector,

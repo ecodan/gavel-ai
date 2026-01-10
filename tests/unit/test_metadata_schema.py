@@ -6,7 +6,6 @@ Per Story 7.2 Task 1: Schema validation, JSON serialization, invalid data reject
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pytest
 from pydantic import ValidationError

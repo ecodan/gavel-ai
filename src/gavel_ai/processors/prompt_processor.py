@@ -5,8 +5,7 @@ Processes prompts against scenarios using Pydantic-AI provider abstraction.
 """
 
 import asyncio
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from pydantic_ai import Agent
 
@@ -15,7 +14,7 @@ from gavel_ai.core.exceptions import ProcessorError
 from gavel_ai.core.models import Input, ProcessorConfig, ProcessorResult
 from gavel_ai.processors.base import InputProcessor
 from gavel_ai.providers.factory import ProviderFactory
-from gavel_ai.telemetry import get_current_run_id, get_tracer
+from gavel_ai.telemetry import get_tracer
 
 
 class PromptInputProcessor(InputProcessor):

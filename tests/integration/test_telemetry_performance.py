@@ -65,6 +65,7 @@ class TestTelemetryPerformance:
 
         # Create mock spans for export
         from unittest.mock import MagicMock
+
         from opentelemetry.trace import StatusCode
 
         def create_mock_span(name: str) -> MagicMock:
@@ -193,7 +194,7 @@ class TestTelemetryPerformance:
         # AC 4: <5% overhead
         assert overhead_percent < 5.0, f"Overhead {overhead_percent:.2f}% exceeds 5%"
 
-        print(f"\nTypical run simulation:")
+        print("\nTypical run simulation:")
         print(f"  Scenarios: {num_scenarios}")
         print(f"  Spans per scenario: {spans_per_scenario}")
         print(f"  Total telemetry time: {telemetry_time:.3f}s")

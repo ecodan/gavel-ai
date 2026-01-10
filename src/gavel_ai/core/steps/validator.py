@@ -14,9 +14,9 @@ Per Tech Spec 3.9: Extracted from run() lines 126-143.
 import logging
 from typing import List
 
+from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError
 from gavel_ai.core.steps.base import Step, StepPhase, ValidationResult
-from gavel_ai.core.contexts import RunContext
 
 
 class ValidatorStep(Step):
@@ -179,4 +179,4 @@ class ValidatorStep(Step):
         # All validations passed
         context.validation_result = ValidationResult(is_valid=True, errors=[], warnings=warnings)
 
-        self.logger.info(f"Validation passed")
+        self.logger.info("Validation passed")

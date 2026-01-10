@@ -8,7 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from gavel_ai.core.exceptions import ConfigError, ValidationError
+from gavel_ai.core.contexts import RunContext
+from gavel_ai.core.exceptions import ConfigError
 from gavel_ai.core.steps import (
     JudgeRunnerStep,
     ReportRunnerStep,
@@ -16,7 +17,6 @@ from gavel_ai.core.steps import (
     ValidatorStep,
 )
 from gavel_ai.core.steps.base import StepPhase
-from gavel_ai.core.contexts import RunContext
 
 
 class TestValidatorStep:

@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from gavel_ai.core.steps.base import Step, StepPhase, ValidationResult, DEFAULT_EVAL_ROOT
 from gavel_ai.core.contexts import EvalContext, RunContext
+from gavel_ai.core.steps.base import DEFAULT_EVAL_ROOT, Step, StepPhase, ValidationResult
 
 
 class TestStepPhase:
