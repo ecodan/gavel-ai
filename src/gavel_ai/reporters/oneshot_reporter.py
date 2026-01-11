@@ -7,7 +7,7 @@ judge reasoning, and detailed results per scenario.
 
 from typing import Any, Dict, List
 
-from gavel_ai.core.models import ReporterConfig
+from gavel_ai.models.runtime import ReporterConfig
 from gavel_ai.reporters.jinja_reporter import Jinja2Reporter
 
 

@@ -24,8 +24,10 @@ from gavel_ai.core.adapters.data_sources import (
     RecordDataSource,
     StructDataSource,
 )
-from gavel_ai.core.config import EvalConfig, Scenario
 from gavel_ai.core.exceptions import ResourceNotFoundError
+from gavel_ai.models import EvalConfig, OutputRecord, Scenario
+from gavel_ai.models.runtime import JudgedRecord
+from gavel_ai.telemetry.metadata import RunMetadataSchema, TelemetrySpan
 
 
 class EvalContext(ABC):
@@ -425,33 +427,30 @@ class LocalRunContext(RunContext):
         Each artifact is exposed as a DataSource property that steps
         can write to immediately.
         """
-        # Import schemas - avoid circular imports
-        from gavel_ai.core.models import OutputRecord
-
         # Raw results - JSONL with schema validation
         self._results_raw = RecordDataSource(
             self._storage, f"{self._run_id}/results_raw.jsonl", schema=OutputRecord
         )
 
-        # Judged results - JSONL (no schema validation for now)
+        # Judged results - JSONL with schema validation
         self._results_judged = RecordDataSource(
             self._storage,
             f"{self._run_id}/results_judged.jsonl",
-            schema=None,  # Use dict for now
+            schema=JudgedRecord,
         )
 
-        # Telemetry - JSONL (no schema validation for now)
+        # Telemetry - JSONL with schema validation
         self._telemetry = RecordDataSource(
             self._storage,
             f"{self._run_id}/telemetry.jsonl",
-            schema=None,  # Use dict for now
+            schema=TelemetrySpan,
         )
 
-        # Run metadata - JSON (no schema validation for now)
+        # Run metadata - JSON with schema validation
         self._run_metadata = StructDataSource(
             self._storage,
             f"{self._run_id}/run_metadata.json",
-            schema=None,  # Use dict for now
+            schema=RunMetadataSchema,
         )
 
         # Reports - multiple formats (html, md, pdf)

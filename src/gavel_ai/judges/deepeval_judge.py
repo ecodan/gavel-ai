@@ -22,8 +22,8 @@ from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from jinja2 import Template
 
 from gavel_ai.core.exceptions import JudgeError
-from gavel_ai.core.models import JudgeConfig, JudgeResult, Scenario
 from gavel_ai.judges.base import Judge
+from gavel_ai.models.runtime import JudgeConfig, JudgeResult, Scenario
 from gavel_ai.telemetry import get_current_run_id
 
 

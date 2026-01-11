@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from gavel_ai.telemetry import get_tracer
 
 if TYPE_CHECKING:
-    from gavel_ai.core.models import ReporterConfig
+    from gavel_ai.models.runtime import ReporterConfig
 
 
 class Reporter(ABC):
@@ -33,7 +33,7 @@ class Reporter(ABC):
         Args:
             config: ReporterConfig instance with reporter behavioral rules
         """
-        from gavel_ai.core.models import ReporterConfig
+        from gavel_ai.models.runtime import ReporterConfig
 
         self.config: ReporterConfig = config
         self.tracer = get_tracer(__name__)

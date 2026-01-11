@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from gavel_ai.core.exceptions import ProcessorError
-from gavel_ai.core.models import Input, ProcessorConfig, ProcessorResult
+from gavel_ai.models.runtime import Input, ProcessorConfig, ProcessorResult
 from gavel_ai.processors.base import InputProcessor
 from gavel_ai.telemetry import get_tracer
 

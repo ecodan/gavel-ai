@@ -5,6 +5,7 @@ Per Story 7.2: Captures timing, token counts, and execution statistics during ev
 
 This module provides:
 - RunMetadataSchema: Pydantic model for run_metadata.json structure
+- TelemetrySpan: Pydantic model for OpenTelemetry span data
 - RunMetadataCollector: Collects timing and token data during execution
 - Helper models: ScenarioTimingStats, LLMMetrics for structured data
 """
@@ -135,6 +136,33 @@ class RunMetadataSchema(BaseModel):
     )
 
 
+class TelemetrySpan(BaseModel):
+    """
+    OpenTelemetry span for distributed tracing.
+
+    Per Data Schemas Specification: OTLP/JSON format for telemetry data.
+    Source of truth for detailed performance metrics.
+
+    Common LLM attributes:
+    - llm.model: Model identifier
+    - llm.tokens.prompt: Prompt tokens
+    - llm.tokens.completion: Completion tokens
+    - scenario.id: Associated scenario ID
+    - variant.id: Model variant ID
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    trace_id: str = Field(..., description="Trace identifier")
+    span_id: str = Field(..., description="Span identifier")
+    parent_span_id: Optional[str] = Field(None, description="Parent span ID (null for root spans)")
+    name: str = Field(..., description="Span name (e.g., 'llm_call', 'judge_evaluation')")
+    start_time: int = Field(..., description="Start time in nanoseconds")
+    end_time: int = Field(..., description="End time in nanoseconds")
+    attributes: Dict[str, Any] = Field(..., description="Span attributes (model, tokens, etc.)")
+    status: Dict[str, Any] = Field(..., description="Span status (ok, error)")
+
+
 class RunMetadataCollector:
     """Collects runtime metrics during evaluation execution."""
 
@@ -229,7 +257,7 @@ class RunMetadataCollector:
         """
         # Compute scenario timing statistics
         scenario_durations_ms: List[float] = []
-        for scenario_id, timings in self.scenario_timings.items():
+        for _scenario_id, timings in self.scenario_timings.items():
             if "start" in timings and "end" in timings:
                 duration_ms = (timings["end"] - timings["start"]) * 1000
                 scenario_durations_ms.append(duration_ms)
@@ -374,6 +402,7 @@ __all__ = [
     "ScenarioTimingStats",
     "LLMMetrics",
     "RunMetadataSchema",
+    "TelemetrySpan",
     "RunMetadataCollector",
     "get_metadata_collector",
     "reset_metadata_collector",

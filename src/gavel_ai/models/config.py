@@ -100,3 +100,14 @@ class EvalConfig(BaseModel):
     async_config: Optional[AsyncConfig] = Field(
         None, alias="async", description="Async configuration"
     )
+
+
+class AgentConfig(BaseModel):
+    """Agent configuration referencing a model."""
+
+    model_config = ConfigDict(extra="ignore")  # Forward compatible
+
+    model_id: str  # Reference to _models key
+    prompt: str  # "prompt-name:version" format
+    model_parameters: Optional[Dict[str, Any]] = None  # Override model params
+    custom_configs: Optional[Dict[str, Any]] = None

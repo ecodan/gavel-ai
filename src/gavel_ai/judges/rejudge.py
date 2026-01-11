@@ -11,13 +11,13 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-from gavel_ai.core.models import (
+from gavel_ai.core.result_storage import ResultStorage
+from gavel_ai.judges.judge_executor import JudgeExecutor
+from gavel_ai.models.runtime import (
     EvaluationResult,
     JudgeConfig,
     Scenario,
 )
-from gavel_ai.core.result_storage import ResultStorage
-from gavel_ai.judges.judge_executor import JudgeExecutor
 from gavel_ai.telemetry import get_tracer
 
 logger = logging.getLogger(__name__)

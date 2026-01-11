@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 from typing import Iterator, List
 
-from gavel_ai.core.models import EvaluationResult
+from gavel_ai.models.runtime import EvaluationResult
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,8 @@ used throughout the application.
 """
 
 from gavel_ai.core.exceptions import GavelError, JudgeError, ProcessorError
-from gavel_ai.core.models import (
+from gavel_ai.core.result_storage import ResultStorage
+from gavel_ai.models.runtime import (
     EvaluationResult,
     Input,
     JudgeConfig,
@@ -19,7 +20,6 @@ from gavel_ai.core.models import (
     ProcessorResult,
     Scenario,
 )
-from gavel_ai.core.result_storage import ResultStorage
 
 # Export public API
 __all__ = [

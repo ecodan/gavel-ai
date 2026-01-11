@@ -14,8 +14,8 @@ from typing import Any, Dict, List
 
 import jsonlines
 
-from gavel_ai.core.models import ProcessorResult, Scenario
 from gavel_ai.log_config import get_application_logger
+from gavel_ai.models.runtime import ProcessorResult, Scenario
 
 logger = get_application_logger()
 

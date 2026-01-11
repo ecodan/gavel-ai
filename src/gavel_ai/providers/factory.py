@@ -12,8 +12,8 @@ from pydantic import BaseModel, ConfigDict
 from pydantic_ai import Agent, models
 from pydantic_ai.providers import Provider
 
-from gavel_ai.core.config.agents import ModelDefinition
 from gavel_ai.core.exceptions import ProcessorError
+from gavel_ai.models.agents import ModelDefinition
 from gavel_ai.telemetry import get_current_run_id, get_metadata_collector, get_tracer
 
 # Import provider classes for passing API keys

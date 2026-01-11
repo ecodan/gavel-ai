@@ -11,11 +11,15 @@ from typing import Any, Dict, List, Optional
 
 import toml
 
-from gavel_ai.core.config.agents import AgentsFile, validate_agent_references
 from gavel_ai.core.config.loader import load_config
-from gavel_ai.core.config.models import AsyncConfig, EvalConfig
-from gavel_ai.core.config.scenarios import Scenario, load_scenarios
 from gavel_ai.core.exceptions import ConfigError
+from gavel_ai.models import (
+    AgentsFile,
+    AsyncConfig,
+    EvalConfig,
+    Scenario,
+)
+from gavel_ai.models.utils import validate_agent_references
 
 
 class ConfigLoader:

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from gavel_ai.core.exceptions import StorageError
-from gavel_ai.core.models import ArtifactRef
+from gavel_ai.models.runtime import ArtifactRef
 from gavel_ai.storage.base import Run
 
 

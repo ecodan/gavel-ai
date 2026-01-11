@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Dict
 from gavel_ai.telemetry import get_tracer
 
 if TYPE_CHECKING:
-    from gavel_ai.core.models import ArtifactRef
+    from gavel_ai.models.runtime import ArtifactRef
 
 
 class Run(ABC):

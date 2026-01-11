@@ -7,7 +7,7 @@ Defines the InputProcessor ABC that all processor implementations must inherit f
 from abc import ABC, abstractmethod
 from typing import List
 
-from gavel_ai.core.models import Input, ProcessorConfig, ProcessorResult
+from gavel_ai.models.runtime import Input, ProcessorConfig, ProcessorResult
 from gavel_ai.telemetry import get_tracer
 
 

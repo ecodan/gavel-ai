@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 import jinja2
 
 from gavel_ai.core.exceptions import ReporterError
-from gavel_ai.core.models import ReporterConfig
+from gavel_ai.models.runtime import ReporterConfig
 from gavel_ai.reporters.base import Reporter
 
 

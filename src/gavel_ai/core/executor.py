@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from tqdm import tqdm
 
-from gavel_ai.core.models import Input, ProcessorResult
+from gavel_ai.models.runtime import Input, ProcessorResult
 from gavel_ai.processors.base import InputProcessor
 from gavel_ai.telemetry import get_metadata_collector, get_tracer
 

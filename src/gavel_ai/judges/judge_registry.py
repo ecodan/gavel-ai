@@ -8,8 +8,8 @@ Per Epic 4 Story 4.4: Registry pattern for pluggable judge discovery.
 from typing import Dict, Type
 
 from gavel_ai.core.exceptions import JudgeError
-from gavel_ai.core.models import JudgeConfig
 from gavel_ai.judges.base import Judge
+from gavel_ai.models.runtime import JudgeConfig
 
 
 class JudgeRegistry:

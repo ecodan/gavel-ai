@@ -11,15 +11,15 @@ from typing import List, Optional
 
 from tqdm import tqdm
 
-from gavel_ai.core.config.models import JudgeConfig
 from gavel_ai.core.exceptions import JudgeError
-from gavel_ai.core.models import (
+from gavel_ai.judges.base import Judge
+from gavel_ai.judges.judge_registry import JudgeRegistry
+from gavel_ai.models import (
     EvaluationResult,
+    JudgeConfig,
     JudgeEvaluation,
     Scenario,
 )
-from gavel_ai.judges.base import Judge
-from gavel_ai.judges.judge_registry import JudgeRegistry
 from gavel_ai.telemetry import get_tracer
 
 logger = logging.getLogger(__name__)

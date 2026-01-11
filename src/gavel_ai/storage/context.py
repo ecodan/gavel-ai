@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from gavel_ai.core.exceptions import StorageError
-from gavel_ai.core.models import Manifest
+from gavel_ai.models.runtime import Manifest
 from gavel_ai.storage.filesystem import LocalFilesystemRun
 
 

@@ -9,7 +9,7 @@ implementations for artifact persistence.
 """
 
 from gavel_ai.core.exceptions import StorageError
-from gavel_ai.core.models import ArtifactRef, Manifest
+from gavel_ai.models.runtime import ArtifactRef, Manifest
 from gavel_ai.storage.archive import RunArchiver
 from gavel_ai.storage.base import Config, Prompt, Run
 from gavel_ai.storage.cleanup import RunCleaner
