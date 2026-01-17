@@ -211,14 +211,15 @@ class LocalFileSystemEvalContext:
 - **Single source of truth**: All config accesses go through EvalContext
 
 **Usage in Steps:**
+
 ```python
 # Steps access data by calling .read()
-eval_config = run_ctx.eval_ctx.eval_config.read()  # EvalConfig instance
-agents = run_ctx.eval_ctx.agents.read()  # AgentsConfig instance
-scenarios = run_ctx.eval_ctx.scenarios.read()  # List[Scenario]
+eval_config = run_ctx.eval_context.eval_config.read()  # EvalConfig instance
+agents = run_ctx.eval_context.agents.read()  # AgentsConfig instance
+scenarios = run_ctx.eval_context.scenarios.read()  # List[Scenario]
 
 # Or stream scenarios efficiently
-for scenario in run_ctx.eval_ctx.scenarios.iter():
+for scenario in run_ctx.eval_context.scenarios.iter():
     process(scenario)
 ```
 

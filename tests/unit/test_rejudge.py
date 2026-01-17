@@ -346,11 +346,9 @@ class TestReJudgeMultipleJudges:
             JudgeConfig(
                 name="quality",
                 type="deepeval.geval",
-                config={
-                    "name": "quality",
-                    "criteria": "Quality",
-                    "evaluation_steps": ["Check quality"],
-                },
+                model="gpt-4",  # GEval requires model
+                criteria="Quality",
+                evaluation_steps=["Check quality"],
             ),
         ]
         rejudge = ReJudge(temp_results_file, configs)

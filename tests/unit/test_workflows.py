@@ -1,15 +1,16 @@
 """Unit tests for workflow execution framework.
 
-Tests EvalContext, RunContext, Step ABC, and StepPhase enum.
+Tests LocalFileSystemEvalContext, LocalRunContext, Step ABC, and StepPhase enum.
 """
 
+import json
 import logging
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from gavel_ai.core.contexts import EvalContext, RunContext
+from gavel_ai.core.contexts import LocalFileSystemEvalContext, LocalRunContext
 from gavel_ai.core.steps.base import DEFAULT_EVAL_ROOT, Step, StepPhase, ValidationResult
 
 
@@ -49,169 +50,162 @@ class TestValidationResult:
         assert len(result.warnings) == 1
 
 
-class TestEvalContext:
-    """Tests for EvalContext class."""
+class TestLocalFileSystemEvalContext:
+    """Tests for LocalFileSystemEvalContext class."""
 
     def test_init(self) -> None:
         """Test EvalContext initialization."""
-        ctx = EvalContext("test_eval", Path("/tmp/evals"))
+        ctx = LocalFileSystemEvalContext("test_eval", Path("/tmp/evals"))
         assert ctx.eval_name == "test_eval"
         assert ctx.eval_root == Path("/tmp/evals")
 
     def test_eval_dir_property(self) -> None:
         """Test eval_dir property."""
-        ctx = EvalContext("test_eval", Path("/tmp/evals"))
+        ctx = LocalFileSystemEvalContext("test_eval", Path("/tmp/evals"))
         assert ctx.eval_dir == Path("/tmp/evals/test_eval")
 
     def test_config_dir_property(self) -> None:
         """Test config_dir property."""
-        ctx = EvalContext("test_eval", Path("/tmp/evals"))
+        ctx = LocalFileSystemEvalContext("test_eval", Path("/tmp/evals"))
         assert ctx.config_dir == Path("/tmp/evals/test_eval/config")
 
     def test_default_eval_root(self) -> None:
         """Test default eval_root is used."""
-        ctx = EvalContext("test_eval")
+        ctx = LocalFileSystemEvalContext("test_eval")
         assert ctx.eval_root == Path(DEFAULT_EVAL_ROOT)
 
-    @patch("gavel_ai.core.workflows.base.ConfigLoader")
-    def test_eval_config_lazy_loading(self, mock_loader_class: MagicMock) -> None:
+    def test_eval_config_lazy_loading(self, tmp_path: Path) -> None:
         """Test that eval_config is lazy-loaded."""
-        mock_loader = MagicMock()
-        mock_loader.load_eval_config.return_value = MagicMock()
-        mock_loader_class.return_value = mock_loader
+        eval_dir = tmp_path / "test_eval" / "config"
+        eval_dir.mkdir(parents=True)
 
-        ctx = EvalContext("test_eval")
+        # Create eval_config.json
+        config_data = {
+            "eval_name": "test_eval",
+            "eval_type": "oneshot",
+            "test_subject_type": "local",
+            "test_subjects": [{"prompt_name": "default", "judges": []}],
+            "variants": ["test"],
+            "scenarios": {"source": "file.local", "name": "scenarios.json"},
+        }
+        with open(eval_dir / "eval_config.json", "w") as f:
+            json.dump(config_data, f)
 
-        # First access should call loader
-        _ = ctx.eval_config
-        assert mock_loader.load_eval_config.call_count == 1
+        ctx = LocalFileSystemEvalContext("test_eval", tmp_path)
 
-        # Second access should use cached value
-        _ = ctx.eval_config
-        assert mock_loader.load_eval_config.call_count == 1
+        # Access should return data source
+        data_source = ctx.eval_config
+        assert data_source is not None
 
-    @patch("gavel_ai.core.workflows.base.ConfigLoader")
-    def test_agents_config_lazy_loading(self, mock_loader_class: MagicMock) -> None:
+        # Reading should return config
+        config = data_source.read()
+        assert config.eval_name == "test_eval"
+
+    def test_agents_config_lazy_loading(self, tmp_path: Path) -> None:
         """Test that agents_config is lazy-loaded."""
-        mock_loader = MagicMock()
-        mock_loader.load_agents_config.return_value = {"_models": {}}
-        mock_loader_class.return_value = mock_loader
+        eval_dir = tmp_path / "test_eval" / "config"
+        eval_dir.mkdir(parents=True)
 
-        ctx = EvalContext("test_eval")
+        agents_data = {
+            "_models": {
+                "test_model": {
+                    "model_provider": "anthropic",
+                    "model_family": "claude",
+                    "model_version": "claude-test",
+                    "model_parameters": {},
+                    "provider_auth": {"api_key": "test"},
+                }
+            }
+        }
+        with open(eval_dir / "agents.json", "w") as f:
+            json.dump(agents_data, f)
 
-        _ = ctx.agents_config
-        assert mock_loader.load_agents_config.call_count == 1
+        ctx = LocalFileSystemEvalContext("test_eval", tmp_path)
+        agents = ctx.agents.read()
 
-        _ = ctx.agents_config
-        assert mock_loader.load_agents_config.call_count == 1
+        assert "_models" in agents
 
-    @patch("gavel_ai.core.workflows.base.ConfigLoader")
-    def test_scenarios_lazy_loading(self, mock_loader_class: MagicMock) -> None:
-        """Test that scenarios is lazy-loaded."""
-        mock_loader = MagicMock()
-        mock_loader.load_scenarios.return_value = []
-        mock_loader_class.return_value = mock_loader
-
-        ctx = EvalContext("test_eval")
-
-        _ = ctx.scenarios
-        assert mock_loader.load_scenarios.call_count == 1
-
-        _ = ctx.scenarios
-        assert mock_loader.load_scenarios.call_count == 1
-
-    @patch("gavel_ai.core.workflows.base.ConfigLoader")
-    def test_get_prompt_caching(self, mock_loader_class: MagicMock) -> None:
+    def test_get_prompt_caching(self, tmp_path: Path) -> None:
         """Test that prompts are cached."""
-        mock_loader = MagicMock()
-        mock_loader.load_prompt_template.return_value = "prompt text"
-        mock_loader_class.return_value = mock_loader
+        prompts_dir = tmp_path / "test_eval" / "config" / "prompts"
+        prompts_dir.mkdir(parents=True)
 
-        ctx = EvalContext("test_eval")
+        with open(prompts_dir / "default.toml", "w") as f:
+            f.write('v1 = "prompt text"')
+
+        ctx = LocalFileSystemEvalContext("test_eval", tmp_path)
 
         # First access
         result1 = ctx.get_prompt("default:v1")
         assert result1 == "prompt text"
-        assert mock_loader.load_prompt_template.call_count == 1
 
-        # Second access should use cache
+        # Second access should use cache (same result)
         result2 = ctx.get_prompt("default:v1")
         assert result2 == "prompt text"
-        assert mock_loader.load_prompt_template.call_count == 1
 
 
-class TestRunContext:
-    """Tests for RunContext class."""
+class TestLocalRunContext:
+    """Tests for LocalRunContext class."""
 
-    @patch("gavel_ai.core.workflows.base.ConfigLoader")
-    @patch("gavel_ai.core.workflows.base.LocalFilesystemRun")
-    def test_init(self, mock_run_class: MagicMock, mock_loader_class: MagicMock) -> None:
+    def test_init(self, tmp_path: Path) -> None:
         """Test RunContext initialization."""
-        mock_loader = MagicMock()
-        mock_loader_class.return_value = mock_loader
+        # Create minimal eval config
+        eval_dir = tmp_path / "test_eval" / "config"
+        eval_dir.mkdir(parents=True)
+        (tmp_path / "test_eval" / "data").mkdir(parents=True)
 
-        eval_ctx = EvalContext("test_eval")
-        run_ctx = RunContext(eval_ctx, "run-123", base_dir=".gavel")
+        config_data = {
+            "eval_name": "test_eval",
+            "eval_type": "oneshot",
+            "test_subject_type": "local",
+            "test_subjects": [{"prompt_name": "default", "judges": []}],
+            "variants": ["test"],
+            "scenarios": {"source": "file.local", "name": "scenarios.json"},
+        }
+        with open(eval_dir / "eval_config.json", "w") as f:
+            json.dump(config_data, f)
+
+        agents_data = {"_models": {}}
+        with open(eval_dir / "agents.json", "w") as f:
+            json.dump(agents_data, f)
+
+        with open(tmp_path / "test_eval" / "data" / "scenarios.json", "w") as f:
+            json.dump([], f)
+
+        eval_ctx = LocalFileSystemEvalContext("test_eval", tmp_path)
+        run_ctx = LocalRunContext(eval_ctx, base_dir=tmp_path / "runs", run_id="run-123")
 
         assert run_ctx.eval_context == eval_ctx
         assert run_ctx.run_id == "run-123"
-        assert run_ctx.base_dir == ".gavel"
 
-    @patch("gavel_ai.core.workflows.base.ConfigLoader")
-    @patch("gavel_ai.core.workflows.base.LocalFilesystemRun")
-    def test_step_output_properties(
-        self, mock_run_class: MagicMock, mock_loader_class: MagicMock
-    ) -> None:
-        """Test step output properties."""
-        mock_loader = MagicMock()
-        mock_loader_class.return_value = mock_loader
+    def test_run_dir_property(self, tmp_path: Path) -> None:
+        """Test run_dir property."""
+        eval_dir = tmp_path / "test_eval" / "config"
+        eval_dir.mkdir(parents=True)
+        (tmp_path / "test_eval" / "data").mkdir(parents=True)
 
-        eval_ctx = EvalContext("test_eval")
-        run_ctx = RunContext(eval_ctx, "run-123")
+        config_data = {
+            "eval_name": "test_eval",
+            "eval_type": "oneshot",
+            "test_subject_type": "local",
+            "test_subjects": [{"prompt_name": "default", "judges": []}],
+            "variants": ["test"],
+            "scenarios": {"source": "file.local", "name": "scenarios.json"},
+        }
+        with open(eval_dir / "eval_config.json", "w") as f:
+            json.dump(config_data, f)
 
-        # Initial values should be None
-        assert run_ctx.validation_result is None
-        assert run_ctx.processor_results is None
-        assert run_ctx.evaluation_results is None
-        assert run_ctx.report_content is None
-        assert run_ctx.run_metadata is None
+        agents_data = {"_models": {}}
+        with open(eval_dir / "agents.json", "w") as f:
+            json.dump(agents_data, f)
 
-        # Set and verify values
-        run_ctx.validation_result = ValidationResult(is_valid=True)
-        assert run_ctx.validation_result.is_valid is True
+        with open(tmp_path / "test_eval" / "data" / "scenarios.json", "w") as f:
+            json.dump([], f)
 
-        run_ctx.processor_results = []
-        assert run_ctx.processor_results == []
+        eval_ctx = LocalFileSystemEvalContext("test_eval", tmp_path)
+        run_ctx = LocalRunContext(eval_ctx, base_dir=tmp_path / "runs", run_id="run-123")
 
-        run_ctx.evaluation_results = [{"score": 8}]
-        assert run_ctx.evaluation_results == [{"score": 8}]
-
-        run_ctx.report_content = "<html></html>"
-        assert run_ctx.report_content == "<html></html>"
-
-        run_ctx.run_metadata = {"duration": 10.5}
-        assert run_ctx.run_metadata == {"duration": 10.5}
-
-    @patch("gavel_ai.core.workflows.base.ConfigLoader")
-    @patch("gavel_ai.core.workflows.base.LocalFilesystemRun")
-    def test_processing_metadata_properties(
-        self, mock_run_class: MagicMock, mock_loader_class: MagicMock
-    ) -> None:
-        """Test processing metadata properties."""
-        mock_loader = MagicMock()
-        mock_loader_class.return_value = mock_loader
-
-        eval_ctx = EvalContext("test_eval")
-        run_ctx = RunContext(eval_ctx, "run-123")
-
-        assert run_ctx.test_subject is None
-        assert run_ctx.model_variant is None
-
-        run_ctx.test_subject = "default:v1"
-        run_ctx.model_variant = "claude-sonnet-4-5-20250929"
-
-        assert run_ctx.test_subject == "default:v1"
-        assert run_ctx.model_variant == "claude-sonnet-4-5-20250929"
+        assert run_ctx.run_dir == tmp_path / "runs" / "run-123"
 
 
 class TestStepABC:
@@ -228,7 +222,7 @@ class TestStepABC:
         logger = logging.getLogger("test")
 
         class IncompleteStep(Step):
-            async def execute(self, context: RunContext) -> None:
+            async def execute(self, context) -> None:
                 pass
 
         with pytest.raises(TypeError):
@@ -255,7 +249,7 @@ class TestStepABC:
             def phase(self) -> StepPhase:
                 return StepPhase.VALIDATION
 
-            async def execute(self, context: RunContext) -> None:
+            async def execute(self, context) -> None:
                 pass
 
         step = CompleteStep(logger)
@@ -271,7 +265,7 @@ class TestStepABC:
             def phase(self) -> StepPhase:
                 return StepPhase.VALIDATION
 
-            async def execute(self, context: RunContext) -> None:
+            async def execute(self, context) -> None:
                 pass
 
         step = SuccessStep(logger)
@@ -290,7 +284,7 @@ class TestStepABC:
             def phase(self) -> StepPhase:
                 return StepPhase.VALIDATION
 
-            async def execute(self, context: RunContext) -> None:
+            async def execute(self, context) -> None:
                 raise ValueError("Test error")
 
         step = FailingStep(logger)

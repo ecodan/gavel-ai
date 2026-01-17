@@ -1,18 +1,10 @@
-"""Unit tests for judges configuration."""
+"""Unit tests for judges configuration models."""
 
-import json
-from pathlib import Path
 from typing import Any, Dict
 
 import pytest
 
-from gavel_ai.core.config.judges import (
-    load_judge_config,
-    validate_judge_ids,
-    validate_judge_type,
-)
-from gavel_ai.core.config.models import EvalConfig, GEvalConfig, JudgeConfig
-from gavel_ai.core.exceptions import JudgeError
+from gavel_ai.models.config import GEvalConfig, JudgeConfig
 
 
 class TestJudgeConfigModel:
@@ -57,6 +49,44 @@ class TestJudgeConfigModel:
         assert judge.name == "similarity"
         assert not hasattr(judge, "future_field")
 
+    def test_judge_with_threshold(self) -> None:
+        """Test parsing judge with threshold."""
+        judge_data: Dict[str, Any] = {
+            "name": "similarity",
+            "type": "deepeval.similarity",
+            "threshold": 0.8,
+        }
+
+        judge = JudgeConfig.model_validate(judge_data)
+
+        assert judge.threshold == 0.8
+
+    def test_judge_with_model(self) -> None:
+        """Test parsing judge with model specification."""
+        judge_data: Dict[str, Any] = {
+            "name": "geval_custom",
+            "type": "deepeval.geval",
+            "model": "claude-3-5-sonnet-latest",
+        }
+
+        judge = JudgeConfig.model_validate(judge_data)
+
+        assert judge.model == "claude-3-5-sonnet-latest"
+
+    def test_judge_with_geval_fields(self) -> None:
+        """Test parsing judge with GEval-specific fields."""
+        judge_data: Dict[str, Any] = {
+            "name": "custom",
+            "type": "deepeval.geval",
+            "criteria": "Technical accuracy",
+            "evaluation_steps": ["Check facts", "Verify code"],
+        }
+
+        judge = JudgeConfig.model_validate(judge_data)
+
+        assert judge.criteria == "Technical accuracy"
+        assert judge.evaluation_steps == ["Check facts", "Verify code"]
+
 
 class TestGEvalConfigModel:
     """Test suite for GEvalConfig Pydantic model."""
@@ -90,156 +120,28 @@ class TestGEvalConfigModel:
         assert geval.threshold == 0.5
 
         # Should reject threshold > 1.0
+        from pydantic import ValidationError
+
         invalid_data: Dict[str, Any] = {
             "criteria": "Test",
             "evaluation_steps": ["Step 1"],
             "model": "claude",
             "threshold": 1.5,
         }
-        with pytest.raises(Exception):  # Pydantic validation error
+        with pytest.raises(ValidationError):
             GEvalConfig.model_validate(invalid_data)
 
-
-class TestEvalConfigWithJudges:
-    """Test suite for EvalConfig with judges array."""
-
-    def test_eval_config_with_judges(self) -> None:
-        """Test that EvalConfig can include judges array."""
-        config_data: Dict[str, Any] = {
-            "eval_name": "test_eval",
-            "eval_type": "local",
-            "processor_type": "prompt_input",
-            "scenarios_file": "data/scenarios.json",
-            "agents_file": "config/agents.json",
-            "judges_config": "config/judges/",
-            "output_dir": "runs/",
-            "judges": [
-                {
-                    "name": "similarity",
-                    "type": "deepeval.similarity",
-                    "config": {"threshold": 0.8},
-                }
-            ],
+    def test_geval_default_threshold(self) -> None:
+        """Test that GEvalConfig has default threshold."""
+        geval_data: Dict[str, Any] = {
+            "criteria": "Test criteria",
+            "evaluation_steps": ["Step 1"],
+            "model": "claude",
         }
 
-        config = EvalConfig.model_validate(config_data)
+        geval = GEvalConfig.model_validate(geval_data)
 
-        assert config.judges is not None
-        assert len(config.judges) == 1
-        assert config.judges[0].name == "similarity"
-
-
-class TestJudgeConfigLoading:
-    """Test suite for loading external judge configs."""
-
-    def test_load_judge_config_without_config_ref(self) -> None:
-        """Test loading judge without external config reference."""
-        judge = JudgeConfig(
-            name="similarity",
-            type="deepeval.similarity",
-            config={"threshold": 0.8},
-        )
-
-        # Should return unchanged
-        loaded = load_judge_config(judge, Path("."))
-
-        assert loaded.name == "similarity"
-        assert loaded.config == {"threshold": 0.8}
-
-    def test_load_judge_config_with_config_ref(self, tmp_path: Path) -> None:
-        """Test loading and merging external judge config."""
-        # Create external config file
-        judges_dir = tmp_path / "config" / "judges"
-        judges_dir.mkdir(parents=True)
-
-        external_config = {
-            "criteria": "Technical accuracy",
-            "evaluation_steps": ["Check facts"],
-            "model": "claude-3-5-sonnet-latest",
-            "threshold": 0.7,
-        }
-
-        config_file = judges_dir / "custom.json"
-        with open(config_file, "w") as f:
-            json.dump(external_config, f)
-
-        # Create judge with config_ref
-        judge = JudgeConfig(
-            name="custom",
-            type="deepeval.geval",
-            config={"threshold": 0.5},  # Should be overridden
-            config_ref="config/judges/custom.json",
-        )
-
-        loaded = load_judge_config(judge, tmp_path)
-
-        # External config should override inline config
-        assert loaded.config["threshold"] == 0.7
-        assert loaded.config["criteria"] == "Technical accuracy"
-
-    def test_load_judge_config_missing_file(self, tmp_path: Path) -> None:
-        """Test that JudgeError is raised for missing config file."""
-        judge = JudgeConfig(
-            name="custom",
-            type="deepeval.geval",
-            config_ref="config/judges/nonexistent.json",
-        )
-
-        with pytest.raises(JudgeError) as exc_info:
-            load_judge_config(judge, tmp_path)
-
-        assert "not found" in str(exc_info.value).lower()
-
-
-class TestJudgeValidation:
-    """Test suite for judge validation functions."""
-
-    def test_validate_judge_ids_success(self) -> None:
-        """Test successful validation when judge names are unique."""
-        judges = [
-            JudgeConfig(name="similarity", type="deepeval.similarity"),
-            JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
-        ]
-
-        # Should not raise exception
-        validate_judge_ids(judges)
-
-    def test_validate_judge_ids_duplicate(self) -> None:
-        """Test that JudgeError is raised for duplicate names."""
-        judges = [
-            JudgeConfig(name="similarity", type="deepeval.similarity"),
-            JudgeConfig(name="similarity", type="deepeval.similarity"),  # Duplicate
-        ]
-
-        with pytest.raises(JudgeError) as exc_info:
-            validate_judge_ids(judges)
-
-        error_msg = str(exc_info.value)
-        assert "duplicate" in error_msg.lower() or "unique" in error_msg.lower()
-
-    def test_validate_deepeval_name_supported(self) -> None:
-        """Test validation of supported judge types."""
-        supported_names = [
-            "deepeval.similarity",
-            "deepeval.faithfulness",
-            "deepeval.hallucination",
-            "deepeval.answer_relevancy",
-            "deepeval.contextual_precision",
-            "deepeval.contextual_recall",
-            "deepeval.geval",
-        ]
-
-        for name in supported_names:
-            # Should not raise exception
-            validate_judge_type(name)
-
-    def test_validate_deepeval_name_unsupported(self) -> None:
-        """Test that JudgeError is raised for unsupported judge types."""
-        with pytest.raises(JudgeError) as exc_info:
-            validate_judge_type("deepeval.invalid_judge")
-
-        error_msg = str(exc_info.value)
-        assert "unsupported" in error_msg.lower() or "invalid" in error_msg.lower()
+        assert geval.threshold == 0.7  # Default value
 
 
 class TestDeepEvalJudgeTypes:
@@ -253,8 +155,8 @@ class TestDeepEvalJudgeTypes:
             config={"threshold": 0.8},
         )
 
-        validate_judge_type(judge.type)
         assert judge.type == "deepeval.similarity"
+        assert judge.name == "similarity"
 
     def test_faithfulness_judge(self) -> None:
         """Test faithfulness judge configuration."""
@@ -264,7 +166,6 @@ class TestDeepEvalJudgeTypes:
             config={"threshold": 0.7},
         )
 
-        validate_judge_type(judge.type)
         assert judge.type == "deepeval.faithfulness"
 
     def test_hallucination_judge(self) -> None:
@@ -275,7 +176,6 @@ class TestDeepEvalJudgeTypes:
             config={"threshold": 0.9},
         )
 
-        validate_judge_type(judge.type)
         assert judge.type == "deepeval.hallucination"
 
     def test_geval_custom_judge(self) -> None:
@@ -291,5 +191,36 @@ class TestDeepEvalJudgeTypes:
             },
         )
 
-        validate_judge_type(judge.type)
         assert judge.type == "deepeval.geval"
+        assert judge.name == "custom_accuracy"
+        assert judge.config["criteria"] == "Technical accuracy"
+
+    def test_answer_relevancy_judge(self) -> None:
+        """Test answer relevancy judge configuration."""
+        judge = JudgeConfig(
+            name="relevancy",
+            type="deepeval.answer_relevancy",
+            threshold=0.7,
+        )
+
+        assert judge.type == "deepeval.answer_relevancy"
+
+    def test_contextual_precision_judge(self) -> None:
+        """Test contextual precision judge configuration."""
+        judge = JudgeConfig(
+            name="precision",
+            type="deepeval.contextual_precision",
+            threshold=0.7,
+        )
+
+        assert judge.type == "deepeval.contextual_precision"
+
+    def test_contextual_recall_judge(self) -> None:
+        """Test contextual recall judge configuration."""
+        judge = JudgeConfig(
+            name="recall",
+            type="deepeval.contextual_recall",
+            threshold=0.7,
+        )
+
+        assert judge.type == "deepeval.contextual_recall"

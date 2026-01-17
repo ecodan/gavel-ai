@@ -51,7 +51,7 @@ class ValidatorStep(Step):
 
         # 1. Validate eval_config loadable
         try:
-            eval_config = context.eval_context.eval_config
+            eval_config = context.eval_context.eval_config.read()
             self.logger.debug(
                 f"eval_config loaded: test_subject_type={eval_config.test_subject_type}"
             )
@@ -66,7 +66,7 @@ class ValidatorStep(Step):
 
         # 2. Validate agents.json exists and has required sections
         try:
-            agents_config = context.eval_context.agents_config
+            agents_config = context.eval_context.agents.read()
             self.logger.debug("agents.json loaded")
         except ConfigError as e:
             errors.append(f"Failed to load agents.json: {e}")

@@ -19,6 +19,13 @@ from gavel_ai.core.steps import (
 from gavel_ai.core.steps.base import StepPhase
 
 
+def _create_mock_data_source(return_value):
+    """Create a mock data source that returns the given value from read()."""
+    mock_ds = MagicMock()
+    mock_ds.read.return_value = return_value
+    return mock_ds
+
+
 class TestValidatorStep:
     """Tests for ValidatorStep."""
 
@@ -34,7 +41,7 @@ class TestValidatorStep:
         logger = logging.getLogger("test")
         step = ValidatorStep(logger)
 
-        # Create mock context with valid config
+        # Create mock config data
         mock_eval_config = MagicMock()
         mock_eval_config.test_subjects = [MagicMock()]
         mock_eval_config.variants = ["test_model"]
@@ -45,11 +52,12 @@ class TestValidatorStep:
         }
         mock_scenarios = [MagicMock()]
 
+        # Create mock eval context with data sources
         mock_eval_context = MagicMock()
         mock_eval_context.eval_name = "test_eval"
-        mock_eval_context.eval_config = mock_eval_config
-        mock_eval_context.agents_config = mock_agents_config
-        mock_eval_context.scenarios = mock_scenarios
+        mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
+        mock_eval_context.agents = _create_mock_data_source(mock_agents_config)
+        mock_eval_context.scenarios = _create_mock_data_source(mock_scenarios)
 
         mock_context = MagicMock(spec=RunContext)
         mock_context.eval_context = mock_eval_context
@@ -66,10 +74,18 @@ class TestValidatorStep:
         logger = logging.getLogger("test")
         step = ValidatorStep(logger)
 
+        # Create mock config with empty _models
+        mock_eval_config = MagicMock()
+        mock_eval_config.test_subjects = [MagicMock()]
+        mock_eval_config.variants = ["test_model"]
+        mock_eval_config.test_subject_type = "local"
+
+        mock_agents_config = {"_models": {}}
+
         mock_eval_context = MagicMock()
         mock_eval_context.eval_name = "test_eval"
-        mock_eval_context.eval_config = MagicMock()
-        mock_eval_context.agents_config = {"_models": {}}
+        mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
+        mock_eval_context.agents = _create_mock_data_source(mock_agents_config)
 
         mock_context = MagicMock(spec=RunContext)
         mock_context.eval_context = mock_eval_context
@@ -89,12 +105,14 @@ class TestValidatorStep:
         mock_eval_config.variants = ["test_model"]
         mock_eval_config.test_subject_type = "local"
 
-        mock_eval_context = MagicMock()
-        mock_eval_context.eval_name = "test_eval"
-        mock_eval_context.eval_config = mock_eval_config
-        mock_eval_context.agents_config = {
+        mock_agents_config = {
             "_models": {"test_model": {}},
         }
+
+        mock_eval_context = MagicMock()
+        mock_eval_context.eval_name = "test_eval"
+        mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
+        mock_eval_context.agents = _create_mock_data_source(mock_agents_config)
 
         mock_context = MagicMock(spec=RunContext)
         mock_context.eval_context = mock_eval_context
@@ -114,13 +132,15 @@ class TestValidatorStep:
         mock_eval_config.variants = ["test_model"]
         mock_eval_config.test_subject_type = "local"
 
-        mock_eval_context = MagicMock()
-        mock_eval_context.eval_name = "test_eval"
-        mock_eval_context.eval_config = mock_eval_config
-        mock_eval_context.agents_config = {
+        mock_agents_config = {
             "_models": {"test_model": {"model_version": "gpt-4"}},
         }
-        mock_eval_context.scenarios = []
+
+        mock_eval_context = MagicMock()
+        mock_eval_context.eval_name = "test_eval"
+        mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
+        mock_eval_context.agents = _create_mock_data_source(mock_agents_config)
+        mock_eval_context.scenarios = _create_mock_data_source([])
 
         mock_context = MagicMock(spec=RunContext)
         mock_context.eval_context = mock_eval_context
@@ -159,7 +179,7 @@ class TestScenarioProcessorStep:
         mock_executor.execute = AsyncMock(return_value=[MagicMock()])
         mock_executor_class.return_value = mock_executor
 
-        # Create mock context
+        # Create mock config data
         mock_async_config = MagicMock()
         mock_async_config.num_workers = 1
         mock_async_config.task_timeout_seconds = 30
@@ -178,10 +198,7 @@ class TestScenarioProcessorStep:
         mock_scenario.input = "test input"
         mock_scenario.metadata = {}
 
-        mock_eval_context = MagicMock()
-        mock_eval_context.eval_name = "test_eval"
-        mock_eval_context.eval_config = mock_eval_config
-        mock_eval_context.agents_config = {
+        mock_agents_config = {
             "_models": {
                 "test_model": {
                     "model_provider": "openai",
@@ -192,7 +209,13 @@ class TestScenarioProcessorStep:
                 }
             },
         }
-        mock_eval_context.scenarios = [mock_scenario]
+
+        # Create mock eval context with data sources
+        mock_eval_context = MagicMock()
+        mock_eval_context.eval_name = "test_eval"
+        mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
+        mock_eval_context.agents = _create_mock_data_source(mock_agents_config)
+        mock_eval_context.scenarios = _create_mock_data_source([mock_scenario])
 
         mock_context = MagicMock(spec=RunContext)
         mock_context.eval_context = mock_eval_context
@@ -220,7 +243,17 @@ class TestJudgeRunnerStep:
         logger = logging.getLogger("test")
         step = JudgeRunnerStep(logger)
 
+        # Create mock eval context with data sources
+        mock_eval_config = MagicMock()
+        mock_eval_config.test_subjects = []
+
+        mock_eval_context = MagicMock()
+        mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
+        mock_eval_context.agents = _create_mock_data_source({"_models": {}})
+        mock_eval_context.scenarios = _create_mock_data_source([])
+
         mock_context = MagicMock(spec=RunContext)
+        mock_context.eval_context = mock_eval_context
         mock_context.processor_results = None
 
         with pytest.raises(ConfigError):
@@ -237,9 +270,9 @@ class TestJudgeRunnerStep:
 
         mock_eval_context = MagicMock()
         mock_eval_context.eval_name = "test_eval"
-        mock_eval_context.eval_config = mock_eval_config
-        mock_eval_context.agents_config = {"_models": {}}
-        mock_eval_context.scenarios = []
+        mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
+        mock_eval_context.agents = _create_mock_data_source({"_models": {}})
+        mock_eval_context.scenarios = _create_mock_data_source([])
 
         mock_context = MagicMock(spec=RunContext)
         mock_context.eval_context = mock_eval_context
@@ -267,8 +300,18 @@ class TestReportRunnerStep:
         logger = logging.getLogger("test")
         step = ReportRunnerStep(logger)
 
+        # Create mock eval context with data sources
+        mock_eval_config = MagicMock()
+        mock_eval_config.test_subjects = []
+
+        mock_eval_context = MagicMock()
+        mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
+        mock_eval_context.scenarios = _create_mock_data_source([])
+
         mock_context = MagicMock(spec=RunContext)
+        mock_context.eval_context = mock_eval_context
         mock_context.processor_results = None
+        mock_context.evaluation_results = None
 
         with pytest.raises(ConfigError):
             await step.execute(mock_context)

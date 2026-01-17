@@ -6,14 +6,14 @@ from typing import Any, Dict
 
 import pytest
 
-from gavel_ai.core.config import load_config
-from gavel_ai.core.config.agents import (
+from gavel_ai.core.adapters.backends import LocalStorageBackend
+from gavel_ai.core.adapters.data_sources import StructDataSource
+from gavel_ai.models.agents import (
     AgentConfig,
     AgentsFile,
     ModelDefinition,
-    merge_parameters,
-    validate_agent_references,
 )
+from gavel_ai.models.utils import validate_agent_references
 from gavel_ai.core.exceptions import ConfigError
 
 
@@ -170,14 +170,16 @@ class TestAgentsFile:
         with open(agents_file, "w") as f:
             json.dump(agents_data, f)
 
-        agents = load_config(agents_file, AgentsFile)
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "agents.json", schema=AgentsFile)
+        agents = source.read()
 
         assert len(agents._models) == 2
         assert "claude-standard" in agents._models
         assert "gpt-standard" in agents._models
 
-    def test_get_agent_by_name(self, tmp_path: Path) -> None:
-        """Test retrieving agent config by name."""
+    def test_agents_file_extra_allows_agent_definitions(self, tmp_path: Path) -> None:
+        """Test that AgentsFile allows extra fields for agent definitions."""
         agents_data: Dict[str, Any] = {
             "_models": {
                 "claude-standard": {
@@ -195,37 +197,13 @@ class TestAgentsFile:
         with open(agents_file, "w") as f:
             json.dump(agents_data, f)
 
-        agents = load_config(agents_file, AgentsFile)
-        agent = agents.get_agent("subject_agent")
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "agents.json", schema=AgentsFile)
+        agents = source.read()
 
-        assert agent.model_id == "claude-standard"
-        assert agent.prompt == "assistant:v1"
-
-    def test_get_nonexistent_agent_raises_error(self, tmp_path: Path) -> None:
-        """Test that getting nonexistent agent raises ConfigError."""
-        agents_data: Dict[str, Any] = {
-            "_models": {
-                "claude-standard": {
-                    "model_provider": "anthropic",
-                    "model_family": "claude",
-                    "model_version": "claude-sonnet-4-5-latest",
-                    "model_parameters": {"temperature": 0.7, "max_tokens": 4096},
-                    "provider_auth": {"api_key": "sk-ant-test"},
-                }
-            },
-            "subject_agent": {"model_id": "claude-standard", "prompt": "assistant:v1"},
-        }
-
-        agents_file = tmp_path / "agents.json"
-        with open(agents_file, "w") as f:
-            json.dump(agents_data, f)
-
-        agents = load_config(agents_file, AgentsFile)
-
-        with pytest.raises(ConfigError) as exc_info:
-            agents.get_agent("nonexistent_agent")
-
-        assert "not found" in str(exc_info.value).lower()
+        # Extra fields should be accessible via __pydantic_extra__
+        assert hasattr(agents, "__pydantic_extra__")
+        assert "subject_agent" in agents.__pydantic_extra__
 
 
 class TestModelLinking:
@@ -250,7 +228,9 @@ class TestModelLinking:
         with open(agents_file, "w") as f:
             json.dump(agents_data, f)
 
-        agents = load_config(agents_file, AgentsFile)
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "agents.json", schema=AgentsFile)
+        agents = source.read()
 
         # Should not raise exception
         validate_agent_references(agents)
@@ -277,7 +257,9 @@ class TestModelLinking:
         with open(agents_file, "w") as f:
             json.dump(agents_data, f)
 
-        agents = load_config(agents_file, AgentsFile)
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "agents.json", schema=AgentsFile)
+        agents = source.read()
 
         with pytest.raises(ConfigError) as exc_info:
             validate_agent_references(agents)
@@ -285,82 +267,6 @@ class TestModelLinking:
         error_msg = str(exc_info.value)
         assert "nonexistent-model" in error_msg
         assert "model_id" in error_msg.lower() or "unknown" in error_msg.lower()
-
-
-class TestParameterMerging:
-    """Test suite for parameter override logic."""
-
-    def test_merge_parameters_no_override(self) -> None:
-        """Test merging when agent has no parameter overrides."""
-        model_def = ModelDefinition.model_validate(
-            {
-                "model_provider": "anthropic",
-                "model_family": "claude",
-                "model_version": "claude-sonnet-4-5-latest",
-                "model_parameters": {"temperature": 0.7, "max_tokens": 4096},
-                "provider_auth": {"api_key": "sk-ant-test"},
-            }
-        )
-
-        agent_config = AgentConfig.model_validate(
-            {"model_id": "claude-standard", "prompt": "assistant:v1"}
-        )
-
-        merged = merge_parameters(model_def, agent_config)
-
-        assert merged["temperature"] == 0.7
-        assert merged["max_tokens"] == 4096
-
-    def test_merge_parameters_with_override(self) -> None:
-        """Test merging when agent overrides some parameters."""
-        model_def = ModelDefinition.model_validate(
-            {
-                "model_provider": "anthropic",
-                "model_family": "claude",
-                "model_version": "claude-sonnet-4-5-latest",
-                "model_parameters": {"temperature": 0.7, "max_tokens": 4096},
-                "provider_auth": {"api_key": "sk-ant-test"},
-            }
-        )
-
-        agent_config = AgentConfig.model_validate(
-            {
-                "model_id": "claude-standard",
-                "prompt": "assistant:v1",
-                "model_parameters": {"temperature": 0.3},  # Override
-            }
-        )
-
-        merged = merge_parameters(model_def, agent_config)
-
-        assert merged["temperature"] == 0.3  # Overridden
-        assert merged["max_tokens"] == 4096  # Kept from model
-
-    def test_merge_parameters_agent_adds_new_param(self) -> None:
-        """Test merging when agent adds new parameters."""
-        model_def = ModelDefinition.model_validate(
-            {
-                "model_provider": "anthropic",
-                "model_family": "claude",
-                "model_version": "claude-sonnet-4-5-latest",
-                "model_parameters": {"temperature": 0.7, "max_tokens": 4096},
-                "provider_auth": {"api_key": "sk-ant-test"},
-            }
-        )
-
-        agent_config = AgentConfig.model_validate(
-            {
-                "model_id": "claude-standard",
-                "prompt": "assistant:v1",
-                "model_parameters": {"top_p": 0.9},  # New param
-            }
-        )
-
-        merged = merge_parameters(model_def, agent_config)
-
-        assert merged["temperature"] == 0.7  # From model
-        assert merged["max_tokens"] == 4096  # From model
-        assert merged["top_p"] == 0.9  # Added by agent
 
 
 class TestProviderTypes:

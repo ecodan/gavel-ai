@@ -91,18 +91,24 @@ class ProviderFactory:
             api_key = model_def.provider_auth.get("api_key")
             base_url = model_def.provider_auth.get("base_url")
 
-            # Resolve environment variables in API key
-            if api_key and api_key.startswith("${") and api_key.endswith("}"):
-                env_var_name = api_key[2:-1]
-                resolved_key = os.getenv(env_var_name)
-                if not resolved_key:
-                    from gavel_ai.core.exceptions import ConfigError
+            # Resolve environment variables in API key (supports {{VAR}} and ${VAR} formats)
+            if api_key:
+                env_var_name = None
+                if api_key.startswith("{{") and api_key.endswith("}}"):
+                    env_var_name = api_key[2:-2]
+                elif api_key.startswith("${") and api_key.endswith("}"):
+                    env_var_name = api_key[2:-1]
 
-                    raise ConfigError(
-                        f"Environment variable '{env_var_name}' not set - "
-                        f"Set {env_var_name} or provide api_key directly in provider_auth"
-                    )
-                api_key = resolved_key
+                if env_var_name:
+                    resolved_key = os.getenv(env_var_name)
+                    if not resolved_key:
+                        from gavel_ai.core.exceptions import ConfigError
+
+                        raise ConfigError(
+                            f"Environment variable '{env_var_name}' not set - "
+                            f"Set {env_var_name} or provide api_key directly in provider_auth"
+                        )
+                    api_key = resolved_key
 
             try:
                 # Build model string: "provider:model_version"

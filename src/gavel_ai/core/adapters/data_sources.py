@@ -116,6 +116,8 @@ class RecordDataSource(DataSource, Generic[T]):
         """Serialize multiple records"""
         if self._ext == ".jsonl":
             return "\n".join(json.dumps(r) for r in records)
+        elif self._ext == ".json":
+            return json.dumps(records, indent=2, ensure_ascii=False)
         elif self._ext == ".csv":
             import csv
             import io
@@ -135,6 +137,12 @@ class RecordDataSource(DataSource, Generic[T]):
             for line in content.splitlines():
                 if line.strip():
                     yield json.loads(line)
+        elif self._ext == ".json":
+            data = json.loads(content)
+            if isinstance(data, list):
+                yield from data
+            else:
+                raise ValueError("JSON file must contain an array of records")
         elif self._ext == ".csv":
             import csv
             import io

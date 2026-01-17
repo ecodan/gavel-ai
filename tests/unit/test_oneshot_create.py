@@ -47,7 +47,7 @@ class TestOneshotCreateCommand:
         assert (eval_dir / "config" / "agents.json").exists()
         assert (eval_dir / "config" / "eval_config.json").exists()
         assert (eval_dir / "data" / "scenarios.json").exists()
-        assert (eval_dir / "config" / "prompts" / "default.toml").exists()
+        assert (eval_dir / "config" / "prompts" / "assistant.toml").exists()
 
     def test_agents_config_valid_json(self, tmp_path: Path) -> None:
         """Test that generated agents.json is valid JSON with correct structure."""
@@ -60,15 +60,15 @@ class TestOneshotCreateCommand:
 
         # Verify structure
         assert "_models" in agents_config
-        assert "subject_agent" in agents_config
-        assert "baseline_agent" in agents_config
+        assert "claude_haiku" in agents_config
+        assert "assistant_agent" in agents_config
 
         # Verify model definitions
-        assert "claude-standard" in agents_config["_models"]
-        assert "gpt-standard" in agents_config["_models"]
+        assert "claude-haiku" in agents_config["_models"]
+        assert "gpt-5-mini" in agents_config["_models"]
 
         # Verify model structure
-        claude_model = agents_config["_models"]["claude-standard"]
+        claude_model = agents_config["_models"]["claude-haiku"]
         assert claude_model["model_provider"] == "anthropic"
         assert claude_model["model_family"] == "claude"
         assert "model_parameters" in claude_model
@@ -170,11 +170,11 @@ class TestOneshotCreateCommand:
         assert "metadata" in scenario
 
     def test_prompts_toml_valid(self, tmp_path: Path) -> None:
-        """Test that generated config/prompts/default.toml is valid TOML."""
+        """Test that generated config/prompts/assistant.toml is valid TOML."""
         eval_name = "test_eval"
         runner.invoke(app, ["oneshot", "create", "--eval", eval_name, "--eval-root", str(tmp_path)])
 
-        prompts_file = tmp_path / eval_name / "config" / "prompts" / "default.toml"
+        prompts_file = tmp_path / eval_name / "config" / "prompts" / "assistant.toml"
         with open(prompts_file) as f:
             prompts = toml.load(f)
 
@@ -305,7 +305,7 @@ class TestScaffoldingFunctions:
         assert (eval_dir / "config" / "agents.json").exists()
         assert (eval_dir / "config" / "eval_config.json").exists()
         assert (eval_dir / "data" / "scenarios.json").exists()
-        assert (eval_dir / "config" / "prompts" / "default.toml").exists()
+        assert (eval_dir / "config" / "prompts" / "assistant.toml").exists()
 
         # Verify directories exist
         assert (eval_dir / "config" / "judges").exists()

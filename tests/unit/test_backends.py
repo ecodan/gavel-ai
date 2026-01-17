@@ -177,8 +177,8 @@ class TestFsspecStorageBackend:
 
         backend = FsspecStorageBackend("s3://bucket/path")
 
-        assert backend._full_path("file.txt") == "s3://bucket/path//file.txt"
-        assert backend._full_path("subdir/file.txt") == "s3://bucket/path//subdir/file.txt"
+        assert backend._full_path("file.txt") == "s3://bucket/path/file.txt"
+        assert backend._full_path("subdir/file.txt") == "s3://bucket/path/subdir/file.txt"
 
     @patch("fsspec.filesystem")
     def test_write_bytes(self, mock_filesystem):
@@ -193,7 +193,7 @@ class TestFsspecStorageBackend:
 
         backend.write_bytes("test.txt", b"test content")
 
-        mock_fs.open.assert_called_once_with("s3://bucket/path//test.txt", "wb")
+        mock_fs.open.assert_called_once_with("s3://bucket/path/test.txt", "wb")
         mock_open.write.assert_called_once_with(b"test content")
 
     @patch("fsspec.filesystem")
@@ -210,7 +210,7 @@ class TestFsspecStorageBackend:
 
         content = backend.read_bytes("test.txt")
 
-        mock_fs.open.assert_called_once_with("s3://bucket/path//test.txt", "rb")
+        mock_fs.open.assert_called_once_with("s3://bucket/path/test.txt", "rb")
         assert content == b"test content"
 
     @patch("fsspec.filesystem")
@@ -226,7 +226,7 @@ class TestFsspecStorageBackend:
 
         backend.append_bytes("test.txt", b"appended")
 
-        mock_fs.open.assert_called_once_with("s3://bucket/path//test.txt", "ab")
+        mock_fs.open.assert_called_once_with("s3://bucket/path/test.txt", "ab")
         mock_open.write.assert_called_once_with(b"appended")
 
     @patch("fsspec.filesystem")
@@ -263,7 +263,7 @@ class TestFsspecStorageBackend:
         backend = FsspecStorageBackend("s3://bucket/path")
 
         assert backend.exists("test.txt") is True
-        mock_fs.exists.assert_called_once_with("s3://bucket/path//test.txt")
+        mock_fs.exists.assert_called_once_with("s3://bucket/path/test.txt")
 
     @patch("fsspec.filesystem")
     def test_delete(self, mock_filesystem):
@@ -275,15 +275,15 @@ class TestFsspecStorageBackend:
 
         backend.delete("test.txt")
 
-        mock_fs.rm.assert_called_once_with("s3://bucket/path//test.txt")
+        mock_fs.rm.assert_called_once_with("s3://bucket/path/test.txt")
 
     @patch("fsspec.filesystem")
     def test_list(self, mock_filesystem):
         """list returns files via fsspec glob."""
         mock_fs = MagicMock()
         mock_fs.glob.return_value = [
-            "s3://bucket/path//file1.txt",
-            "s3://bucket/path//subdir/file2.txt",
+            "s3://bucket/path/file1.txt",
+            "s3://bucket/path/subdir/file2.txt",
         ]
         mock_filesystem.return_value = mock_fs
 
@@ -299,7 +299,7 @@ class TestFsspecStorageBackend:
     def test_list_with_prefix(self, mock_filesystem):
         """list with prefix filters via fsspec glob."""
         mock_fs = MagicMock()
-        mock_fs.glob.return_value = ["s3://bucket/path//subdir/file.txt"]
+        mock_fs.glob.return_value = ["s3://bucket/path/subdir/file.txt"]
         mock_filesystem.return_value = mock_fs
 
         backend = FsspecStorageBackend("s3://bucket/path")

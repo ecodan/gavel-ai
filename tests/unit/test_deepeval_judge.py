@@ -8,7 +8,6 @@ Tests Story 4.2 acceptance criteria:
 - Errors are wrapped in JudgeError with recovery guidance
 """
 
-
 import pytest
 from deepeval.test_case import LLMTestCaseParams
 
@@ -89,12 +88,15 @@ class TestDeepEvalJudgeInitialization:
 
     def test_answer_relevancy_judge_creation(self, mock_deepeval_metrics, answer_relevancy_config):
         """Test creating answer relevancy judge."""
+        from unittest.mock import ANY
+
         judge = DeepEvalJudge(answer_relevancy_config)
 
         assert judge.config == answer_relevancy_config
         assert judge.metric == mock_deepeval_metrics["relevancy_instance"]
         mock_deepeval_metrics["AnswerRelevancyMetric"].assert_called_once_with(
-            threshold=0.7, model="gpt-4"
+            threshold=0.7,
+            model=ANY,  # DeepEval wraps model string in GPTModel object
         )
 
     def test_faithfulness_judge_creation(self, mock_deepeval_metrics, faithfulness_config):
@@ -107,6 +109,8 @@ class TestDeepEvalJudgeInitialization:
 
     def test_geval_judge_creation(self, mock_deepeval_metrics, geval_config):
         """Test creating GEval judge."""
+        from unittest.mock import ANY
+
         judge = DeepEvalJudge(geval_config)
 
         assert judge.config == geval_config
@@ -120,7 +124,7 @@ class TestDeepEvalJudgeInitialization:
                 LLMTestCaseParams.ACTUAL_OUTPUT,
                 LLMTestCaseParams.EXPECTED_OUTPUT,
             ],
-            model="gpt-4",
+            model=ANY,  # DeepEval wraps model string in GPTModel object
             threshold=0.7,
         )
 

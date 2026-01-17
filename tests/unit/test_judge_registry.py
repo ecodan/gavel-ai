@@ -133,7 +133,13 @@ class TestJudgeRegistryFactory:
         configs = [
             JudgeConfig(name="relevancy", type="deepeval.answer_relevancy"),
             JudgeConfig(name="faithfulness", type="deepeval.faithfulness"),
-            JudgeConfig(name="geval", type="deepeval.geval"),
+            JudgeConfig(
+                name="geval",
+                type="deepeval.geval",
+                model="gpt-4",  # GEval requires model
+                criteria="Test criteria",
+                evaluation_steps=["Step 1"],
+            ),
         ]
 
         judges = [JudgeRegistry.create(config) for config in configs]

@@ -13,11 +13,43 @@ Per Tech Spec 3.9: Extracted from run() lines 247-318.
 import logging
 from typing import Any, Dict, List
 
-from gavel_ai.core.config_loader import get_model_definition
 from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError
 from gavel_ai.core.steps.base import Step, StepPhase
 from gavel_ai.judges.judge_executor import JudgeExecutor
+
+
+def get_model_definition(agents_config: dict, model_id: str) -> dict:
+    """
+    Get model definition from agents config.
+
+    Args:
+        agents_config: The agents configuration dict
+        model_id: Model ID to look up (can be model name or agent name)
+
+    Returns:
+        Model definition dict with model_version, model_family, etc.
+
+    Raises:
+        ConfigError: If model not found
+    """
+    models = agents_config.get("_models", {})
+
+    # Check if it's a direct model name
+    if model_id in models:
+        return models[model_id]
+
+    # Check if it's an agent name that references a model
+    if model_id in agents_config:
+        agent = agents_config[model_id]
+        referenced_model_id = agent.get("model_id")
+        if referenced_model_id and referenced_model_id in models:
+            return models[referenced_model_id]
+
+    raise ConfigError(
+        f"Model '{model_id}' not found in _models or agents - "
+        f"Add '{model_id}' to _models section of agents.json"
+    )
 
 
 class JudgeRunnerStep(Step):
@@ -44,9 +76,9 @@ class JudgeRunnerStep(Step):
         Raises:
             ConfigError: If judge configuration fails
         """
-        eval_config = context.eval_context.eval_config
-        agents_config = context.eval_context.agents_config
-        scenarios = context.eval_context.scenarios
+        eval_config = context.eval_context.eval_config.read()
+        agents_config = context.eval_context.agents.read()
+        scenarios = context.eval_context.scenarios.read()
         processor_results = context.processor_results
 
         if processor_results is None:

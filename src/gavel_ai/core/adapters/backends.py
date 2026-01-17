@@ -128,7 +128,7 @@ class FsspecStorageBackend(StorageBackend):
         self.fs.rm(self._full_path(path))
 
     def list(self, prefix: str = "") -> list[str]:
-        full_prefix = self._full_path(prefix)
+        full_prefix = self._full_path(prefix).rstrip("/")
         files = self.fs.glob(f"{full_prefix}/**")
         # Return relative paths
         base_len = len(self.fs_url) + 1

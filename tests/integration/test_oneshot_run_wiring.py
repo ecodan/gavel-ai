@@ -1,7 +1,7 @@
 """Integration tests for oneshot run CLI wiring.
 
 Tests verify that all components are correctly wired together:
-- Config loading
+- Config loading via LocalFileSystemEvalContext
 - Run context creation
 - Component instantiation
 - Error handling
@@ -14,12 +14,12 @@ from pathlib import Path
 
 import pytest
 
-from gavel_ai.core.config_loader import ConfigLoader
-from gavel_ai.core.exceptions import ConfigError, ValidationError
+from gavel_ai.core.contexts import LocalFileSystemEvalContext
+from gavel_ai.core.exceptions import ConfigError, ResourceNotFoundError, ValidationError
 
 
-class TestConfigLoaderIntegration:
-    """Test ConfigLoader orchestration."""
+class TestEvalContextIntegration:
+    """Test LocalFileSystemEvalContext config loading."""
 
     def test_load_all_configs_success(self, tmp_path: Path) -> None:
         """Test loading all config files successfully."""
@@ -103,10 +103,10 @@ class TestConfigLoaderIntegration:
         with open(eval_dir / "config" / "prompts" / "default.toml", "w") as f:
             f.write('v1 = "Test prompt: {{input}}"')
 
-        # Test loading
-        loader = ConfigLoader(eval_root, eval_name)
+        # Test loading via LocalFileSystemEvalContext
+        ctx = LocalFileSystemEvalContext(eval_name, eval_root)
 
-        eval_config = loader.load_eval_config()
+        eval_config = ctx.eval_config.read()
         assert eval_config.eval_name == "test_eval"
         assert eval_config.eval_type == "oneshot"
         assert eval_config.test_subject_type == "local"
@@ -115,28 +115,29 @@ class TestConfigLoaderIntegration:
         assert eval_config.test_subjects[0].prompt_name == "default"
         assert eval_config.variants == ["test_model"]
 
-        agents_config = loader.load_agents_config()
+        agents_config = ctx.agents.read()
         assert "_models" in agents_config
         assert "subject_agent" in agents_config
 
-        scenarios = loader.load_scenarios()
+        scenarios = ctx.scenarios.read()
         assert len(scenarios) == 1
         assert scenarios[0].scenario_id == "s1"
 
-        prompt = loader.load_prompt_template()
+        prompt = ctx.get_prompt("default:v1")
         assert "Test prompt" in prompt
 
-    def test_config_loader_missing_evaluation(self, tmp_path: Path) -> None:
+    def test_eval_context_missing_evaluation(self, tmp_path: Path) -> None:
         """Test error when evaluation doesn't exist."""
         eval_root = tmp_path / "evaluations"
         eval_name = "missing_eval"
 
-        loader = ConfigLoader(eval_root, eval_name)
+        ctx = LocalFileSystemEvalContext(eval_name, eval_root)
 
-        with pytest.raises(ConfigError, match="Evaluation 'missing_eval' not found"):
-            loader.load_eval_config()
+        # Reading non-existent file should raise FileNotFoundError
+        with pytest.raises(FileNotFoundError):
+            ctx.eval_config.read()
 
-    def test_config_loader_invalid_agents_json(self, tmp_path: Path) -> None:
+    def test_eval_context_invalid_agents_json(self, tmp_path: Path) -> None:
         """Test error handling for invalid agents.json."""
         eval_root = tmp_path / "evaluations"
         eval_name = "test_eval"
@@ -147,24 +148,25 @@ class TestConfigLoaderIntegration:
         with open(eval_dir / "config" / "agents.json", "w") as f:
             f.write("{invalid json")
 
-        loader = ConfigLoader(eval_root, eval_name)
+        ctx = LocalFileSystemEvalContext(eval_name, eval_root)
 
-        with pytest.raises(ConfigError, match="Invalid TOML|Invalid JSON"):
-            loader.load_agents_config()
+        with pytest.raises(json.JSONDecodeError):
+            ctx.agents.read()
 
-    def test_config_loader_missing_scenarios(self, tmp_path: Path) -> None:
+    def test_eval_context_missing_scenarios(self, tmp_path: Path) -> None:
         """Test error when scenarios file doesn't exist."""
         eval_root = tmp_path / "evaluations"
         eval_name = "test_eval"
         eval_dir = eval_root / eval_name
         (eval_dir / "data").mkdir(parents=True)
 
-        loader = ConfigLoader(eval_root, eval_name)
+        ctx = LocalFileSystemEvalContext(eval_name, eval_root)
 
-        with pytest.raises(ConfigError, match="Scenarios file not found"):
-            loader.load_scenarios()
+        # Scenarios are read via iterator, empty if file doesn't exist
+        scenarios = ctx.scenarios.read()
+        assert scenarios == []
 
-    def test_config_loader_prompt_version_not_found(self, tmp_path: Path) -> None:
+    def test_eval_context_prompt_version_not_found(self, tmp_path: Path) -> None:
         """Test error when prompt version doesn't exist."""
         eval_root = tmp_path / "evaluations"
         eval_name = "test_eval"
@@ -175,10 +177,10 @@ class TestConfigLoaderIntegration:
         with open(eval_dir / "config" / "prompts" / "default.toml", "w") as f:
             f.write('v1 = "Test prompt"')
 
-        loader = ConfigLoader(eval_root, eval_name)
+        ctx = LocalFileSystemEvalContext(eval_name, eval_root)
 
-        with pytest.raises(ConfigError, match="Prompt version 'v2' not found"):
-            loader.load_prompt_template("default:v2")
+        with pytest.raises(ResourceNotFoundError, match="Version 'v2' not found"):
+            ctx.get_prompt("default:v2")
 
 
 class TestRunContextCreation:

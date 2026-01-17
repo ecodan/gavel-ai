@@ -106,7 +106,7 @@ class RunContext(ABC):
 
     @property
     @abstractmethod
-    def eval_ctx(self) -> EvalContext:
+    def eval_context(self) -> EvalContext:
         """Access to evaluation configuration."""
 
     @property
@@ -406,7 +406,7 @@ class LocalRunContext(RunContext):
         self.snapshot_run_config()
 
     @property
-    def eval_ctx(self) -> LocalFileSystemEvalContext:
+    def eval_context(self) -> LocalFileSystemEvalContext:
         """Access to evaluation configuration."""
         return self._eval_ctx
 

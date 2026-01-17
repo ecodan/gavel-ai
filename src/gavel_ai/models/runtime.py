@@ -15,7 +15,7 @@ Defines Pydantic models for:
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from gavel_ai.models.config import JudgeConfig  # noqa: F401
 
@@ -81,9 +81,12 @@ class Scenario(BaseModel):
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    id: str
+    id: str = Field(..., validation_alias=AliasChoices("id", "scenario_id"))
     input: Union[str, Dict[str, Any]]
-    expected_behavior: Optional[str] = Field(None, validation_alias="expected")
+    expected_behavior: Optional[str] = Field(
+        None, validation_alias=AliasChoices("expected_behavior", "expected")
+    )
+    context: Optional[str] = None
     metadata: Dict[str, Any] = {}
 
     @property

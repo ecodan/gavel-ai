@@ -48,9 +48,9 @@ class ScenarioProcessorStep(Step):
         Raises:
             ConfigError: If processor configuration fails
         """
-        eval_config = context.eval_context.eval_config
-        agents_config = context.eval_context.agents_config
-        scenarios = context.eval_context.scenarios
+        eval_config = context.eval_context.eval_config.read()
+        agents_config = context.eval_context.agents.read()
+        scenarios = context.eval_context.scenarios.read()
         async_config = eval_config.async_config
 
         # Get first variant and test subject from eval_config

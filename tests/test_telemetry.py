@@ -2,7 +2,6 @@
 Tests for gavel-ai OpenTelemetry setup (Story 1.6).
 """
 
-
 from opentelemetry import trace
 
 from gavel_ai.telemetry import get_tracer, start_span

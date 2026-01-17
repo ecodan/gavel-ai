@@ -1,4 +1,8 @@
-"""Unit tests for config loading and validation."""
+"""Unit tests for config loading and validation using new storage abstraction.
+
+Tests the StructDataSource and config model functionality that replaced
+the old ConfigLoader.
+"""
 
 import json
 import os
@@ -9,93 +13,102 @@ import pytest
 import toml
 import yaml
 
-from gavel_ai.core.config.loader import load_config
-from gavel_ai.core.config.models import AsyncConfig, EvalConfig
-from gavel_ai.core.config_loader import resolve_model_id
-from gavel_ai.core.exceptions import ConfigError, ValidationError
+from gavel_ai.core.adapters.backends import InMemoryStorageBackend, LocalStorageBackend
+from gavel_ai.core.adapters.data_sources import StructDataSource
+from gavel_ai.models.config import AsyncConfig, EvalConfig
 
 
-class TestLoadConfig:
-    """Test suite for config loader functionality."""
+class TestStructDataSource:
+    """Test suite for StructDataSource config loading functionality."""
 
     def test_load_valid_json_config(self, tmp_path: Path) -> None:
         """Test loading a valid JSON config file."""
         config_data: Dict[str, Any] = {
             "eval_name": "test_eval",
-            "eval_type": "local",
-            "processor_type": "prompt_input",
-            "scenarios_file": "data/scenarios.json",
-            "agents_file": "config/agents.json",
-            "judges_config": "config/judges/",
-            "output_dir": "runs/",
+            "eval_type": "oneshot",
+            "test_subject_type": "local",
+            "test_subjects": [{"prompt_name": "default", "judges": []}],
+            "variants": ["test"],
+            "scenarios": {"source": "file.local", "name": "scenarios.json"},
         }
 
         config_file = tmp_path / "eval_config.json"
         with open(config_file, "w") as f:
             json.dump(config_data, f)
 
-        config = load_config(config_file, EvalConfig)
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "eval_config.json", schema=EvalConfig)
+        config = source.read()
 
         assert config.eval_name == "test_eval"
-        assert config.eval_type == "local"
-        assert config.processor_type == "prompt_input"
+        assert config.eval_type == "oneshot"
+        assert config.test_subject_type == "local"
 
     def test_load_valid_yaml_config(self, tmp_path: Path) -> None:
         """Test loading a valid YAML config file."""
         config_data: Dict[str, Any] = {
-            "max_workers": 4,
-            "timeout_seconds": 30,
-            "retry_count": 3,
-            "error_handling": "fail_fast",
+            "num_workers": 4,
+            "arrival_rate_per_sec": 20.0,
+            "exec_rate_per_min": 100,
+            "max_retries": 3,
+            "task_timeout_seconds": 300,
+            "stuck_timeout_seconds": 600,
+            "emit_progress_interval_sec": 10,
         }
 
         config_file = tmp_path / "async_config.yaml"
         with open(config_file, "w") as f:
             yaml.dump(config_data, f)
 
-        config = load_config(config_file, AsyncConfig)
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "async_config.yaml", schema=AsyncConfig)
+        config = source.read()
 
-        assert config.max_workers == 4
-        assert config.timeout_seconds == 30
-        assert config.retry_count == 3
+        assert config.num_workers == 4
+        assert config.arrival_rate_per_sec == 20.0
+        assert config.max_retries == 3
 
     def test_load_valid_toml_config(self, tmp_path: Path) -> None:
         """Test loading a valid TOML config file."""
         config_data: Dict[str, Any] = {
-            "max_workers": 8,
-            "timeout_seconds": 60,
-            "retry_count": 5,
-            "error_handling": "continue",
+            "num_workers": 8,
+            "arrival_rate_per_sec": 15.0,
+            "exec_rate_per_min": 50,
+            "max_retries": 5,
+            "task_timeout_seconds": 600,
+            "stuck_timeout_seconds": 1200,
+            "emit_progress_interval_sec": 20,
         }
 
         config_file = tmp_path / "async_config.toml"
         with open(config_file, "w") as f:
             toml.dump(config_data, f)
 
-        config = load_config(config_file, AsyncConfig)
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "async_config.toml", schema=AsyncConfig)
+        config = source.read()
 
-        assert config.max_workers == 8
-        assert config.timeout_seconds == 60
+        assert config.num_workers == 8
+        assert config.arrival_rate_per_sec == 15.0
 
     def test_missing_config_file(self, tmp_path: Path) -> None:
-        """Test that ConfigError is raised for missing config file."""
-        config_file = tmp_path / "nonexistent.json"
+        """Test that FileNotFoundError is raised for missing config file."""
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "nonexistent.json", schema=EvalConfig)
 
-        with pytest.raises(ConfigError) as exc_info:
-            load_config(config_file, EvalConfig)
-
-        assert "not found" in str(exc_info.value).lower()
-        assert "Create file or check path" in str(exc_info.value)
+        with pytest.raises(FileNotFoundError):
+            source.read()
 
     def test_invalid_json_syntax(self, tmp_path: Path) -> None:
-        """Test that ConfigError is raised for invalid JSON syntax."""
+        """Test that JSONDecodeError is raised for invalid JSON syntax."""
         config_file = tmp_path / "invalid.json"
         config_file.write_text("{invalid json}")
 
-        with pytest.raises(ConfigError) as exc_info:
-            load_config(config_file, EvalConfig)
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "invalid.json", schema=EvalConfig)
 
-        assert "invalid" in str(exc_info.value).lower() or "parse" in str(exc_info.value).lower()
+        with pytest.raises(json.JSONDecodeError):
+            source.read()
 
     def test_missing_required_field(self, tmp_path: Path) -> None:
         """Test that ValidationError is raised for missing required fields."""
@@ -108,41 +121,47 @@ class TestLoadConfig:
         with open(config_file, "w") as f:
             json.dump(config_data, f)
 
-        with pytest.raises(ValidationError) as exc_info:
-            load_config(config_file, EvalConfig)
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "incomplete.json", schema=EvalConfig)
 
-        error_msg = str(exc_info.value).lower()
-        assert "validation" in error_msg or "required" in error_msg
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            source.read()
 
     def test_type_mismatch(self, tmp_path: Path) -> None:
         """Test that ValidationError is raised for type mismatches."""
         config_data: Dict[str, Any] = {
-            "max_workers": "four",  # Should be int
-            "timeout_seconds": 30,
-            "retry_count": 3,
-            "error_handling": "fail_fast",
+            "num_workers": "four",  # Should be int
+            "arrival_rate_per_sec": 20.0,
+            "exec_rate_per_min": 100,
+            "max_retries": 3,
+            "task_timeout_seconds": 300,
+            "stuck_timeout_seconds": 600,
+            "emit_progress_interval_sec": 10,
         }
 
         config_file = tmp_path / "type_error.json"
         with open(config_file, "w") as f:
             json.dump(config_data, f)
 
-        with pytest.raises(ValidationError) as exc_info:
-            load_config(config_file, AsyncConfig)
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "type_error.json", schema=AsyncConfig)
 
-        error_msg = str(exc_info.value).lower()
-        assert "validation" in error_msg or "type" in error_msg or "int" in error_msg
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            source.read()
 
     def test_forward_compatibility_unknown_fields(self, tmp_path: Path) -> None:
         """Test that unknown fields are silently ignored (forward compatible)."""
         config_data: Dict[str, Any] = {
             "eval_name": "test_eval",
-            "eval_type": "local",
-            "processor_type": "prompt_input",
-            "scenarios_file": "data/scenarios.json",
-            "agents_file": "config/agents.json",
-            "judges_config": "config/judges/",
-            "output_dir": "runs/",
+            "eval_type": "oneshot",
+            "test_subject_type": "local",
+            "test_subjects": [{"prompt_name": "default", "judges": []}],
+            "variants": ["test"],
+            "scenarios": {"source": "file.local", "name": "scenarios.json"},
             "future_feature_flag": True,  # Unknown field
             "new_v2_setting": "value",  # Unknown field
         }
@@ -151,94 +170,70 @@ class TestLoadConfig:
         with open(config_file, "w") as f:
             json.dump(config_data, f)
 
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "forward_compat.json", schema=EvalConfig)
+
         # Should not raise exception, unknown fields silently ignored
-        config = load_config(config_file, EvalConfig)
+        config = source.read()
 
         assert config.eval_name == "test_eval"
         # Unknown fields should not be accessible
         assert not hasattr(config, "future_feature_flag")
         assert not hasattr(config, "new_v2_setting")
 
-    def test_environment_variable_substitution(self, tmp_path: Path) -> None:
-        """Test that {{VAR_NAME}} is substituted with environment variables."""
-        # Set environment variable
-        os.environ["TEST_API_KEY"] = "sk-test-key-12345"
-
-        config_data: Dict[str, Any] = {
-            "eval_name": "test_eval",
-            "eval_type": "local",
-            "processor_type": "prompt_input",
-            "scenarios_file": "data/scenarios.json",
-            "agents_file": "{{TEST_API_KEY}}",  # Should be substituted
-            "judges_config": "config/judges/",
-            "output_dir": "runs/",
-        }
-
-        config_file = tmp_path / "env_vars.json"
-        with open(config_file, "w") as f:
-            json.dump(config_data, f)
-
-        config = load_config(config_file, EvalConfig)
-
-        assert config.agents_file == "sk-test-key-12345"
-
-        # Cleanup
-        del os.environ["TEST_API_KEY"]
-
-    def test_missing_environment_variable(self, tmp_path: Path) -> None:
-        """Test that ConfigError is raised for missing environment variables."""
-        config_data: Dict[str, Any] = {
-            "eval_name": "test_eval",
-            "eval_type": "local",
-            "processor_type": "prompt_input",
-            "scenarios_file": "data/scenarios.json",
-            "agents_file": "{{MISSING_ENV_VAR}}",  # Not set
-            "judges_config": "config/judges/",
-            "output_dir": "runs/",
-        }
-
-        config_file = tmp_path / "missing_env.json"
-        with open(config_file, "w") as f:
-            json.dump(config_data, f)
-
-        with pytest.raises(ConfigError) as exc_info:
-            load_config(config_file, EvalConfig)
-
-        error_msg = str(exc_info.value)
-        assert "MISSING_ENV_VAR" in error_msg
-        assert "not set" in error_msg.lower()
-
-    def test_no_env_substitution_when_disabled(self, tmp_path: Path) -> None:
-        """Test that env vars are not substituted when substitute_env=False."""
-        config_data: Dict[str, Any] = {
-            "eval_name": "test_eval",
-            "eval_type": "local",
-            "processor_type": "prompt_input",
-            "scenarios_file": "data/scenarios.json",
-            "agents_file": "{{SOME_VAR}}",  # Should NOT be substituted
-            "judges_config": "config/judges/",
-            "output_dir": "runs/",
-        }
-
-        config_file = tmp_path / "no_sub.json"
-        with open(config_file, "w") as f:
-            json.dump(config_data, f)
-
-        config = load_config(config_file, EvalConfig, substitute_env=False)
-
-        assert config.agents_file == "{{SOME_VAR}}"  # Not substituted
-
     def test_unsupported_file_format(self, tmp_path: Path) -> None:
-        """Test that ConfigError is raised for unsupported file formats."""
+        """Test that ValueError is raised for unsupported file formats."""
         config_file = tmp_path / "config.xml"
         config_file.write_text("<config>data</config>")
 
-        with pytest.raises(ConfigError) as exc_info:
-            load_config(config_file, EvalConfig)
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "config.xml", schema=EvalConfig)
 
-        error_msg = str(exc_info.value)
-        assert "unsupported" in error_msg.lower() or "format" in error_msg.lower()
-        assert ".xml" in error_msg or "xml" in error_msg.lower()
+        with pytest.raises(ValueError, match="Unsupported struct format"):
+            source.read()
+
+    def test_in_memory_backend(self) -> None:
+        """Test loading config from in-memory backend."""
+        storage = InMemoryStorageBackend()
+
+        config_data: Dict[str, Any] = {
+            "num_workers": 4,
+            "arrival_rate_per_sec": 20.0,
+            "exec_rate_per_min": 100,
+            "max_retries": 3,
+            "task_timeout_seconds": 300,
+            "stuck_timeout_seconds": 600,
+            "emit_progress_interval_sec": 10,
+        }
+
+        storage.write_bytes("config.json", json.dumps(config_data).encode())
+        source = StructDataSource(storage, "config.json", schema=AsyncConfig)
+        config = source.read()
+
+        assert config.num_workers == 4
+        assert config.max_retries == 3
+
+    def test_write_and_read_roundtrip(self, tmp_path: Path) -> None:
+        """Test writing and reading a config file."""
+        storage = LocalStorageBackend(tmp_path)
+        source = StructDataSource(storage, "output.json", schema=AsyncConfig)
+
+        config = AsyncConfig(
+            num_workers=16,
+            arrival_rate_per_sec=50.0,
+            exec_rate_per_min=200,
+            max_retries=5,
+            task_timeout_seconds=600,
+            stuck_timeout_seconds=1200,
+            emit_progress_interval_sec=30,
+        )
+
+        source.write(config)
+        loaded_config = source.read()
+
+        assert loaded_config.num_workers == 16
+        assert loaded_config.arrival_rate_per_sec == 50.0
+        assert loaded_config.max_retries == 5
 
 
 class TestConfigModels:
@@ -248,12 +243,11 @@ class TestConfigModels:
         """Test that EvalConfig uses extra='ignore' for forward compatibility."""
         config_dict = {
             "eval_name": "test",
-            "eval_type": "local",
-            "processor_type": "prompt_input",
-            "scenarios_file": "data/scenarios.json",
-            "agents_file": "config/agents.json",
-            "judges_config": "config/judges/",
-            "output_dir": "runs/",
+            "eval_type": "oneshot",
+            "test_subject_type": "local",
+            "test_subjects": [{"prompt_name": "default", "judges": []}],
+            "variants": ["test"],
+            "scenarios": {"source": "file.local", "name": "scenarios.json"},
             "unknown_field": "should_be_ignored",
         }
 
@@ -266,178 +260,26 @@ class TestConfigModels:
     def test_async_config_has_extra_ignore(self) -> None:
         """Test that AsyncConfig uses extra='ignore' for forward compatibility."""
         config_dict = {
-            "max_workers": 4,
-            "timeout_seconds": 30,
-            "retry_count": 3,
-            "error_handling": "fail_fast",
+            "num_workers": 4,
+            "arrival_rate_per_sec": 20.0,
+            "exec_rate_per_min": 100,
+            "max_retries": 3,
+            "task_timeout_seconds": 300,
+            "stuck_timeout_seconds": 600,
+            "emit_progress_interval_sec": 10,
             "future_feature": True,
         }
 
         # Should not raise validation error
         config = AsyncConfig.model_validate(config_dict)
 
-        assert config.max_workers == 4
+        assert config.num_workers == 4
         assert not hasattr(config, "future_feature")
 
     def test_async_config_defaults(self) -> None:
         """Test that AsyncConfig has sensible defaults."""
         config = AsyncConfig()
 
-        assert config.max_workers == 4
-        assert config.timeout_seconds == 30
-        assert config.retry_count == 3
-        assert config.error_handling == "fail_fast"
-
-
-class TestResolveModelId:
-    """Test suite for resolve_model_id() helper function."""
-
-    def test_resolve_custom_model_id(self) -> None:
-        """Test resolving custom model ID to actual model version."""
-        agents_config: Dict[str, Any] = {
-            "_models": {
-                "claude_standard": {
-                    "model_version": "claude-sonnet-4-5-20250929",
-                    "model_provider": "anthropic",
-                }
-            }
-        }
-
-        result = resolve_model_id(agents_config, "claude_standard")
-        assert result == "claude-sonnet-4-5-20250929"
-
-    def test_resolve_multiple_custom_ids(self) -> None:
-        """Test resolving multiple different custom model IDs."""
-        agents_config: Dict[str, Any] = {
-            "_models": {
-                "claude_standard": {"model_version": "claude-sonnet-4-5-20250929"},
-                "gpt_standard": {"model_version": "gpt-4o-2024-08-06"},
-                "claude_creative": {"model_version": "claude-opus-4-1-20250805"},
-            }
-        }
-
-        assert resolve_model_id(agents_config, "claude_standard") == "claude-sonnet-4-5-20250929"
-        assert resolve_model_id(agents_config, "gpt_standard") == "gpt-4o-2024-08-06"
-        assert resolve_model_id(agents_config, "claude_creative") == "claude-opus-4-1-20250805"
-
-    def test_pass_through_standard_model_name(self) -> None:
-        """Test that standard model names pass through unchanged."""
-        agents_config: Dict[str, Any] = {"_models": {}}
-
-        # Standard model names should pass through
-        assert resolve_model_id(agents_config, "gpt-4o") == "gpt-4o"
-        assert (
-            resolve_model_id(agents_config, "claude-sonnet-4-5-20250929")
-            == "claude-sonnet-4-5-20250929"
-        )
-        assert resolve_model_id(agents_config, "gemini-2.0-flash") == "gemini-2.0-flash"
-
-    def test_pass_through_when_not_in_models(self) -> None:
-        """Test that model IDs not in _models are passed through."""
-        agents_config: Dict[str, Any] = {
-            "_models": {"claude_standard": {"model_version": "claude-sonnet-4-5-20250929"}}
-        }
-
-        # Unknown custom ID should be passed through (assumed to be standard name)
-        result = resolve_model_id(agents_config, "some-unknown-model")
-        assert result == "some-unknown-model"
-
-    def test_error_when_model_version_missing(self) -> None:
-        """Test that ConfigError is raised when model_version field is missing."""
-        agents_config: Dict[str, Any] = {
-            "_models": {
-                "claude_standard": {
-                    # Missing model_version field
-                    "model_provider": "anthropic"
-                }
-            }
-        }
-
-        with pytest.raises(ConfigError) as exc_info:
-            resolve_model_id(agents_config, "claude_standard")
-
-        error_msg = str(exc_info.value)
-        assert "missing 'model_version'" in error_msg
-        assert "claude_standard" in error_msg
-
-    def test_error_when_model_version_empty(self) -> None:
-        """Test that ConfigError is raised when model_version is empty string."""
-        agents_config: Dict[str, Any] = {
-            "_models": {
-                "claude_standard": {
-                    "model_version": "",  # Empty string is falsy
-                    "model_provider": "anthropic",
-                }
-            }
-        }
-
-        with pytest.raises(ConfigError) as exc_info:
-            resolve_model_id(agents_config, "claude_standard")
-
-        error_msg = str(exc_info.value)
-        assert "missing 'model_version'" in error_msg
-
-    def test_error_when_model_version_none(self) -> None:
-        """Test that ConfigError is raised when model_version is None."""
-        agents_config: Dict[str, Any] = {
-            "_models": {
-                "claude_standard": {
-                    "model_version": None,
-                    "model_provider": "anthropic",
-                }
-            }
-        }
-
-        with pytest.raises(ConfigError) as exc_info:
-            resolve_model_id(agents_config, "claude_standard")
-
-        error_msg = str(exc_info.value)
-        assert "missing 'model_version'" in error_msg
-
-    def test_empty_models_dict(self) -> None:
-        """Test handling of empty _models dict."""
-        agents_config: Dict[str, Any] = {"_models": {}}
-
-        # Should pass through unknown IDs
-        result = resolve_model_id(agents_config, "any-model-id")
-        assert result == "any-model-id"
-
-    def test_missing_models_key(self) -> None:
-        """Test handling when _models key is missing entirely."""
-        agents_config: Dict[str, Any] = {"other_field": "value"}
-
-        # Should pass through any model ID when _models is missing
-        result = resolve_model_id(agents_config, "any-model")
-        assert result == "any-model"
-
-    def test_resolve_with_nested_config_fields(self) -> None:
-        """Test resolving custom ID when model has nested config fields."""
-        agents_config: Dict[str, Any] = {
-            "_models": {
-                "claude_standard": {
-                    "model_version": "claude-sonnet-4-5-20250929",
-                    "model_provider": "anthropic",
-                    "model_family": "claude",
-                    "model_parameters": {
-                        "temperature": 0.7,
-                        "max_tokens": 4096,
-                    },
-                    "provider_auth": {
-                        "api_key": "{{ANTHROPIC_API_KEY}}",
-                    },
-                }
-            }
-        }
-
-        result = resolve_model_id(agents_config, "claude_standard")
-        assert result == "claude-sonnet-4-5-20250929"
-
-    def test_case_sensitive_model_id_lookup(self) -> None:
-        """Test that model ID lookup is case-sensitive."""
-        agents_config: Dict[str, Any] = {
-            "_models": {"claude_standard": {"model_version": "claude-sonnet-4-5-20250929"}}
-        }
-
-        # Different case should not match
-        result = resolve_model_id(agents_config, "Claude_Standard")
-        assert result == "Claude_Standard"  # Passed through, not resolved
+        assert config.num_workers == 8
+        assert config.arrival_rate_per_sec == 20.0
+        assert config.max_retries == 3

@@ -7,7 +7,7 @@ miss (like the model_name parameter bug fixed in Story 3.9).
 
 import pytest
 
-from gavel_ai.core.config.agents import ModelDefinition
+from gavel_ai.models.agents import ModelDefinition
 from gavel_ai.core.exceptions import ProcessorError
 from gavel_ai.providers.factory import ProviderFactory
 

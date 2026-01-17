@@ -247,7 +247,8 @@ class TestAgentsFile:
             },
         }
         agents_file = AgentsFile(**agents_file_dict)
-        assert "research_assistant" in agents_file.__dict__
+        # Extra fields in Pydantic v2 are stored in __pydantic_extra__
+        assert "research_assistant" in agents_file.__pydantic_extra__
 
     def test_agents_file_requires_models(self):
         """AgentsFile requires _models section."""
@@ -296,5 +297,6 @@ class TestAgentsFile:
             },
         }
         agents_file = AgentsFile(**agents_file_dict)
-        research_assistant = agents_file.__dict__.get("research_assistant")
+        # Extra fields in Pydantic v2 are stored in __pydantic_extra__
+        research_assistant = agents_file.__pydantic_extra__.get("research_assistant")
         assert research_assistant is not None

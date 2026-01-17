@@ -87,7 +87,7 @@ class GEvalConfig(BaseModel):
 class EvalConfig(BaseModel):
     """Evaluation configuration model."""
 
-    model_config = ConfigDict(extra="ignore")  # Forward compatible
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)  # Forward compatible
 
     eval_type: str = Field(..., description="Evaluation type (oneshot, conversational, autotune)")
     eval_name: str = Field(..., description="Evaluation name")
