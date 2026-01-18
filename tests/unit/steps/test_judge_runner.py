@@ -271,9 +271,7 @@ class TestJudgeRunnerStep:
         mock_eval_result = MagicMock()
         mock_eval_result.model_dump.return_value = {"judges": [{"name": "judge1", "score": 8}]}
 
-        with patch(
-            "gavel_ai.core.steps.judge_runner.JudgeExecutor"
-        ) as mock_executor_class:
+        with patch("gavel_ai.core.steps.judge_runner.JudgeExecutor") as mock_executor_class:
             mock_executor = MagicMock()
             mock_executor.execute_batch = AsyncMock(return_value=[mock_eval_result])
             mock_executor_class.return_value = mock_executor

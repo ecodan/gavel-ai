@@ -182,7 +182,9 @@ class TestRunContext:
     def test_get_log_returns_log_string(self):
         """get_log() returns log content as string."""
         mock_run = MagicMock()
-        mock_run.log_data = "2025-01-01 00:00:00 [INFO] Test started\n2025-01-01 00:05:00 [INFO] Test completed\n"
+        mock_run.log_data = (
+            "2025-01-01 00:00:00 [INFO] Test started\n2025-01-01 00:05:00 [INFO] Test completed\n"
+        )
 
         ctx = RunContext(mock_run)
         log = ctx.get_log()

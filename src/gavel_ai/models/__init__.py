@@ -12,6 +12,12 @@ Configuration Models (from config.py):
 - AsyncConfig: Async execution settings
 - GEvalConfig: GEval judge configuration
 
+Conversational Models (from conversation.py):
+- DialogueGuidance: Guidance for turn generation behavior
+- ConversationScenario: Conversational scenario with user_goal
+- load_conversation_scenarios(): Load scenarios from JSON/JSONL file
+- iter_conversation_scenarios(): Stream scenarios (memory efficient)
+
 Runtime Models (from runtime.py):
 - Input: Input data for processing
 - ProcessorConfig: Processor configuration
@@ -49,6 +55,14 @@ from gavel_ai.models.config import (
     JudgeConfig,
 )
 
+# Conversational models
+from gavel_ai.models.conversation import (
+    ConversationScenario,
+    DialogueGuidance,
+    iter_conversation_scenarios,
+    load_conversation_scenarios,
+)
+
 # Runtime models
 from gavel_ai.models.runtime import (
     ArtifactRef,
@@ -76,6 +90,11 @@ __all__ = [
     "EvalConfig",
     "GEvalConfig",
     "JudgeConfig",
+    # Conversational models
+    "ConversationScenario",
+    "DialogueGuidance",
+    "iter_conversation_scenarios",
+    "load_conversation_scenarios",
     # Runtime models
     "ArtifactRef",
     "EvaluationResult",

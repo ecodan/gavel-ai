@@ -319,11 +319,13 @@ class TestResultsExporter:
         file3 = tmp_path / "scenarios.json"
         file3.write_text(json.dumps({"scenarios": []}))
 
-        hash_result = ResultsExporter.compute_config_hash({
-            "agents": file1,
-            "eval_config": file2,
-            "scenarios": file3,
-        })
+        hash_result = ResultsExporter.compute_config_hash(
+            {
+                "agents": file1,
+                "eval_config": file2,
+                "scenarios": file3,
+            }
+        )
 
         assert len(hash_result) == 64
         assert hash_result.isalnum()  # Valid hex string
