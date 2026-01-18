@@ -1,6 +1,6 @@
 """Unit tests for workflow execution framework.
 
-Tests LocalFileSystemEvalContext, LocalRunContext, Step ABC, and StepPhase enum.
+Tests LocalFileSystemEvalContext, LocalRunContext, Step ABC, StepPhase enum, and GavelWorkflow.
 """
 
 import json
@@ -12,6 +12,7 @@ import pytest
 
 from gavel_ai.core.contexts import LocalFileSystemEvalContext, LocalRunContext
 from gavel_ai.core.steps.base import DEFAULT_EVAL_ROOT, Step, StepPhase, ValidationResult
+from gavel_ai.core.workflows.base import GavelWorkflow
 
 
 class TestStepPhase:
@@ -292,3 +293,56 @@ class TestStepABC:
 
         result = await step.safe_execute(mock_context)
         assert result is False
+
+
+class TestGavelWorkflow:
+    """Tests for GavelWorkflow abstract base class."""
+
+    def test_gavel_workflow_is_abstract(self) -> None:
+        """Test that GavelWorkflow cannot be instantiated directly."""
+        logger = logging.getLogger("test")
+        mock_eval_context = MagicMock()
+
+        with pytest.raises(TypeError):
+            GavelWorkflow(mock_eval_context, logger)  # type: ignore
+
+    def test_concrete_workflow_must_implement_execute(self) -> None:
+        """Test that concrete workflows must implement execute method."""
+        logger = logging.getLogger("test")
+        mock_eval_context = MagicMock()
+
+        class IncompleteWorkflow(GavelWorkflow):
+            pass
+
+        with pytest.raises(TypeError):
+            IncompleteWorkflow(mock_eval_context, logger)  # type: ignore
+
+    def test_concrete_workflow_can_be_instantiated(self) -> None:
+        """Test that complete concrete workflows can be instantiated."""
+        logger = logging.getLogger("test")
+        mock_eval_context = MagicMock()
+        mock_eval_context.eval_name = "test_eval"
+
+        class CompleteWorkflow(GavelWorkflow):
+            def execute(self):
+                return MagicMock()
+
+        workflow = CompleteWorkflow(mock_eval_context, logger)
+        assert workflow.logger == logger
+        assert workflow.eval_context == mock_eval_context
+
+    def test_init_stores_eval_context_and_logger(self) -> None:
+        """Test that __init__ stores eval_context and logger correctly."""
+        logger = logging.getLogger("test")
+        mock_eval_context = MagicMock()
+        mock_eval_context.eval_name = "test_eval"
+
+        class TestWorkflow(GavelWorkflow):
+            def execute(self):
+                return MagicMock()
+
+        workflow = TestWorkflow(mock_eval_context, logger)
+
+        assert workflow.eval_context is mock_eval_context
+        assert workflow.logger is logger
+        assert workflow.eval_context.eval_name == "test_eval"
