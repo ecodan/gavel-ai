@@ -143,8 +143,8 @@ development_status:
   c-1-1-define-scenario-schema-with-user-goal-and-context: done
   c-1-2-implement-conversationscenario-pydantic-model: done
   c-1-3-implement-turn-and-conversationstate-models: done
-  c-1-4-extend-eval-config-json-with-conversational-schema: in-progress
-  c-1-5-implement-conversationresult-data-model: in-progress
+  c-1-4-extend-eval-config-json-with-conversational-schema: done
+  c-1-5-implement-conversationresult-data-model: done
   epic-c-1-retrospective: optional
 
   # ============================================================================
@@ -163,7 +163,7 @@ development_status:
   # EPIC C2: Scenario Generation (Conversational)
   # Goal: Implement optional scenario generation where prompts describe desired test scenarios
   # ============================================================================
-  epic-c-2: ready-for-dev
+  epic-c-2: in-progress
   c-2-1-create-generatestep-skeleton-for-scenario-generation: ready-for-dev
   c-2-2-implement-scenario-generation-logic-with-llm: ready-for-dev
   c-2-3-wire-generatestep-into-workflow-via-cli-command: ready-for-dev

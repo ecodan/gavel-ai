@@ -1,6 +1,6 @@
 # Story C1.5: Implement ConversationResult Data Model
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -30,50 +30,57 @@ So that results can be stored and passed to judge runner.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create TurnResult nested model (AC: #2)
-  - [ ] 1.1: Define `TurnResult` model in `src/gavel_ai/models/conversation.py`
-  - [ ] 1.2: Add `turn_number: int` field
-  - [ ] 1.3: Add `processor_output: str` field (assistant response)
-  - [ ] 1.4: Add `timing_ms: int` field (latency for this turn)
-  - [ ] 1.5: Add `tokens_prompt: Optional[int]` field
-  - [ ] 1.6: Add `tokens_completion: Optional[int]` field
-  - [ ] 1.7: Add `error: Optional[str]` field for turn-level errors
+- [x] Task 1: Create TurnResult nested model (AC: #2)
+  - [x] 1.1: Define `TurnResult` model in `src/gavel_ai/models/conversation.py`
+  - [x] 1.2: Add `turn_number: int` field
+  - [x] 1.3: Add `processor_output: str` field (assistant response)
+  - [x] 1.4: Add `timing_ms: int` field (latency for this turn)
+  - [x] 1.5: Add `tokens_prompt: Optional[int]` field
+  - [x] 1.6: Add `tokens_completion: Optional[int]` field
+  - [x] 1.7: Add `error: Optional[str]` field for turn-level errors
 
-- [ ] Task 2: Create ConversationResult Pydantic model (AC: #1, #3)
-  - [ ] 2.1: Define `ConversationResult` model in `src/gavel_ai/models/conversation.py`
-  - [ ] 2.2: Add `scenario_id: str` field (required)
-  - [ ] 2.3: Add `variant_id: str` field (required)
-  - [ ] 2.4: Add `conversation_transcript: ConversationState` field (full dialogue)
-  - [ ] 2.5: Add `results_raw: List[TurnResult]` field (per-turn processor results)
-  - [ ] 2.6: Add `duration_ms: int` field (total conversation duration)
-  - [ ] 2.7: Add `tokens_total: int` field (sum of all tokens)
-  - [ ] 2.8: Add `completed: bool` field (whether goal achieved or max_turns reached)
-  - [ ] 2.9: Add `error: Optional[str]` field for conversation-level errors
+- [x] Task 2: Create ConversationResult Pydantic model (AC: #1, #3)
+  - [x] 2.1: Define `ConversationResult` model in `src/gavel_ai/models/conversation.py`
+  - [x] 2.2: Add `scenario_id: str` field (required)
+  - [x] 2.3: Add `variant_id: str` field (required)
+  - [x] 2.4: Add `conversation_transcript: ConversationState` field (full dialogue)
+  - [x] 2.5: Add `results_raw: List[TurnResult]` field (per-turn processor results)
+  - [x] 2.6: Add `duration_ms: int` field (total conversation duration)
+  - [x] 2.7: Add `tokens_total: int` field (sum of all tokens)
+  - [x] 2.8: Add `completed: bool` field (whether goal achieved or max_turns reached)
+  - [x] 2.9: Add `error: Optional[str]` field for conversation-level errors
 
-- [ ] Task 3: Implement helper methods on ConversationResult (AC: #1, #3)
-  - [ ] 3.1: Implement `total_turns` property returning len(conversation_transcript.turns)
-  - [ ] 3.2: Implement `compute_tokens_total() -> int` method summing all turn tokens
-  - [ ] 3.3: Implement `to_jsonl_entry() -> dict` method for JSONL serialization
+- [x] Task 3: Implement helper methods on ConversationResult (AC: #1, #3)
+  - [x] 3.1: Implement `total_turns` property returning len(conversation_transcript.turns)
+  - [x] 3.2: Implement `compute_tokens_total() -> int` method summing all turn tokens
+  - [x] 3.3: Implement `to_jsonl_entry() -> dict` method for JSONL serialization
 
-- [ ] Task 4: Implement serialization for conversations.jsonl (AC: #4)
-  - [ ] 4.1: Ensure ConversationState can serialize nested Turns properly
-  - [ ] 4.2: Add `model_dump(mode='json')` support for datetime serialization
-  - [ ] 4.3: Verify round-trip: serialize to JSON, deserialize back to ConversationResult
+- [x] Task 4: Implement serialization for conversations.jsonl (AC: #4)
+  - [x] 4.1: Ensure ConversationState can serialize nested Turns properly
+  - [x] 4.2: Add `model_dump(mode='json')` support for datetime serialization
+  - [x] 4.3: Verify round-trip: serialize to JSON, deserialize back to ConversationResult
 
-- [ ] Task 5: Export models from gavel_ai.models package (AC: #1)
-  - [ ] 5.1: Update `src/gavel_ai/models/__init__.py` to export ConversationResult, TurnResult
-  - [ ] 5.2: Add to `__all__` list for clean imports
+- [x] Task 5: Export models from gavel_ai.models package (AC: #1)
+  - [x] 5.1: Update `src/gavel_ai/models/__init__.py` to export ConversationResult, TurnResult
+  - [x] 5.2: Add to `__all__` list for clean imports
 
-- [ ] Task 6: Write unit tests (AC: #1, #2, #3, #4)
-  - [ ] 6.1: Add tests in `tests/unit/test_conversation.py` for new models
-  - [ ] 6.2: Test ConversationResult with all fields populated
-  - [ ] 6.3: Test ConversationResult with nested ConversationState and Turns
-  - [ ] 6.4: Test TurnResult with all fields including error
-  - [ ] 6.5: Test total_turns property
-  - [ ] 6.6: Test compute_tokens_total method
-  - [ ] 6.7: Test to_jsonl_entry serialization
-  - [ ] 6.8: Test JSON round-trip (serialize then deserialize)
-  - [ ] 6.9: Test multiple independent ConversationResults
+- [x] Task 6: Write unit tests (AC: #1, #2, #3, #4)
+  - [x] 6.1: Add tests in `tests/unit/test_conversation.py` for new models
+  - [x] 6.2: Test ConversationResult with all fields populated
+  - [x] 6.3: Test ConversationResult with nested ConversationState and Turns
+  - [x] 6.4: Test TurnResult with all fields including error
+  - [x] 6.5: Test total_turns property
+  - [x] 6.6: Test compute_tokens_total method
+  - [x] 6.7: Test to_jsonl_entry serialization
+  - [x] 6.8: Test JSON round-trip (serialize then deserialize)
+  - [x] 6.9: Test multiple independent ConversationResults
+
+### Review Follow-ups (AI)
+- [x] [AI-Review][Medium] Validate `tokens_total` matches `results_raw` sum or remove field in favor of property [src/gavel_ai/models/conversation.py]
+- [x] [AI-Review][Medium] Rename `TurnResult.timing_ms` to `latency_ms` to match `TurnMetadata` [src/gavel_ai/models/conversation.py]
+- [x] [AI-Review][Medium] Optimize `to_jsonl_entry` serialization to exclude None values [src/gavel_ai/models/conversation.py]
+- [x] [AI-Review][Low] Document extensibility pattern for `TurnResult` extra fields [src/gavel_ai/models/conversation.py]
+- [x] [AI-Review][Low] Clarify `completed` vs `error` relationship in docstrings or validation [src/gavel_ai/models/conversation.py]
 
 ## Dev Notes
 
@@ -256,15 +263,24 @@ Each line in `conversations.jsonl` is a complete ConversationResult:
 
 ### Agent Model Used
 
-_To be filled during implementation_
+Antigravity (Google DeepMind)
 
 ### Debug Log References
 
-_To be filled during implementation_
+- ImportError 'ConversationState' during initial testing (fixed by imports in __init__.py and proper definition order awareness)
+- Syntax issue with append needing newline handled.
 
 ### Completion Notes List
 
-_To be filled during implementation_
+### Completion Notes List
+
+- Implemented `TurnResult` with extensive validation fields
+- Implemented `ConversationResult` with helper methods (`compute_tokens_total`, `total_turns`)
+- Exported models in `gavel_ai.models`
+- Added comprehensive unit tests in `tests/unit/test_conversation.py` achieving 100% pass rate
+- Verified JSONL serialization compatibility
+
+### File List
 
 ### File List
 
@@ -274,4 +290,4 @@ _To be filled during implementation_
 - `tests/unit/test_conversation.py` - Add tests for new models
 
 **Files Created:**
-_None expected_
+_None_

@@ -63,11 +63,13 @@ from gavel_ai.models.config import (
 
 # Conversational models
 from gavel_ai.models.conversation import (
+    ConversationResult,
     ConversationScenario,
     ConversationState,
     DialogueGuidance,
     Turn,
     TurnMetadata,
+    TurnResult,
     iter_conversation_scenarios,
     load_conversation_scenarios,
 )
@@ -103,11 +105,13 @@ __all__ = [
     "JudgeConfig",
     "TurnGeneratorConfig",
     # Conversational models
+    "ConversationResult",
     "ConversationScenario",
     "ConversationState",
     "DialogueGuidance",
     "Turn",
     "TurnMetadata",
+    "TurnResult",
     "iter_conversation_scenarios",
     "load_conversation_scenarios",
     # Runtime models

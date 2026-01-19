@@ -1,6 +1,6 @@
 # Story C1.4: Extend eval_config.json for Conversational Settings
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -294,9 +294,9 @@ _None expected_
 
 ## Review Follow-ups (AI)
 
-- [ ] [AI-Review][HIGH] Remove scope creep from conversation.py - Move conversational runtime models (Turn, TurnMetadata, ConversationState) to separate story file, not part of C1.4 config schema work
-- [ ] [AI-Review][MEDIUM] Clean up gitignore changes - Revert `.gitignore` to original state unless there were legitimate security additions
-- [ ] [AI-Review][LOW] Update story documentation standards - Ensure File List section only includes files that were actually needed for story completion
+- [x] [AI-Review][HIGH] Remove scope creep from conversation.py - Move conversational runtime models (Turn, TurnMetadata, ConversationState) to separate story file, not part of C1.4 config schema work
+- [x] [AI-Review][MEDIUM] Clean up gitignore changes - Revert `.gitignore` to original state unless there were legitimate security additions
+- [x] [AI-Review][LOW] Update story documentation standards - Ensure File List section only includes files that were actually needed for story completion
 
 ## Change Log
 

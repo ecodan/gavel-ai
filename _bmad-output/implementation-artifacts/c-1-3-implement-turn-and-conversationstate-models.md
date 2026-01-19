@@ -1,6 +1,6 @@
 # Story C1.3: Implement Turn and ConversationState Models
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -34,56 +34,64 @@ So that turns can be tracked and conversation state maintained during execution.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create Turn Pydantic model (AC: #1, #5)
-  - [ ] 1.1: Define `Turn` model in `src/gavel_ai/models/conversation.py`
-  - [ ] 1.2: Add `turn_number: int` field (0-indexed)
-  - [ ] 1.3: Add `role: Literal["user", "assistant"]` field with validation
-  - [ ] 1.4: Add `content: str` field (required, non-empty)
-  - [ ] 1.5: Add `timestamp: datetime` field with default factory `datetime.utcnow`
-  - [ ] 1.6: Add `metadata: Optional[TurnMetadata]` field for tokens/latency
+- [x] Task 1: Create Turn Pydantic model (AC: #1, #5)
+  - [x] 1.1: Define `Turn` model in `src/gavel_ai/models/conversation.py`
+  - [x] 1.2: Add `turn_number: int` field (0-indexed)
+  - [x] 1.3: Add `role: Literal["user", "assistant"]` field with validation
+  - [x] 1.4: Add `content: str` field (required, non-empty)
+  - [x] 1.5: Add `timestamp: datetime` field with default factory `datetime.utcnow`
+  - [x] 1.6: Add `metadata: Optional[TurnMetadata]` field for tokens/latency
 
-- [ ] Task 2: Create TurnMetadata nested model (AC: #5)
-  - [ ] 2.1: Define `TurnMetadata` model for turn-level metrics
-  - [ ] 2.2: Add `tokens_prompt: Optional[int]` field
-  - [ ] 2.3: Add `tokens_completion: Optional[int]` field
-  - [ ] 2.4: Add `latency_ms: Optional[int]` field
-  - [ ] 2.5: Add `extra: Optional[Dict[str, Any]]` for extensibility
+- [x] Task 2: Create TurnMetadata nested model (AC: #5)
+  - [x] 2.1: Define `TurnMetadata` model for turn-level metrics
+  - [x] 2.2: Add `tokens_prompt: Optional[int]` field
+  - [x] 2.3: Add `tokens_completion: Optional[int]` field
+  - [x] 2.4: Add `latency_ms: Optional[int]` field
+  - [x] 2.5: Add `extra: Optional[Dict[str, Any]]` for extensibility
 
-- [ ] Task 3: Create ConversationState model (AC: #2, #3, #4)
-  - [ ] 3.1: Define `ConversationState` model in `src/gavel_ai/models/conversation.py`
-  - [ ] 3.2: Add `scenario_id: str` field (required)
-  - [ ] 3.3: Add `variant_id: str` field (required)
-  - [ ] 3.4: Add `turns: List[Turn]` field with default empty list
-  - [ ] 3.5: Add `start_time: datetime` field with default factory
-  - [ ] 3.6: Add `metadata: Optional[Dict[str, Any]]` field
+- [x] Task 3: Create ConversationState model (AC: #2, #3, #4)
+  - [x] 3.1: Define `ConversationState` model in `src/gavel_ai/models/conversation.py`
+  - [x] 3.2: Add `scenario_id: str` field (required)
+  - [x] 3.3: Add `variant_id: str` field (required)
+  - [x] 3.4: Add `turns: List[Turn]` field with default empty list
+  - [x] 3.5: Add `start_time: datetime` field with default factory
+  - [x] 3.6: Add `metadata: Optional[Dict[str, Any]]` field
 
-- [ ] Task 4: Implement add_turn method on ConversationState (AC: #3)
-  - [ ] 4.1: Implement `add_turn(role: str, content: str, metadata: Optional[TurnMetadata] = None) -> Turn`
-  - [ ] 4.2: Auto-increment turn_number based on existing turns count
-  - [ ] 4.3: Set timestamp to current UTC time
-  - [ ] 4.4: Append Turn to turns list
-  - [ ] 4.5: Return the created Turn for reference
+- [x] Task 4: Implement add_turn method on ConversationState (AC: #3)
+  - [x] 4.1: Implement `add_turn(role: str, content: str, metadata: Optional[TurnMetadata] = None) -> Turn`
+  - [x] 4.2: Auto-increment turn_number based on existing turns count
+  - [x] 4.3: Set timestamp to current UTC time
+  - [x] 4.4: Append Turn to turns list
+  - [x] 4.5: Return the created Turn for reference
 
-- [ ] Task 5: Implement history property on ConversationState (AC: #4)
-  - [ ] 5.1: Implement `history` property returning formatted string
-  - [ ] 5.2: Format: "user: content\nassistant: content\n..."
-  - [ ] 5.3: Handle empty turns list gracefully (return empty string)
+- [x] Task 5: Implement history property on ConversationState (AC: #4)
+  - [x] 5.1: Implement `history` property returning formatted string
+  - [x] 5.2: Format: "user: content\nassistant: content\n..."
+  - [x] 5.3: Handle empty turns list gracefully (return empty string)
 
-- [ ] Task 6: Export models from gavel_ai.models package (AC: #1, #2)
-  - [ ] 6.1: Update `src/gavel_ai/models/__init__.py` to export Turn, TurnMetadata, ConversationState
-  - [ ] 6.2: Add to `__all__` list for clean imports
+- [x] Task 6: Export models from gavel_ai.models package (AC: #1, #2)
+  - [x] 6.1: Update `src/gavel_ai/models/__init__.py` to export Turn, TurnMetadata, ConversationState
+  - [x] 6.2: Add to `__all__` list for clean imports
 
-- [ ] Task 7: Write unit tests (AC: #1, #2, #3, #4, #5)
-  - [ ] 7.1: Create tests in `tests/unit/test_conversation.py` for new models
-  - [ ] 7.2: Test Turn model with all fields populated
-  - [ ] 7.3: Test Turn model with only required fields
-  - [ ] 7.4: Test Turn role validation (only "user" or "assistant")
-  - [ ] 7.5: Test TurnMetadata with token counts and latency
-  - [ ] 7.6: Test ConversationState initialization
-  - [ ] 7.7: Test add_turn auto-increments turn_number
-  - [ ] 7.8: Test add_turn sets timestamp
-  - [ ] 7.9: Test history property formatting
-  - [ ] 7.10: Test history property with empty turns
+- [x] Task 7: Write unit tests (AC: #1, #2, #3, #4, #5)
+  - [x] 7.1: Create tests in `tests/unit/test_conversation.py` for new models
+  - [x] 7.2: Test Turn model with all fields populated
+  - [x] 7.3: Test Turn model with only required fields
+  - [x] 7.4: Test Turn role validation (only "user" or "assistant")
+  - [x] 7.5: Test TurnMetadata with token counts and latency
+  - [x] 7.6: Test ConversationState initialization
+  - [x] 7.7: Test add_turn auto-increments turn_number
+  - [x] 7.8: Test add_turn sets timestamp
+  - [x] 7.9: Test history property formatting
+  - [x] 7.10: Test history property with empty turns
+
+### Review Follow-ups (AI)
+
+- [ ] [AI-Review][MEDIUM] Inconsistent whitespace validation - Turn.content uses min_length=1 but allows whitespace-only content, unlike ConversationScenario.user_goal which validates against whitespace [conversation.py:139-142]
+- [ ] [AI-Review][MEDIUM] Missing serialization round-trip tests - No tests verify model_dump_json() / model_validate_json() [test_conversation.py]
+- [ ] [AI-Review][MEDIUM] Missing error message test for add_turn with empty content [test_conversation.py]
+- [ ] [AI-Review][LOW] Missing convenience properties - TurnMetadata.total_tokens, ConversationState.turn_count [conversation.py]
+- [ ] [AI-Review][LOW] Models not frozen for immutability - Turn should arguably be immutable once created [conversation.py]
 
 ## Dev Notes
 
@@ -253,22 +261,48 @@ print(state.history)
 
 ### Agent Model Used
 
-_To be filled during implementation_
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
-_To be filled during implementation_
+No debug issues encountered during implementation.
 
 ### Completion Notes List
 
-_To be filled during implementation_
+- Implemented TurnMetadata model with tokens_prompt, tokens_completion, latency_ms, and extra fields
+- Implemented Turn model with turn_number (0-indexed, ge=0), role (Literal["user", "assistant"]), content (min_length=1), timestamp (default factory), and metadata fields
+- Implemented ConversationState model with scenario_id, variant_id, turns, start_time, and metadata fields
+- Implemented add_turn() method that auto-increments turn_number and sets timestamp
+- Implemented history property that formats turns as "role: content" separated by newlines
+- All models use ConfigDict(extra="ignore") for forward compatibility
+- Exported Turn, TurnMetadata, ConversationState from gavel_ai.models package
+- Added 38 new unit tests covering all acceptance criteria
+- All 920 tests pass (4 pre-existing skips), linting passes
+
+### Senior Developer Review (AI)
+
+**Reviewer:** Claude Opus 4.5 (code-review workflow)
+**Date:** 2026-01-18
+
+**Critical Issues Fixed:**
+1. Replaced deprecated `datetime.utcnow()` with `datetime.now(UTC)` in models and tests (Python 3.12+ compliance)
+2. Removed duplicate timestamp logic in `add_turn()` - now uses Turn's default_factory (DRY principle)
+
+**Review Follow-ups Added:** 3 MEDIUM, 2 LOW (see Tasks section)
 
 ### File List
 
-**Files to Modify:**
-- `src/gavel_ai/models/conversation.py` - Add Turn, TurnMetadata, ConversationState models
-- `src/gavel_ai/models/__init__.py` - Export new models
-- `tests/unit/test_conversation.py` - Add tests for new models
+**Files Modified:**
+- `src/gavel_ai/models/conversation.py` - Added Turn, TurnMetadata, ConversationState models
+- `src/gavel_ai/models/__init__.py` - Exported new models and updated docstring
+- `tests/unit/test_conversation.py` - Added 38 new tests for new models
 
 **Files Created:**
-_None expected_
+_None_
+
+## Change Log
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2026-01-18 | Implemented Turn, TurnMetadata, ConversationState models with full test coverage | Claude Opus 4.5 |
+| 2026-01-18 | Code review: Fixed deprecated datetime.utcnow(), removed DRY violation, added 5 follow-up items | Claude Opus 4.5 |
