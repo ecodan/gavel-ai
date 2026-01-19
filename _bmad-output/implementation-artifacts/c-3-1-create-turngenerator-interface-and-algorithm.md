@@ -1,6 +1,6 @@
 # Story C-3-1: Create TurnGenerator Interface and Algorithm
 
-**Status:** review
+**Status:** done
 
 ## Story
 
