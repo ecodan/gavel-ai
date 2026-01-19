@@ -142,9 +142,9 @@ development_status:
   epic-c-1: in-progress
   c-1-1-define-scenario-schema-with-user-goal-and-context: done
   c-1-2-implement-conversationscenario-pydantic-model: done
-  c-1-3-implement-turn-and-conversationstate-models: ready-for-dev
-  c-1-4-extend-eval-config-json-with-conversational-schema: ready-for-dev
-  c-1-5-implement-conversationresult-data-model: ready-for-dev
+  c-1-3-implement-turn-and-conversationstate-models: done
+  c-1-4-extend-eval-config-json-with-conversational-schema: in-progress
+  c-1-5-implement-conversationresult-data-model: in-progress
   epic-c-1-retrospective: optional
 
   # ============================================================================

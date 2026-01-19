@@ -8,12 +8,15 @@ from pydantic import ValidationError
 from gavel_ai.models.config import (
     AgentConfig,
     AsyncConfig,
+    ConversationalConfig,
+    ElaborationConfig,
     EvalConfig,
     ExecutionConfig,
     GEvalConfig,
     JudgeConfig,
     ScenariosConfig,
     TestSubject,
+    TurnGeneratorConfig,
 )
 
 
@@ -451,3 +454,363 @@ class TestAgentConfig:
         """AgentConfig requires prompt field."""
         with pytest.raises(ValidationError):
             AgentConfig(model_id="claude-standard")
+
+
+class TestTurnGeneratorConfig:
+    """Test TurnGeneratorConfig model."""
+
+    def test_turn_generator_config_basic_creation(self):
+        """TurnGeneratorConfig can be created with required fields."""
+        config = TurnGeneratorConfig(
+            model_id="claude-standard",
+        )
+        assert config.model_id == "claude-standard"
+        assert config.temperature == 0.0
+        assert config.max_tokens == 500
+
+    def test_turn_generator_config_custom_values(self):
+        """TurnGeneratorConfig can customize all fields."""
+        from gavel_ai.models.config import TurnGeneratorConfig
+
+        config = TurnGeneratorConfig(
+            model_id="gpt-4",
+            temperature=0.7,
+            max_tokens=1000,
+        )
+        assert config.model_id == "gpt-4"
+        assert config.temperature == 0.7
+        assert config.max_tokens == 1000
+
+    def test_turn_generator_config_temperature_validation(self):
+        """TurnGeneratorConfig validates temperature range (0.0-2.0)."""
+        from gavel_ai.models.config import TurnGeneratorConfig
+
+        # Valid temperatures
+        TurnGeneratorConfig(model_id="test", temperature=0.0)
+        TurnGeneratorConfig(model_id="test", temperature=1.0)
+        TurnGeneratorConfig(model_id="test", temperature=2.0)
+
+        # Invalid temperatures
+        with pytest.raises(ValidationError):
+            TurnGeneratorConfig(model_id="test", temperature=-0.1)
+
+        with pytest.raises(ValidationError):
+            TurnGeneratorConfig(model_id="test", temperature=2.1)
+
+    def test_turn_generator_config_max_tokens_validation(self):
+        """TurnGeneratorConfig validates max_tokens range (1-4000)."""
+        from gavel_ai.models.config import TurnGeneratorConfig
+
+        # Valid values
+        TurnGeneratorConfig(model_id="test", max_tokens=1)
+        TurnGeneratorConfig(model_id="test", max_tokens=4000)
+
+        # Invalid values
+        with pytest.raises(ValidationError):
+            TurnGeneratorConfig(model_id="test", max_tokens=0)
+
+        with pytest.raises(ValidationError):
+            TurnGeneratorConfig(model_id="test", max_tokens=4001)
+
+    def test_turn_generator_config_extra_ignore(self):
+        """TurnGeneratorConfig ignores extra fields."""
+        from gavel_ai.models.config import TurnGeneratorConfig
+
+        config_dict = {
+            "model_id": "claude-standard",
+            "extra_field": "ignored",
+        }
+        config = TurnGeneratorConfig(**config_dict)
+        assert not hasattr(config, "extra_field")
+
+    def test_turn_generator_config_requires_model_id(self):
+        """TurnGeneratorConfig requires model_id field."""
+        from gavel_ai.models.config import TurnGeneratorConfig
+
+        with pytest.raises(ValidationError):
+            TurnGeneratorConfig()
+
+
+class TestElaborationConfig:
+    """Test ElaborationConfig model."""
+
+    def test_elaboration_config_basic_creation(self):
+        """ElaborationConfig can be created with default values."""
+
+        config = ElaborationConfig()
+        assert config.enabled is False
+        assert config.elaboration_template is None
+        assert config.model_id is None
+
+    def test_elaboration_config_all_fields(self):
+        """ElaborationConfig can include all fields."""
+
+        config = ElaborationConfig(
+            enabled=True,
+            elaboration_template="prompts/elaborate_scenarios.toml",
+            model_id="claude-creative",
+        )
+        assert config.enabled is True
+        assert config.elaboration_template == "prompts/elaborate_scenarios.toml"
+        assert config.model_id == "claude-creative"
+
+    def test_elaboration_config_extra_ignore(self):
+        """ElaborationConfig ignores extra fields."""
+
+        config_dict = {
+            "enabled": True,
+            "extra_field": "ignored",
+        }
+        config = ElaborationConfig(**config_dict)
+        assert not hasattr(config, "extra_field")
+
+
+class TestConversationalConfig:
+    """Test ConversationalConfig model."""
+
+    def test_conversational_config_basic_creation(self):
+        """ConversationalConfig can be created with required fields."""
+        from gavel_ai.models.config import ConversationalConfig, TurnGeneratorConfig
+
+        config = ConversationalConfig(
+            turn_generator=TurnGeneratorConfig(model_id="claude-standard"),
+        )
+        assert config.max_turns == 10
+        assert config.max_turn_length == 2000
+        assert config.timeout_seconds == 300
+        assert config.elaboration is None
+        assert config.turn_generator.model_id == "claude-standard"
+
+    def test_conversational_config_all_fields(self):
+        """ConversationalConfig can include all fields."""
+        from gavel_ai.models.config import (
+            ConversationalConfig,
+            TurnGeneratorConfig,
+        )
+
+        config = ConversationalConfig(
+            max_turns=15,
+            max_turn_length=3000,
+            turn_generator=TurnGeneratorConfig(model_id="gpt-4", temperature=0.7),
+            elaboration=ElaborationConfig(enabled=True, elaboration_template="template.toml"),
+            timeout_seconds=600,
+        )
+        assert config.max_turns == 15
+        assert config.max_turn_length == 3000
+        assert config.turn_generator.model_id == "gpt-4"
+        assert config.turn_generator.temperature == 0.7
+        assert config.elaboration.enabled is True
+        assert config.timeout_seconds == 600
+
+    def test_conversational_config_max_turns_validation(self):
+        """ConversationalConfig validates max_turns range (1-100)."""
+        from gavel_ai.models.config import ConversationalConfig, TurnGeneratorConfig
+
+        turn_gen = TurnGeneratorConfig(model_id="test")
+
+        # Valid values
+        ConversationalConfig(turn_generator=turn_gen, max_turns=1)
+        ConversationalConfig(turn_generator=turn_gen, max_turns=100)
+
+        # Invalid values
+        with pytest.raises(ValidationError):
+            ConversationalConfig(turn_generator=turn_gen, max_turns=0)
+
+        with pytest.raises(ValidationError):
+            ConversationalConfig(turn_generator=turn_gen, max_turns=101)
+
+    def test_conversational_config_max_turn_length_validation(self):
+        """ConversationalConfig validates max_turn_length range (100-10000)."""
+        from gavel_ai.models.config import ConversationalConfig, TurnGeneratorConfig
+
+        turn_gen = TurnGeneratorConfig(model_id="test")
+
+        # Valid values
+        ConversationalConfig(turn_generator=turn_gen, max_turn_length=100)
+        ConversationalConfig(turn_generator=turn_gen, max_turn_length=10000)
+
+        # Invalid values
+        with pytest.raises(ValidationError):
+            ConversationalConfig(turn_generator=turn_gen, max_turn_length=99)
+
+        with pytest.raises(ValidationError):
+            ConversationalConfig(turn_generator=turn_gen, max_turn_length=10001)
+
+    def test_conversational_config_timeout_validation(self):
+        """ConversationalConfig validates timeout_seconds range (30-3600)."""
+        from gavel_ai.models.config import ConversationalConfig, TurnGeneratorConfig
+
+        turn_gen = TurnGeneratorConfig(model_id="test")
+
+        # Valid values
+        ConversationalConfig(turn_generator=turn_gen, timeout_seconds=30)
+        ConversationalConfig(turn_generator=turn_gen, timeout_seconds=3600)
+
+        # Invalid values
+        with pytest.raises(ValidationError):
+            ConversationalConfig(turn_generator=turn_gen, timeout_seconds=29)
+
+        with pytest.raises(ValidationError):
+            ConversationalConfig(turn_generator=turn_gen, timeout_seconds=3601)
+
+    def test_conversational_config_extra_ignore(self):
+        """ConversationalConfig ignores extra fields."""
+        from gavel_ai.models.config import ConversationalConfig
+
+        config_dict = {
+            "turn_generator": {"model_id": "claude-standard"},
+            "extra_field": "ignored",
+        }
+        config = ConversationalConfig(**config_dict)
+        assert not hasattr(config, "extra_field")
+
+    def test_conversational_config_requires_turn_generator(self):
+        """ConversationalConfig requires turn_generator field."""
+        from gavel_ai.models.config import ConversationalConfig
+
+        with pytest.raises(ValidationError):
+            ConversationalConfig()
+
+
+class TestEvalConfigConversationalExtension:
+    """Test EvalConfig conversational extensions."""
+
+    def test_eval_config_with_workflow_type_conversational(self):
+        """EvalConfig supports workflow_type='conversational'."""
+        from gavel_ai.models.config import EvalConfig
+
+        config = EvalConfig(
+            eval_type="conversational",  # This will be updated to workflow_type
+            eval_name="test-conversational",
+            test_subject_type="local",
+            test_subjects=[
+                TestSubject(
+                    judges=[JudgeConfig(name="test", type="test.type")],
+                ),
+            ],
+            variants=["variant1"],
+            scenarios=ScenariosConfig(source="file.local", name="scenarios.json"),
+        )
+        # This will need to be updated when we modify EvalConfig
+        assert config.eval_type == "conversational"
+
+    def test_eval_config_conversational_validation(self):
+        """EvalConfig validates conversational config when workflow_type='conversational'."""
+        # Should pass when workflow_type is oneshot without conversational config
+        config = EvalConfig(
+            workflow_type="oneshot",
+            eval_type="oneshot",
+            eval_name="test-oneshot",
+            test_subject_type="local",
+            test_subjects=[
+                TestSubject(
+                    judges=[JudgeConfig(name="test", type="test.type")],
+                ),
+            ],
+            variants=["variant1"],
+            scenarios=ScenariosConfig(source="file.local", name="scenarios.json"),
+        )
+        assert config.workflow_type == "oneshot"
+        assert config.conversational is None
+
+        # Should pass when workflow_type is conversational with conversational config
+        config = EvalConfig(
+            workflow_type="conversational",
+            eval_type="conversational",
+            eval_name="test-conversational",
+            test_subject_type="local",
+            test_subjects=[
+                TestSubject(
+                    judges=[JudgeConfig(name="test", type="test.type")],
+                ),
+            ],
+            variants=["variant1"],
+            scenarios=ScenariosConfig(source="file.local", name="scenarios.json"),
+            conversational=ConversationalConfig(
+                turn_generator=TurnGeneratorConfig(model_id="claude-standard")
+            ),
+        )
+        assert config.workflow_type == "conversational"
+        assert config.conversational is not None
+        assert config.conversational.turn_generator.model_id == "claude-standard"
+
+        # Should fail when workflow_type is conversational but no conversational config
+        with pytest.raises(ValueError) as excinfo:
+            EvalConfig(
+                workflow_type="conversational",
+                eval_type="conversational",
+                eval_name="test-conversational",
+                test_subject_type="local",
+                test_subjects=[
+                    TestSubject(
+                        judges=[JudgeConfig(name="test", type="test.type")],
+                    ),
+                ],
+                variants=["variant1"],
+                scenarios=ScenariosConfig(source="file.local", name="scenarios.json"),
+                # Missing conversational config
+            )
+        assert "conversational config is required when workflow_type='conversational'" in str(
+            excinfo.value
+        )
+
+    def test_eval_config_load_conversational_from_json(self):
+        """EvalConfig can load conversational config from JSON file."""
+        import json
+        import os
+        import tempfile
+
+        # Create a conversational config JSON
+        config_dict = {
+            "workflow_type": "conversational",
+            "eval_type": "conversational",
+            "eval_name": "test-conversational",
+            "test_subject_type": "local",
+            "test_subjects": [
+                {"judges": [{"name": "relevancy", "type": "deepeval.turn_relevancy"}]}
+            ],
+            "variants": ["variant1"],
+            "scenarios": {"source": "file.local", "name": "scenarios.json"},
+            "conversational": {
+                "max_turns": 15,
+                "max_turn_length": 3000,
+                "turn_generator": {
+                    "model_id": "claude-standard",
+                    "temperature": 0.0,
+                    "max_tokens": 500,
+                },
+                "elaboration": {"enabled": True, "elaboration_template": "prompts/elaborate.toml"},
+                "timeout_seconds": 600,
+            },
+        }
+
+        # Write to temporary file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(config_dict, f)
+            temp_file = f.name
+
+        try:
+            # Load and validate the config
+            with open(temp_file) as f:
+                loaded_config = json.load(f)
+
+            config = EvalConfig.model_validate(loaded_config)
+
+            # Verify all fields loaded correctly
+            assert config.workflow_type == "conversational"
+            assert config.eval_name == "test-conversational"
+            assert config.conversational is not None
+            assert config.conversational.max_turns == 15
+            assert config.conversational.max_turn_length == 3000
+            assert config.conversational.turn_generator.model_id == "claude-standard"
+            assert config.conversational.turn_generator.temperature == 0.0
+            assert config.conversational.turn_generator.max_tokens == 500
+            assert config.conversational.elaboration.enabled is True
+            assert (
+                config.conversational.elaboration.elaboration_template == "prompts/elaborate.toml"
+            )
+            assert config.conversational.timeout_seconds == 600
+
+        finally:
+            # Clean up temporary file
+            os.unlink(temp_file)

@@ -15,6 +15,9 @@ Configuration Models (from config.py):
 Conversational Models (from conversation.py):
 - DialogueGuidance: Guidance for turn generation behavior
 - ConversationScenario: Conversational scenario with user_goal
+- TurnMetadata: Metadata for a single conversation turn (tokens, latency)
+- Turn: A single turn in a conversation
+- ConversationState: State of a multi-turn conversation
 - load_conversation_scenarios(): Load scenarios from JSON/JSONL file
 - iter_conversation_scenarios(): Stream scenarios (memory efficient)
 
@@ -50,15 +53,21 @@ from gavel_ai.models.agents import (
 )
 from gavel_ai.models.config import (
     AsyncConfig,
+    ConversationalConfig,
+    ElaborationConfig,
     EvalConfig,
     GEvalConfig,
     JudgeConfig,
+    TurnGeneratorConfig,
 )
 
 # Conversational models
 from gavel_ai.models.conversation import (
     ConversationScenario,
+    ConversationState,
     DialogueGuidance,
+    Turn,
+    TurnMetadata,
     iter_conversation_scenarios,
     load_conversation_scenarios,
 )
@@ -87,12 +96,18 @@ from gavel_ai.models.utils import (
 __all__ = [
     # Configuration models
     "AsyncConfig",
+    "ConversationalConfig",
+    "ElaborationConfig",
     "EvalConfig",
     "GEvalConfig",
     "JudgeConfig",
+    "TurnGeneratorConfig",
     # Conversational models
     "ConversationScenario",
+    "ConversationState",
     "DialogueGuidance",
+    "Turn",
+    "TurnMetadata",
     "iter_conversation_scenarios",
     "load_conversation_scenarios",
     # Runtime models

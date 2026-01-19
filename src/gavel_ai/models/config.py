@@ -1,8 +1,8 @@
 """Pydantic models for configuration schemas."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class JudgeConfig(BaseModel):
@@ -84,11 +84,60 @@ class GEvalConfig(BaseModel):
     threshold: float = Field(0.7, ge=0.0, le=1.0, description="Pass/fail threshold")
 
 
+class TurnGeneratorConfig(BaseModel):
+    """Configuration for turn generation in conversational evaluation."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    model_id: str = Field(..., description="Model ID from agents.json for turn generation")
+    temperature: float = Field(
+        0.0, ge=0.0, le=2.0, description="Temperature for turn generation (0.0 for determinism)"
+    )
+    max_tokens: int = Field(500, ge=1, le=4000, description="Maximum tokens per generated turn")
+
+
+class ElaborationConfig(BaseModel):
+    """Configuration for scenario elaboration (GenerateStep)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    enabled: bool = Field(False, description="Whether to elaborate scenarios before execution")
+    elaboration_template: Optional[str] = Field(
+        None, description="Path to prompt template for elaboration"
+    )
+    model_id: Optional[str] = Field(
+        None, description="Model ID for elaboration (defaults to turn_generator model)"
+    )
+
+
+class ConversationalConfig(BaseModel):
+    """Configuration for conversational evaluation workflow."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    max_turns: int = Field(
+        10, ge=1, le=100, description="Maximum turns per conversation before termination"
+    )
+    max_turn_length: int = Field(2000, ge=100, le=10000, description="Maximum characters per turn")
+    turn_generator: TurnGeneratorConfig = Field(
+        ..., description="Configuration for turn generation"
+    )
+    elaboration: Optional[ElaborationConfig] = Field(
+        None, description="Configuration for scenario elaboration"
+    )
+    timeout_seconds: int = Field(
+        300, ge=30, le=3600, description="Timeout for entire conversation execution"
+    )
+
+
 class EvalConfig(BaseModel):
     """Evaluation configuration model."""
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)  # Forward compatible
 
+    workflow_type: Literal["oneshot", "conversational"] = Field(
+        "oneshot", description="Type of evaluation workflow"
+    )
     eval_type: str = Field(..., description="Evaluation type (oneshot, conversational, autotune)")
     eval_name: str = Field(..., description="Evaluation name")
     description: Optional[str] = Field(None, description="Evaluation description")
@@ -100,6 +149,19 @@ class EvalConfig(BaseModel):
     async_config: Optional[AsyncConfig] = Field(
         None, alias="async", description="Async configuration"
     )
+    conversational: Optional[ConversationalConfig] = Field(
+        None, description="Conversational evaluation configuration"
+    )
+
+    @model_validator(mode="after")
+    def validate_conversational_config(self) -> "EvalConfig":
+        """Ensure conversational config present when workflow_type is conversational."""
+        if self.workflow_type == "conversational" and self.conversational is None:
+            raise ValueError(
+                "conversational config is required when workflow_type='conversational' - "
+                "Add 'conversational' section with turn_generator configuration"
+            )
+        return self
 
 
 class AgentConfig(BaseModel):
