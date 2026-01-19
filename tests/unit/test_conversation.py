@@ -306,7 +306,7 @@ class TestLoadConversationScenarios:
         with pytest.raises(ValueError) as exc_info:
             load_conversation_scenarios(file_path)
 
-        assert "Unsupported file format" in str(exc_info.value)
+        assert "Unsupported file extension" in str(exc_info.value)
 
     def test_load_with_full_scenario_data(self, tmp_path: Path):
         """Load scenarios with complete data including dialogue_guidance."""
@@ -403,8 +403,7 @@ class TestIterConversationScenarios:
         """Iter raises ValueError for invalid scenario in JSONL."""
         file_path = tmp_path / "scenarios.jsonl"
         file_path.write_text(
-            '{"id": "scenario1", "user_goal": "Valid"}\n'
-            '{"id": "scenario2"}\n'  # Missing user_goal
+            '{"id": "scenario1", "user_goal": "Valid"}\n{"id": "scenario2"}\n'  # Missing user_goal
         )
 
         with pytest.raises(ValueError) as exc_info:
@@ -848,6 +847,7 @@ class TestConversationStateFullExample:
         )
         assert state.history == expected_history
 
+
 class TestTurnResult:
     """Test TurnResult Pydantic model."""
 
@@ -892,7 +892,7 @@ class TestConversationResult:
             conversation_transcript=transcript,
             duration_ms=1000,
             completed=True,
-            tokens_total=100
+            tokens_total=100,
         )
         assert result.scenario_id == "s1"
         assert result.variant_id == "v1"
@@ -918,10 +918,22 @@ class TestConversationResult:
     def test_compute_tokens_total(self):
         """compute_tokens_total correctly sums tokens from TurnResults."""
         transcript = ConversationState(scenario_id="s1", variant_id="v1")
-        
+
         turn_results = [
-            TurnResult(turn_number=0, processor_output="", latency_ms=0, tokens_prompt=10, tokens_completion=5),
-            TurnResult(turn_number=1, processor_output="", latency_ms=0, tokens_prompt=20, tokens_completion=10),
+            TurnResult(
+                turn_number=0,
+                processor_output="",
+                latency_ms=0,
+                tokens_prompt=10,
+                tokens_completion=5,
+            ),
+            TurnResult(
+                turn_number=1,
+                processor_output="",
+                latency_ms=0,
+                tokens_prompt=20,
+                tokens_completion=10,
+            ),
         ]
 
         result = ConversationResult(
@@ -944,5 +956,5 @@ class TestConversationResult:
         )
         entry = result.to_jsonl_entry()
         assert isinstance(entry, dict)
-        assert entry['scenario_id'] == "s1"
-        assert entry['duration_ms'] == 100
+        assert entry["scenario_id"] == "s1"
+        assert entry["duration_ms"] == 100

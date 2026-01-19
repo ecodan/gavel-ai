@@ -5,8 +5,8 @@ repos:
     hooks:
       - id: black
         language_version: python3.10
-        args: ["--line-length=100"]
-        stages: [commit]
+        args: ["--line-length=100", "--target-version=py312"]
+        stages: [pre-commit]
 
   # Linting with ruff (imports + code quality)
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -14,19 +14,19 @@ repos:
     hooks:
       - id: ruff
         args: ["--line-length=100", "--fix"]
-        stages: [commit]
+        stages: [pre-commit]
       - id: ruff-format
         args: ["--line-length=100"]
-        stages: [commit]
+        stages: [pre-commit]
 
   # Type checking with mypy
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.8.0
     hooks:
       - id: mypy
-        additional_dependencies: ["types-all"]
-        args: ["--python-version=3.10", "src/"]
-        stages: [commit]
+        additional_dependencies: ["types-toml"]
+        args: ["--python-version=3.10", "--explicit-package-bases"]
+        stages: [pre-commit]
 
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks

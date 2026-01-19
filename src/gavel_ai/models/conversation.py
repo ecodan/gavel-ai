@@ -16,7 +16,7 @@ Utilities:
 """
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime  # type: ignore[attr-defined]
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Literal, Optional, Union
 
@@ -85,7 +85,7 @@ class ConversationScenario(BaseModel):
             raise ValueError(
                 "user_goal cannot be empty - Provide a clear description of what the simulated user is trying to accomplish"
             )
-        return v
+        return v  # type: ignore[no-any-return]
 
     @property
     def id(self) -> str:
@@ -219,7 +219,7 @@ class ConversationState(BaseModel):
         return "\n".join(f"{turn.role}: {turn.content}" for turn in self.turns)
 
 
-def load_conversation_scenarios(
+def load_conversation_scenarios(  # noqa: C901
     path: Union[str, Path],
 ) -> List[ConversationScenario]:
     """
@@ -252,7 +252,6 @@ def load_conversation_scenarios(
     ext = path.suffix.lower()
 
     scenarios: List[ConversationScenario] = []
-    raw_records: List[dict] = []
 
     if ext == ".json":
         data = json.loads(content)
@@ -260,35 +259,44 @@ def load_conversation_scenarios(
             raise ValueError(
                 f"JSON file must contain an array of scenarios - Got {type(data).__name__}"
             )
-        raw_records = data
+        for record in data:
+            try:
+                scenarios.append(ConversationScenario.model_validate(record))
+            except ValidationError as e:
+                scenario_id = record.get("id", record.get("scenario_id", "unknown"))
+                raise ValueError(
+                    f"ConversationScenario validation failed for '{scenario_id}' - {str(e)}"
+                ) from e
 
     elif ext == ".jsonl":
         for line_num, line in enumerate(content.splitlines(), start=1):
             if line.strip():
+                record: Dict[str, Any] = {}
                 try:
-                    raw_records.append(json.loads(line))
+                    record = json.loads(line)
                 except json.JSONDecodeError as e:
                     raise ValueError(f"Invalid JSON on line {line_num} - {e}") from e
-    else:
-        raise ValueError(f"Unsupported file format: {ext} - Use .json or .jsonl")
+                try:
+                    scenarios.append(ConversationScenario.model_validate(record))
+                except ValidationError as e:
+                    scenario_id = record.get("id", record.get("scenario_id", f"line {line_num}"))
+                    raise ValueError(
+                        f"ConversationScenario validation failed for '{scenario_id}' - {str(e)}"
+                    ) from e
 
-    for idx, record in enumerate(raw_records):
-        try:
-            scenarios.append(ConversationScenario(**record))
-        except ValidationError as e:
-            scenario_id = record.get("id", record.get("scenario_id", f"index {idx}"))
-            raise ValueError(
-                f"ConversationScenario validation failed for '{scenario_id}' - {e.errors()[0]['msg']}"
-            ) from e
+    else:
+        raise ValueError(f"Unsupported file extension '{ext}' - Use .json or .jsonl")
 
     return scenarios
 
 
-def iter_conversation_scenarios(
+def iter_conversation_scenarios(  # noqa: C901
     path: Union[str, Path],
 ) -> Iterator[ConversationScenario]:
     """
-    Stream conversational scenarios from a file (memory efficient).
+    Stream conversational scenarios from a JSON or JSONL file.
+
+    Memory-efficient generator for large scenario files.
 
     Args:
         path: Path to scenarios file (.json or .jsonl)
@@ -299,6 +307,11 @@ def iter_conversation_scenarios(
     Raises:
         FileNotFoundError: If file does not exist
         ValueError: If file format is not supported or data is invalid
+        ValidationError: If scenario validation fails (e.g., missing user_goal)
+
+    Example:
+        >>> for scenario in iter_conversation_scenarios("data/scenarios.jsonl"):
+        ...     print(f"{scenario.id}: {scenario.user_goal}")
     """
     path = Path(path)
 
@@ -307,27 +320,42 @@ def iter_conversation_scenarios(
             f"Scenario file not found: {path} - Check file path and ensure it exists"
         )
 
+    content = path.read_text(encoding="utf-8")
     ext = path.suffix.lower()
 
-    if ext == ".jsonl":
-        with path.open(encoding="utf-8") as f:
-            for line_num, line in enumerate(f, start=1):
-                if line.strip():
-                    try:
-                        record = json.loads(line)
-                        yield ConversationScenario(**record)
-                    except json.JSONDecodeError as e:
-                        raise ValueError(f"Invalid JSON on line {line_num} - {e}") from e
-                    except ValidationError as e:
-                        scenario_id = record.get(
-                            "id", record.get("scenario_id", f"line {line_num}")
-                        )
-                        raise ValueError(
-                            f"ConversationScenario validation failed for '{scenario_id}' - {e.errors()[0]['msg']}"
-                        ) from e
+    if ext == ".json":
+        data = json.loads(content)
+        if not isinstance(data, list):
+            raise ValueError(
+                f"JSON file must contain an array of scenarios - Got {type(data).__name__}"
+            )
+        for record in data:
+            try:
+                yield ConversationScenario.model_validate(record)
+            except ValidationError as e:
+                scenario_id = record.get("id", record.get("scenario_id", "unknown"))
+                raise ValueError(
+                    f"ConversationScenario validation failed for '{scenario_id}' - {str(e)}"
+                ) from e
+
+    elif ext == ".jsonl":
+        for line_num, line in enumerate(content.splitlines(), start=1):
+            if line.strip():
+                record: Dict[str, Any] = {}
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Invalid JSON on line {line_num} - {e}") from e
+                try:
+                    yield ConversationScenario.model_validate(record)
+                except ValidationError as e:
+                    scenario_id = record.get("id", record.get("scenario_id", f"line {line_num}"))
+                    raise ValueError(
+                        f"ConversationScenario validation failed for '{scenario_id}' - {str(e)}"
+                    ) from e
+
     else:
-        # For JSON files, load all at once (can't stream)
-        yield from load_conversation_scenarios(path)
+        raise ValueError(f"Unsupported file extension '{ext}' - Use .json or .jsonl")
 
 
 class TurnResult(BaseModel):
@@ -335,77 +363,39 @@ class TurnResult(BaseModel):
 
     Supports partial updates and ignoring extra fields for robust parsing.
     """
-    model_config = ConfigDict(extra='ignore')
 
-    turn_number: int = Field(
-        ...,
-        ge=0,
-        description="Turn number this result corresponds to"
-    )
-    processor_output: str = Field(
-        ...,
-        description="Assistant response (processor output)"
-    )
-    latency_ms: int = Field(
-        ...,
-        ge=0,
-        description="Processing time in milliseconds"
-    )
-    tokens_prompt: Optional[int] = Field(
-        None,
-        description="Number of prompt tokens"
-    )
-    tokens_completion: Optional[int] = Field(
-        None,
-        description="Number of completion tokens"
-    )
-    error: Optional[str] = Field(
-        None,
-        description="Error message if turn processing failed"
-    )
+    model_config = ConfigDict(extra="ignore")
+
+    turn_number: int = Field(..., ge=0, description="Turn number this result corresponds to")
+    processor_output: str = Field(..., description="Assistant response (processor output)")
+    latency_ms: int = Field(..., ge=0, description="Processing time in milliseconds")
+    tokens_prompt: Optional[int] = Field(None, description="Number of prompt tokens")
+    tokens_completion: Optional[int] = Field(None, description="Number of completion tokens")
+    error: Optional[str] = Field(None, description="Error message if turn processing failed")
 
 
 class ConversationResult(BaseModel):
     """Complete result of a conversational evaluation execution."""
-    model_config = ConfigDict(extra='ignore')
 
-    scenario_id: str = Field(
-        ...,
-        description="ID of the scenario that was executed"
-    )
-    variant_id: str = Field(
-        ...,
-        description="ID of the variant (model/config) used"
-    )
+    model_config = ConfigDict(extra="ignore")
+
+    scenario_id: str = Field(..., description="ID of the scenario that was executed")
+    variant_id: str = Field(..., description="ID of the variant (model/config) used")
     conversation_transcript: ConversationState = Field(
-        ...,
-        description="Full conversation transcript with all turns"
+        ..., description="Full conversation transcript with all turns"
     )
     results_raw: List[TurnResult] = Field(
-        default_factory=list,
-        description="Per-turn processor results"
+        default_factory=list, description="Per-turn processor results"
     )
-    duration_ms: int = Field(
-        ...,
-        ge=0,
-        description="Total conversation duration in milliseconds"
-    )
-    tokens_total: int = Field(
-        0,
-        ge=0,
-        description="Total tokens used across all turns"
-    )
+    duration_ms: int = Field(..., ge=0, description="Total conversation duration in milliseconds")
+    tokens_total: int = Field(0, ge=0, description="Total tokens used across all turns")
     completed: bool = Field(
         False,
-        description="Whether conversation completed successfully (goal achieved or max_turns). False does not strictly imply error."
+        description="Whether conversation completed successfully (goal achieved or max_turns). False does not strictly imply error.",
     )
-    error: Optional[str] = Field(
-        None,
-        description="Conversation-level error if execution failed"
-    )
+    error: Optional[str] = Field(None, description="Conversation-level error if execution failed")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        description="When this result was created"
+        default_factory=lambda: datetime.now(UTC), description="When this result was created"
     )
 
     @computed_field
@@ -440,6 +430,6 @@ class ConversationResult(BaseModel):
             Excludes None values to optimize storage.
         """
         return self.model_dump(
-            mode='json',
+            mode="json",
             exclude_none=True,
         )
