@@ -79,7 +79,10 @@ class RecordDataSource(DataSource, Generic[T]):
 
     def append(self, record: T | dict[str, Any]) -> None:
         """Append single record"""
-        data = record.model_dump(mode="json") if isinstance(record, BaseModel) else record
+        if hasattr(record, "to_jsonl_entry"):
+            data = record.to_jsonl_entry()
+        else:
+            data = record.model_dump(mode="json") if isinstance(record, BaseModel) else record
         line = self._serialize_record(data)
         self._storage.append_bytes(self._path, line.encode("utf-8"))
 

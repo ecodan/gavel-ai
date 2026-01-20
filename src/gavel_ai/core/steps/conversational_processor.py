@@ -433,6 +433,7 @@ class ConversationalProcessingStep(Step):
                             tokens_prompt=tokens_p,
                             tokens_completion=tokens_c,
                             timestamp=datetime.now(UTC).isoformat(),
+                            metadata={"turn_number": len(conv.turns) - 1},
                         )
                     )
 

@@ -374,6 +374,10 @@ class TurnResult(BaseModel):
     tokens_prompt: Optional[int] = Field(None, description="Number of prompt tokens")
     tokens_completion: Optional[int] = Field(None, description="Number of completion tokens")
     error: Optional[str] = Field(None, description="Error message if turn processing failed")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="UTC timestamp when turn was executed",
+    )
 
 
 class ConversationResult(BaseModel):
@@ -428,10 +432,47 @@ class ConversationResult(BaseModel):
         """Convert to dictionary suitable for JSONL serialization.
 
         Returns:
-            Dict ready for json.dumps() with ISO format datetimes.
-            Excludes None values to optimize storage.
+            Dict matching the specified conversations.jsonl format:
+            - scenario_id/variant_id
+            - conversation: list of turns (flattened from transcript)
+            - metadata: consolidated metrics
+
+        Raises:
+            ValueError: If serialization fails due to invalid data
         """
-        return self.model_dump(
-            mode="json",
-            exclude_none=True,
-        )
+        try:
+            # Base dump
+            data = self.model_dump(mode="json", exclude_none=True)
+
+            # Structure transformation
+            transcript = data.pop("conversation_transcript", {})
+            turns = transcript.get("turns", [])
+
+            # Ensure metadata is JSON-serializable
+            conv_metadata = self.conversation_transcript.metadata or {}
+            result_metadata = data.get("metadata", {})
+
+            # Build new structure
+            entry = {
+                "scenario_id": self.scenario_id,
+                "variant_id": self.variant_id,
+                "conversation": turns,
+                "metadata": {
+                    "total_turns": self.total_turns,
+                    "duration_ms": self.duration_ms,
+                    "tokens_total": self.tokens_total,
+                    **conv_metadata,
+                    **result_metadata,
+                },
+                # Include timestamp if needed, often useful
+                "timestamp": data.get("timestamp"),
+            }
+
+            # Also include any errors
+            if self.error:
+                entry["error"] = self.error
+
+            return entry
+
+        except Exception as e:
+            raise ValueError(f"Failed to serialize ConversationResult to JSONL entry: {e}") from e

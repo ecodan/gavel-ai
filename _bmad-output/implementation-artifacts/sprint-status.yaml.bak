@@ -148,6 +148,18 @@ development_status:
   epic-c-1-retrospective: optional
 
   # ============================================================================
+  # EPIC C7: CLI Integration (Conversational)
+  # Goal: Wire Conversational Evaluation into CLI with gavel conversational subcommands
+  # ============================================================================
+  epic-c-7: ready-for-dev
+   c-7-1-implement-gavel-conversational-create-scaffolding: in-progress
+  c-7-2-implement-gavel-conversational-run-execution: ready-for-dev
+  c-7-3-implement-gavel-conversational-judge-re-judging: ready-for-dev
+  c-7-4-implement-gavel-conversational-report-generation: ready-for-dev
+  c-7-5-implement-gavel-conversational-list-run-history: ready-for-dev
+  epic-c-7-retrospective: optional
+
+  # ============================================================================
   # EPIC C2: Scenario Generation (Conversational)
   # Goal: Implement optional scenario generation where prompts describe desired test scenarios
   # ============================================================================
@@ -161,11 +173,11 @@ development_status:
   # EPIC C3: Multi-Turn Execution (Conversational)
   # Goal: Implement core conversational processing with on-the-fly turn generation
   # ============================================================================
-  epic-c-3: in-progress
-  c-3-1-create-turngenerator-interface-and-algorithm: done
-  c-3-2-implement-conversationalprocessingstep: done
-  c-3-3-support-multiple-variants-in-conversational-execution: done
-  c-3-4-export-conversations-and-raw-results-to-jsonl: done
+  epic-c-3: ready-for-dev
+  c-3-1-create-turngenerator-interface-and-algorithm: ready-for-dev
+  c-3-2-implement-conversationalprocessingstep: ready-for-dev
+  c-3-3-support-multiple-variants-in-conversational-execution: ready-for-dev
+  c-3-4-export-conversations-and-raw-results-to-jsonl: ready-for-dev
   c-3-5-implement-conversation-timeout-and-error-handling: ready-for-dev
   epic-c-3-retrospective: optional
 
@@ -200,18 +212,6 @@ development_status:
   c-6-3-implement-turn-level-display-with-duration-and-judge-score-badges: ready-for-dev
   c-6-4-implement-judge-reasoning-display-and-insight-summary: ready-for-dev
   epic-c-6-retrospective: optional
-
-  # ============================================================================
-  # EPIC C7: CLI Integration (Conversational)
-  # Goal: Wire Conversational Evaluation into CLI with gavel conversational subcommands
-  # ============================================================================
-  epic-c-7: ready-for-dev
-  c-7-1-implement-gavel-conversational-create-scaffolding: ready-for-dev
-  c-7-2-implement-gavel-conversational-run-execution: ready-for-dev
-  c-7-3-implement-gavel-conversational-judge-re-judging: ready-for-dev
-  c-7-4-implement-gavel-conversational-report-generation: ready-for-dev
-  c-7-5-implement-gavel-conversational-list-run-history: ready-for-dev
-  epic-c-7-retrospective: optional
 
   # ============================================================================
   # EPIC C8: Testing & Validation (Conversational)
@@ -255,9 +255,9 @@ summary:
     epic-4: done (7/7 stories)
     epic-5: done (5/5 stories)
     epic-6: done (8/8 stories)
-    epic-7: backlog (8/9 stories done, 1 backlog)
-    epic-c-1: done (5/5 stories)
-    epic-c-2: done (3/3 stories)
+    epic-7: in-progress (8/9 stories done, 1 backlog)
+    epic-c-1: in-progress (5/5 stories)
+    epic-c-2: ready-for-dev (3/3 stories)
     epic-c-3: ready-for-dev (5/5 stories)
     epic-c-4: ready-for-dev (5/5 stories)
     epic-c-5: ready-for-dev (2/2 stories)

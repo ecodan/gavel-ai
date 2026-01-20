@@ -247,6 +247,9 @@ class OutputRecord(BaseModel):
     tokens_prompt: int = Field(..., ge=0, description="Prompt tokens consumed")
     tokens_completion: int = Field(..., ge=0, description="Completion tokens generated")
     error: Optional[str] = Field(None, description="Error message if execution failed")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata (e.g. turn_number)"
+    )
     timestamp: str = Field(..., description="ISO 8601 timestamp of execution")
 
 

@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 from typing import Iterator, List
 
+from gavel_ai.models.conversation import ConversationResult, TurnResult
 from gavel_ai.models.runtime import EvaluationResult
 
 logger = logging.getLogger(__name__)
@@ -221,3 +222,134 @@ class ResultStorage:
         if self.results_file.exists():
             self.results_file.unlink()
             logger.info(f"Cleared results from {self.results_file}")
+
+
+class ConversationStorage(ResultStorage):
+    """
+    Storage for full conversation transcripts.
+
+    Stores ConversationResult objects in JSONL format with one entry per scenario × variant.
+
+    JSONL Format:
+        Each line contains a JSON object with:
+        - scenario_id: Scenario identifier
+        - variant_id: Model variant identifier
+        - conversation: Array of turn objects (role, content, timestamp, metadata)
+        - metadata: Aggregated metrics (total_turns, duration_ms, tokens_total)
+        - timestamp: ISO 8601 timestamp of conversation completion
+        - error: Optional error message if conversation failed
+
+    Example:
+        {"scenario_id":"s1","variant_id":"v1","conversation":[{"turn_number":0,"role":"user",...}],"metadata":{...}}
+    """
+
+    def append(self, result: ConversationResult) -> None:
+        """
+        Append a conversation result to storage.
+
+        Args:
+            result: ConversationResult to store
+
+        Raises:
+            ValueError: If conversation_transcript is invalid
+            IOError: If write fails
+        """
+        try:
+            # Validate conversation_transcript exists
+            if not result.conversation_transcript:
+                raise ValueError(
+                    f"Cannot serialize ConversationResult for {result.scenario_id}/{result.variant_id}: "
+                    "conversation_transcript is None"
+                )
+
+            # Use to_jsonl_entry for optimized serialization (exclude none, etc)
+            entry = result.to_jsonl_entry()
+            json_line = json.dumps(entry) + "\n"
+
+            with open(self.results_file, "a") as f:
+                f.write(json_line)
+
+            logger.debug(
+                f"Stored conversation for scenario '{result.scenario_id}' "
+                f"variant '{result.variant_id}' to {self.results_file}"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to write conversation to {self.results_file}: {e}")
+            raise IOError(f"Failed to write conversation to {self.results_file}: {e}") from e
+
+    def append_batch(self, results: List[ConversationResult]) -> None:
+        """Append multiple conversation results."""
+        try:
+            with open(self.results_file, "a") as f:
+                for result in results:
+                    entry = result.to_jsonl_entry()
+                    json_line = json.dumps(entry) + "\n"
+                    f.write(json_line)
+
+            logger.info(f"Stored {len(results)} conversations to {self.results_file}")
+
+        except Exception as e:
+            logger.error(f"Failed to write batch conversations to {self.results_file}: {e}")
+            raise IOError(f"Failed to write batch conversations to {self.results_file}: {e}") from e
+
+
+class RawResultStorage(ResultStorage):
+    """
+    Storage for raw turn-level processing results.
+
+    Stores TurnResult objects in JSONL format with one entry per turn (flattened, not nested).
+    This matches the OneShot results_raw schema for consistency.
+
+    JSONL Format:
+        Each line contains a JSON object with:
+        - turn_number: Zero-indexed turn number
+        - scenario_id: Scenario identifier
+        - variant_id: Model variant identifier
+        - processor_output: Assistant response text
+        - latency_ms: Processing time in milliseconds
+        - tokens_prompt: Number of prompt tokens (optional)
+        - tokens_completion: Number of completion tokens (optional)
+        - timestamp: ISO 8601 timestamp when turn was executed
+        - error: Optional error message if turn failed
+
+    Example:
+        {"turn_number":1,"scenario_id":"s1","variant_id":"v1","processor_output":"Response","latency_ms":100,...}
+    """
+
+    def append(self, result: TurnResult) -> None:
+        """
+        Append a turn result to raw storage.
+
+        Args:
+            result: TurnResult to store
+        """
+        try:
+            # Use mode='json' to ensure datetime fields are serialized to ISO format strings
+            data = result.model_dump(mode="json", exclude_none=True)
+            json_line = json.dumps(data) + "\n"
+
+            with open(self.results_file, "a") as f:
+                f.write(json_line)
+
+            logger.debug(f"Stored raw results for turn {result.turn_number} to {self.results_file}")
+
+        except Exception as e:
+            logger.error(f"Failed to write raw result to {self.results_file}: {e}")
+            raise IOError(f"Failed to write raw result to {self.results_file}: {e}") from e
+
+    def append_batch(self, results: List[TurnResult]) -> None:
+        """Append multiple turn results."""
+        try:
+            with open(self.results_file, "a") as f:
+                for result in results:
+                    # Use mode='json' to ensure datetime fields are serialized to ISO format strings
+                    data = result.model_dump(mode="json", exclude_none=True)
+                    json_line = json.dumps(data) + "\n"
+                    f.write(json_line)
+
+            logger.info(f"Stored {len(results)} raw results to {self.results_file}")
+
+        except Exception as e:
+            logger.error(f"Failed to write batch raw results to {self.results_file}: {e}")
+            raise IOError(f"Failed to write batch raw results to {self.results_file}: {e}") from e
