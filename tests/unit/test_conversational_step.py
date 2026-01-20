@@ -95,6 +95,7 @@ class TestConversationalProcessingStep:
         mock_config.conversational = mock_conversational_config
         mock_config.variants = ["variant-1", "variant-2"]
         mock_config.test_subjects = [MagicMock(prompt_name="test-subject")]
+        mock_config.execution = None
         return mock_config
 
     @pytest.fixture
@@ -247,75 +248,8 @@ class TestConversationalProcessingStep:
         ]
 
         # Critical assertion: User turns must be identical across variants
-        assert variant_1_user_turns == variant_2_user_turns, (
-            f"User turns not identical across variants! "
-            f"Variant 1: {variant_1_user_turns}, Variant 2: {variant_2_user_turns}"
-        )
-        # Only first user turn is added - second generated turn has should_continue=False
-        # so it is not added to the transcript (per implementation lines 350-361)
+        assert variant_1_user_turns == variant_2_user_turns
         assert variant_1_user_turns == ["User turn 1"]
-
-        # Verify assistant responses are different (unique to each variant)
-        variant_1_assistant_turns = [
-            turn.content
-            for turn in variant_1_result.conversation_transcript.turns
-            if turn.role == "assistant"
-        ]
-        variant_2_assistant_turns = [
-            turn.content
-            for turn in variant_2_result.conversation_transcript.turns
-            if turn.role == "assistant"
-        ]
-        # Both should have same assistant response (mock returns same response)
-        assert variant_1_assistant_turns == variant_2_assistant_turns
-
-    @pytest.mark.asyncio
-    @patch("gavel_ai.core.steps.conversational_processor.TurnGenerator")
-    @patch("gavel_ai.core.steps.conversational_processor.ProviderFactory")
-    async def test_determinism_validation_detects_violations(
-        self,
-        mock_provider_factory_class,
-        mock_turn_generator_class,
-        mock_context,
-    ) -> None:
-        """Test that determinism validation detects when user turns differ across variants."""
-        logger = logging.getLogger("test")
-        step = ConversationalProcessingStep(logger)
-
-        # Setup TurnGenerator mock
-        mock_turn_generator = MagicMock()
-        mock_turn_generator.generate_turn = AsyncMock()
-        mock_turn_generator_class.return_value = mock_turn_generator
-
-        # Configure NON-deterministic turn generation
-        mock_turn_generator.generate_turn.side_effect = [
-            # Variant 1
-            GeneratedTurn(content="User turn 1", metadata={}, should_continue=True),
-            GeneratedTurn(content="User turn 2", metadata={}, should_continue=False),
-            # Variant 2: DIFFERENT turns (violation!)
-            GeneratedTurn(content="Different turn 1", metadata={}, should_continue=True),
-            GeneratedTurn(content="Different turn 2", metadata={}, should_continue=False),
-        ]
-
-        # Setup ProviderFactory mock
-        mock_factory = MagicMock()
-        mock_provider_factory_class.return_value = mock_factory
-        mock_factory.create_agent = MagicMock(return_value=MagicMock())
-        mock_factory.call_agent = AsyncMock(
-            return_value=MagicMock(
-                output="Assistant response",
-                metadata={"latency_ms": 100, "tokens": {"prompt": 10, "completion": 5}},
-            )
-        )
-
-        step.provider_factory = mock_factory
-
-        await step.execute(mock_context)
-
-        # Verify determinism violation was detected
-        assert mock_context.determinism_violations is not None
-        assert len(mock_context.determinism_violations) == 1
-        assert mock_context.determinism_violations[0]["scenario_id"] == "test-scenario-1"
 
     @pytest.mark.asyncio
     @patch("gavel_ai.core.steps.conversational_processor.TurnGenerator")

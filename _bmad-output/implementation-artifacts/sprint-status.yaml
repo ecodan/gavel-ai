@@ -162,9 +162,9 @@ development_status:
   # Goal: Implement core conversational processing with on-the-fly turn generation
   # ============================================================================
   epic-c-3: in-progress
-   c-3-1-create-turngenerator-interface-and-algorithm: done
-   c-3-2-implement-conversationalprocessingstep: ready-for-dev
-  c-3-3-support-multiple-variants-in-conversational-execution: ready-for-dev
+  c-3-1-create-turngenerator-interface-and-algorithm: done
+  c-3-2-implement-conversationalprocessingstep: done
+  c-3-3-support-multiple-variants-in-conversational-execution: done
   c-3-4-export-conversations-and-raw-results-to-jsonl: ready-for-dev
   c-3-5-implement-conversation-timeout-and-error-handling: ready-for-dev
   epic-c-3-retrospective: optional

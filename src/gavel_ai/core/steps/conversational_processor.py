@@ -11,13 +11,14 @@ Per TDD Conversational Evaluation: ConversationalProcessingStep is a Step,
 following the same pattern as ScenarioProcessorStep for OneShot.
 """
 
+import asyncio
 import logging
 import time
 from datetime import UTC, datetime  # type: ignore[attr-defined]
 from typing import Any, Dict, List, Optional
 
 from gavel_ai.core.contexts import RunContext
-from gavel_ai.core.exceptions import ConfigError, ProcessorError
+from gavel_ai.core.exceptions import ConfigError
 from gavel_ai.core.steps.base import Step, StepPhase
 from gavel_ai.models.agents import ModelDefinition
 from gavel_ai.models.config import ConversationalConfig
@@ -28,6 +29,7 @@ from gavel_ai.models.conversation import (
     TurnMetadata,
     TurnResult,
 )
+from gavel_ai.models.runtime import OutputRecord
 from gavel_ai.processors.turn_generator import TurnGenerator
 from gavel_ai.providers.factory import ProviderFactory
 
@@ -108,48 +110,63 @@ class ConversationalProcessingStep(Step):
             agents_config, conv_config.turn_generator.model_id
         )
 
-        # Get test subject model definition (first variant)
-        # For conversational, we test each variant against the scenarios
-        self.logger.info(
-            f"Executing {len(scenarios)} scenarios × {len(variants)} variants "
-            f"(max_turns={conv_config.max_turns})"
-        )
+        # Resolve all variants to their model definitions and prompt references
+        # Per AC #1: one entry per agent with: id, model_id, model_def, prompt_ref
+        resolved_variants = []
+        for v_id in variants:
+            try:
+                m_def, p_ref = self._resolve_variant(agents_config, v_id)
+                resolved_variants.append({"id": v_id, "model_def": m_def, "prompt_ref": p_ref})
+            except ConfigError as e:
+                self.logger.warning(f"Skipping variant '{v_id}': {e}")
+
+        if not resolved_variants:
+            raise ConfigError("No valid variants could be resolved from eval_config")
+
+        # Get concurrency limits
+        max_concurrent = eval_config.execution.max_concurrent if eval_config.execution else 5
+        semaphore = asyncio.Semaphore(max_concurrent)
 
         # Execute conversations
-        all_results: List[ConversationResult] = []
-        determinism_violations: List[Dict[str, Any]] = []
+        self.logger.info(
+            f"Executing {len(scenarios)} scenarios × {len(variants)} variants "
+            f"(concurrency={max_concurrent})"
+        )
 
-        for scenario in scenarios:
-            # Create ONE TurnGenerator per scenario (shared across all variants)
-            # This ensures deterministic user turns across variants (AC #2)
-            turn_generator = TurnGenerator(
-                scenario=scenario,
-                model_def=turn_gen_model_def,
-                max_turns=conv_config.max_turns,
-            )
-
-            scenario_results: List[ConversationResult] = []
-
-            for variant_id in variants:
-                # Get model definition for this variant
-                variant_model_def = self._get_model_definition(agents_config, variant_id)
-
-                # Execute conversation
-                result = await self._execute_conversation(
+        async def _run_scenario(scenario: ConversationScenario) -> List[ConversationResult]:
+            async with semaphore:
+                # Create ONE TurnGenerator per scenario (shared across all variants)
+                # This ensures deterministic user turns across variants (AC #2)
+                turn_generator = TurnGenerator(
                     scenario=scenario,
-                    variant_id=variant_id,
-                    model_def=variant_model_def,
+                    model_def=turn_gen_model_def,
+                    max_turns=conv_config.max_turns,
+                )
+                return await self._execute_scenario_variants(
+                    context=context,
+                    scenario=scenario,
+                    variants=resolved_variants,
                     turn_generator=turn_generator,
                     max_turns=conv_config.max_turns,
                 )
-                scenario_results.append(result)
 
-            # Validate determinism across variants for this scenario
-            violation = self._validate_determinism(scenario.scenario_id, scenario_results)
-            if violation:
-                determinism_violations.append(violation)
+        # Gather results for all scenarios in parallel
+        scenario_tasks = [_run_scenario(s) for s in scenarios]
+        scenario_results_lists = await asyncio.gather(*scenario_tasks)
 
+        # Aggregate results
+        all_results: List[ConversationResult] = []
+        determinism_violations: List[Dict[str, Any]] = []
+
+        for scenario_results in scenario_results_lists:
             all_results.extend(scenario_results)
+            # Validate determinism across variants for this scenario
+            if scenario_results:
+                violation = self._validate_determinism(
+                    scenario_results[0].scenario_id, scenario_results
+                )
+                if violation:
+                    determinism_violations.append(violation)
 
         # Store results in context
         context.conversation_results = all_results
@@ -212,6 +229,47 @@ class ConversationalProcessingStep(Step):
 
         return scenarios
 
+    def _resolve_variant(
+        self, agents_config: dict, variant_id: str
+    ) -> tuple[ModelDefinition, Optional[str]]:
+        """
+        Resolve variant ID to ModelDefinition and prompt reference.
+
+        Args:
+            agents_config: The agents configuration dict
+            variant_id: Variant ID to look up (can be model name or agent name)
+
+        Returns:
+            Tuple of (ModelDefinition, prompt_ref)
+
+        Raises:
+            ConfigError: If variant not found or invalid
+        """
+        models = agents_config.get("_models", {})
+
+        # 1. Check if it's an agent name (has priority)
+        if variant_id in agents_config and variant_id != "_models":
+            agent = agents_config[variant_id]
+            model_id = agent.get("model_id")
+            if not model_id or model_id not in models:
+                raise ConfigError(
+                    f"Agent '{variant_id}' model_id '{model_id}' not found in _models"
+                )
+
+            prompt_ref = agent.get("prompt")
+            model_def = ModelDefinition.model_validate(models[model_id])
+            return model_def, prompt_ref
+
+        # 2. Check if it's a direct model name
+        if variant_id in models:
+            model_def = ModelDefinition.model_validate(models[variant_id])
+            return model_def, None
+
+        raise ConfigError(
+            f"Variant '{variant_id}' not found in _models or agents - "
+            f"Add '{variant_id}' to agents.json"
+        )
+
     def _get_model_definition(self, agents_config: dict, model_id: str) -> ModelDefinition:
         """
         Get model definition from agents config.
@@ -226,201 +284,241 @@ class ConversationalProcessingStep(Step):
         Raises:
             ConfigError: If model not found
         """
-        models = agents_config.get("_models", {})
+        m_def, _ = self._resolve_variant(agents_config, model_id)
+        return m_def
 
-        # Check if it's a direct model name
-        if model_id in models:
-            return ModelDefinition.model_validate(models[model_id])
-
-        # Check if it's an agent name that references a model
-        if model_id in agents_config:
-            agent = agents_config[model_id]
-            referenced_model_id = agent.get("model_id")
-            if referenced_model_id and referenced_model_id in models:
-                return ModelDefinition.model_validate(models[referenced_model_id])
-
-        raise ConfigError(
-            f"Model '{model_id}' not found in _models or agents - "
-            f"Add '{model_id}' to _models section of agents.json"
-        )
-
-    async def _execute_conversation(
+    async def _execute_scenario_variants(
         self,
+        context: RunContext,
         scenario: ConversationScenario,
-        variant_id: str,
-        model_def: ModelDefinition,
+        variants: List[dict],
         turn_generator: TurnGenerator,
         max_turns: int,
-    ) -> ConversationResult:
+    ) -> List[ConversationResult]:
         """
-        Execute a single conversation for given scenario and variant.
+        Execute a scenario against multiple variants in parallel turn-by-turn.
+
+        This ensures shared user turns are generated exactly once per turn
+        and used across all variants simultaneously.
 
         Args:
+            context: RunContext for saving results
             scenario: Conversation scenario to execute
-            variant_id: Variant ID being tested
-            model_def: Model definition for the test subject
+            variants: List of resolved variant dicts (id, model_def, prompt_ref)
             turn_generator: Shared TurnGenerator instance for this scenario
             max_turns: Maximum turns per conversation
 
         Returns:
-            ConversationResult with full transcript and turn results
+            List of ConversationResult (one per variant)
         """
         start_time = time.time()
+        v_ids = [v["id"] for v in variants]
 
-        # Create conversation state
-        conversation = ConversationState(
-            scenario_id=scenario.scenario_id,
-            variant_id=variant_id,
-            metadata=None,
+        # Get test subject name
+        eval_config = context.eval_context.eval_config.read()
+        test_subject = (
+            eval_config.test_subjects[0].prompt_name
+            if eval_config.test_subjects
+            else "conversational"
         )
 
-        # Create agent for this variant
-        agent = self.provider_factory.create_agent(model_def)
+        # Initialize conversation state for each variant
+        variant_convs: Dict[str, ConversationState] = {
+            v_id: ConversationState(
+                scenario_id=scenario.scenario_id,
+                variant_id=v_id,
+                metadata=None,
+            )
+            for v_id in v_ids
+        }
 
-        results_raw: List[TurnResult] = []
+        # Initialize results and agents for each variant
+        results_raw: Dict[str, List[TurnResult]] = {v_id: [] for v_id in v_ids}
+        variant_agents: Dict[str, Any] = {}
+        variant_errors: Dict[str, Optional[str]] = {v_id: None for v_id in v_ids}
+
+        for v in variants:
+            v_id = v["id"]
+            try:
+                # TODO: Pass system prompt from v["prompt_ref"] if supported by factory
+                variant_agents[v_id] = self.provider_factory.create_agent(v["model_def"])
+            except Exception as e:
+                variant_errors[v_id] = f"Agent setup failed: {str(e)}"
 
         try:
-            with self.tracer.start_as_current_span("conversation.execute") as span:
-                span.set_attribute("scenario_id", scenario.scenario_id)
-                span.set_attribute("variant_id", variant_id)
-                span.set_attribute("max_turns", max_turns)
+            # Generate initial user turn (once per scenario)
+            # Use the first variant's conversation state as initial context (it's empty)
+            generated_turn = await turn_generator.generate_turn(
+                scenario, list(variant_convs.values())[0]
+            )
 
-                # Generate initial user turn
-                generated_turn = await turn_generator.generate_turn(scenario, conversation)
-                # Ensure metadata is dict (may be None or empty dict)
-                turn_gen_metadata = generated_turn.metadata or {}
-                turn_metadata = TurnMetadata(
-                    tokens_prompt=(turn_gen_metadata.get("tokens") or {}).get("prompt"),
-                    tokens_completion=(turn_gen_metadata.get("tokens") or {}).get("completion"),
-                    latency_ms=turn_gen_metadata.get("latency_ms"),
-                    extra=turn_gen_metadata.get("extra"),
-                )
-                conversation.add_turn("user", generated_turn.content, turn_metadata)
+            # Extract common turn metadata
+            turn_gen_metadata = generated_turn.metadata or {}
+            user_turn_metadata = TurnMetadata(
+                tokens_prompt=(turn_gen_metadata.get("tokens") or {}).get("prompt"),
+                tokens_completion=(turn_gen_metadata.get("tokens") or {}).get("completion"),
+                latency_ms=turn_gen_metadata.get("latency_ms"),
+                extra=turn_gen_metadata.get("extra"),
+            )
 
-                # Main conversation loop
-                # Note: turn_count tracks LLM calls (assistant responses)
-                # max_turns limits the number of LLM calls, not total turns
-                # Total turns = 1 initial user turn + (turn_count * 2)
-                turn_count = 0
-                while generated_turn.should_continue and turn_count < max_turns:
-                    turn_count += 1
+            # Add initial user turn to all variants
+            for conv in variant_convs.values():
+                conv.add_turn("user", generated_turn.content, user_turn_metadata)
 
-                    # Call LLM (Test Subject) for assistant response
-                    assistant_start = time.time()
-                    result = await self.provider_factory.call_agent(
-                        agent,
-                        conversation.history,
-                    )
-                    assistant_response = result.output
-                    assistant_latency = result.metadata.get(
-                        "latency_ms", int((time.time() - assistant_start) * 1000)
-                    )
+            turn_count = 0
+            while generated_turn.should_continue and turn_count < max_turns:
+                turn_count += 1
 
-                    # Extract token information
-                    tokens_prompt = result.metadata.get("tokens", {}).get("prompt", 0)
-                    tokens_completion = result.metadata.get("tokens", {}).get("completion", 0)
+                # Execute assistant responses in parallel for all variants
+                assistant_tasks = []
+                active_variants = [v_id for v_id in v_ids if not variant_errors[v_id]]
 
-                    # Add assistant turn to transcript
-                    conversation.add_turn(
+                if not active_variants:
+                    break
+
+                for v_id in active_variants:
+                    agent = variant_agents[v_id]
+                    conv = variant_convs[v_id]
+                    assistant_tasks.append(self.provider_factory.call_agent(agent, conv.history))
+
+                assistant_responses = await asyncio.gather(*assistant_tasks, return_exceptions=True)
+
+                # Process results for each variant
+                for v_id, response in zip(active_variants, assistant_responses, strict=False):
+                    conv = variant_convs[v_id]
+
+                    if isinstance(response, BaseException):
+                        self.logger.error(f"Assistant call failed for variant {v_id}: {response}")
+                        variant_errors[v_id] = f"Assistant call failed: {str(response)}"
+                        continue
+
+                    # Success: extract and add assistant response
+                    assistant_response = response.output
+                    meta = response.metadata
+
+                    tokens_p = meta.get("tokens", {}).get("prompt", 0)
+                    tokens_c = meta.get("tokens", {}).get("completion", 0)
+                    latency = meta.get("latency_ms", 0)
+
+                    conv.add_turn(
                         "assistant",
                         assistant_response,
                         TurnMetadata(
-                            latency_ms=assistant_latency,
-                            tokens_prompt=tokens_prompt,
-                            tokens_completion=tokens_completion,
-                            extra=None,
+                            latency_ms=latency,
+                            tokens_prompt=tokens_p,
+                            tokens_completion=tokens_c,
                         ),
                     )
 
-                    # Create TurnResult for assistant's output
+                    # Store in TurnResult (in-memory)
                     turn_result = TurnResult(
-                        turn_number=len(conversation.turns) - 1,
+                        turn_number=len(conv.turns) - 1,
                         processor_output=assistant_response,
-                        latency_ms=assistant_latency,
-                        tokens_prompt=tokens_prompt,
-                        tokens_completion=tokens_completion,
-                        error=None,
+                        latency_ms=latency,
+                        tokens_prompt=tokens_p,
+                        tokens_completion=tokens_c,
+                        scenario_id=scenario.scenario_id,
+                        variant_id=v_id,
                     )
-                    results_raw.append(turn_result)
+                    results_raw[v_id].append(turn_result)
 
-                    # Generate next user turn
-                    generated_turn = await turn_generator.generate_turn(scenario, conversation)
-
-                    # Add user turn to transcript if continuing
-                    if generated_turn.should_continue:
-                        # Ensure metadata is dict (may be None or empty dict)
-                        turn_gen_metadata = generated_turn.metadata or {}
-                        turn_metadata = TurnMetadata(
-                            tokens_prompt=(turn_gen_metadata.get("tokens") or {}).get("prompt"),
-                            tokens_completion=(turn_gen_metadata.get("tokens") or {}).get(
-                                "completion"
-                            ),
-                            latency_ms=turn_gen_metadata.get("latency_ms"),
-                            extra=turn_gen_metadata.get("extra"),
+                    # Persist to results_raw (one per turn per variant)
+                    context.results_raw.append(
+                        OutputRecord(
+                            test_subject=test_subject,
+                            variant_id=v_id,
+                            scenario_id=scenario.scenario_id,
+                            processor_output=assistant_response,
+                            timing_ms=latency,
+                            tokens_prompt=tokens_p,
+                            tokens_completion=tokens_c,
+                            timestamp=datetime.now(UTC).isoformat(),
                         )
-                        conversation.add_turn("user", generated_turn.content, turn_metadata)
+                    )
 
-                # Finalize conversation result
-                duration_ms = int((time.time() - start_time) * 1000)
-                completed = not generated_turn.should_continue or turn_count >= max_turns
+                # Generate next user turn (shared)
+                # Use FIRST variant's history for coherence as authoritative history
+                # We only pick a variant that hasn't failed yet
+                lead_v_id = next((v_id for v_id in v_ids if not variant_errors[v_id]), None)
+                if not lead_v_id:
+                    break
+
+                generated_turn = await turn_generator.generate_turn(
+                    scenario, variant_convs[lead_v_id]
+                )
+
+                if generated_turn.should_continue:
+                    # Extract turn metadata
+                    turn_gen_metadata = generated_turn.metadata or {}
+                    user_turn_metadata = TurnMetadata(
+                        tokens_prompt=(turn_gen_metadata.get("tokens") or {}).get("prompt"),
+                        tokens_completion=(turn_gen_metadata.get("tokens") or {}).get("completion"),
+                        latency_ms=turn_gen_metadata.get("latency_ms"),
+                        extra=turn_gen_metadata.get("extra"),
+                    )
+                    # Add user turn to all active variants
+                    for v_id in active_variants:
+                        if not variant_errors[v_id]:
+                            variant_convs[v_id].add_turn(
+                                "user", generated_turn.content, user_turn_metadata
+                            )
+
+            # Finalize results for all variants
+            final_results = []
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            for v_id in v_ids:
+                conv = variant_convs[v_id]
+                error = variant_errors[v_id]
 
                 # Compute total tokens
                 tokens_total = sum(
-                    (r.tokens_prompt or 0) + (r.tokens_completion or 0) for r in results_raw
+                    (r.tokens_prompt or 0) + (r.tokens_completion or 0) for r in results_raw[v_id]
                 )
 
-                span.set_attribute("total_turns", len(conversation.turns))
-                span.set_attribute("completed", completed)
-                span.set_attribute("tokens_total", tokens_total)
-
-                return ConversationResult(
+                final_result = ConversationResult(
                     scenario_id=scenario.scenario_id,
-                    variant_id=variant_id,
-                    conversation_transcript=conversation,
-                    results_raw=results_raw,
+                    variant_id=v_id,
+                    conversation_transcript=conv,
+                    results_raw=results_raw[v_id],
                     duration_ms=duration_ms,
-                    completed=completed,
+                    completed=(
+                        not generated_turn.should_continue or turn_count >= max_turns
+                        if not error
+                        else False
+                    ),
                     tokens_total=tokens_total,
-                    error=None,
+                    error=error,
                     timestamp=datetime.now(UTC),
                 )
+                final_results.append(final_result)
 
-        except (ProcessorError, ConfigError) as e:
-            # Expected errors (LLM failures, config issues)
-            duration_ms = int((time.time() - start_time) * 1000)
-            self.logger.error(
-                f"Conversation failed for scenario={scenario.scenario_id} "
-                f"variant={variant_id}: {type(e).__name__}: {e}"
-            )
-            return ConversationResult(
-                scenario_id=scenario.scenario_id,
-                variant_id=variant_id,
-                conversation_transcript=conversation,
-                results_raw=results_raw,
-                duration_ms=duration_ms,
-                completed=False,
-                tokens_total=0,
-                error=str(e),
-                timestamp=datetime.now(UTC),
-            )
+                # Persist full transcript to conversations.jsonl
+                context.conversations.append(final_result)
+
+            return final_results
+
         except Exception as e:
-            # Unexpected errors (programming bugs, unexpected exceptions)
+            self.logger.exception(f"Fatal error in scenario {scenario.scenario_id} execution")
+            # Fallback for catastrophic failure
             duration_ms = int((time.time() - start_time) * 1000)
-            self.logger.exception(
-                f"UNEXPECTED ERROR in conversation: "
-                f"scenario={scenario.scenario_id} variant={variant_id}"
-            )
-            return ConversationResult(
-                scenario_id=scenario.scenario_id,
-                variant_id=variant_id,
-                conversation_transcript=conversation,
-                results_raw=results_raw,
-                duration_ms=duration_ms,
-                completed=False,
-                tokens_total=0,
-                error=f"Unexpected error: {type(e).__name__}: {e}",
-                timestamp=datetime.now(UTC),
-            )
+            fallback_results = [
+                ConversationResult(
+                    scenario_id=scenario.scenario_id,
+                    variant_id=v_id,
+                    conversation_transcript=variant_convs[v_id],
+                    results_raw=results_raw[v_id],
+                    duration_ms=duration_ms,
+                    completed=False,
+                    tokens_total=0,
+                    error=f"Catastrophic failure: {str(e)}",
+                    timestamp=datetime.now(UTC),
+                )
+                for v_id in v_ids
+            ]
+            for r in fallback_results:
+                context.conversations.append(r)
+            return fallback_results
 
     def _validate_determinism(
         self, scenario_id: str, results: List[ConversationResult]

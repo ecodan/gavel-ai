@@ -25,7 +25,7 @@ from gavel_ai.core.adapters.data_sources import (
     StructDataSource,
 )
 from gavel_ai.core.exceptions import ResourceNotFoundError
-from gavel_ai.models import EvalConfig, OutputRecord, Scenario
+from gavel_ai.models import ConversationResult, EvalConfig, OutputRecord, Scenario
 from gavel_ai.models.runtime import JudgedRecord
 from gavel_ai.telemetry.metadata import RunMetadataSchema, TelemetrySpan
 
@@ -139,6 +139,11 @@ class RunContext(ABC):
     @abstractmethod
     def reports(self) -> MultiFormatDataSource:
         """Reports in multiple formats data source."""
+
+    @property
+    @abstractmethod
+    def conversations(self) -> RecordDataSource[ConversationResult]:
+        """Full conversation transcripts data source."""
 
     @property
     @abstractmethod
@@ -371,7 +376,7 @@ class LocalRunContext(RunContext):
 
     def __init__(
         self,
-        eval_ctx: EvalContext,
+        eval_ctx: LocalFileSystemEvalContext,
         base_dir: Path = Path(".gavel/runs"),
         run_id: Optional[str] = None,
     ):
@@ -451,6 +456,13 @@ class LocalRunContext(RunContext):
             self._storage,
             f"{self._run_id}/run_metadata.json",
             schema=RunMetadataSchema,
+        )
+
+        # Conversations - JSONL with schema validation
+        self._conversations = RecordDataSource(
+            self._storage,
+            f"{self._run_id}/conversations.jsonl",
+            schema=ConversationResult,
         )
 
         # Reports - multiple formats (html, md, pdf)
@@ -550,6 +562,15 @@ class LocalRunContext(RunContext):
         Reporter writes metadata via: run_ctx.run_metadata.write(metadata)
         """
         return self._run_metadata
+
+    @property
+    def conversations(self) -> RecordDataSource[ConversationResult]:
+        """
+        Full conversation transcripts data source.
+
+        Steps write transcripts via: run_ctx.conversations.append(result)
+        """
+        return self._conversations
 
     @property
     def reports(self) -> MultiFormatDataSource:

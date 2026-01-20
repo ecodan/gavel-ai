@@ -367,6 +367,8 @@ class TurnResult(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     turn_number: int = Field(..., ge=0, description="Turn number this result corresponds to")
+    scenario_id: Optional[str] = Field(None, description="Scenario identifier")
+    variant_id: Optional[str] = Field(None, description="Variant identifier")
     processor_output: str = Field(..., description="Assistant response (processor output)")
     latency_ms: int = Field(..., ge=0, description="Processing time in milliseconds")
     tokens_prompt: Optional[int] = Field(None, description="Number of prompt tokens")
