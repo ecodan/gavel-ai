@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """Unit tests for CLI entry point and command structure."""
 
 from typer.testing import CliRunner

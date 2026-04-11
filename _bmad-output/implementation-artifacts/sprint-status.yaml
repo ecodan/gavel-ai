@@ -161,12 +161,12 @@ development_status:
   # EPIC C3: Multi-Turn Execution (Conversational)
   # Goal: Implement core conversational processing with on-the-fly turn generation
   # ============================================================================
-  epic-c-3: in-progress
+  epic-c-3: done
   c-3-1-create-turngenerator-interface-and-algorithm: done
   c-3-2-implement-conversationalprocessingstep: done
   c-3-3-support-multiple-variants-in-conversational-execution: done
   c-3-4-export-conversations-and-raw-results-to-jsonl: done
-  c-3-5-implement-conversation-timeout-and-error-handling: ready-for-dev
+  c-3-5-implement-conversation-timeout-and-error-handling: done
   epic-c-3-retrospective: optional
 
   # ============================================================================
@@ -241,7 +241,7 @@ summary:
   retrospectives_total: 15
   items_total: 114
   status_breakdown:
-    done: 45
+    done: 46
     review: 0
     in-progress: 0
     ready-for-dev: 33
@@ -258,7 +258,7 @@ summary:
     epic-7: backlog (8/9 stories done, 1 backlog)
     epic-c-1: done (5/5 stories)
     epic-c-2: done (3/3 stories)
-    epic-c-3: ready-for-dev (5/5 stories)
+    epic-c-3: done (5/5 stories)
     epic-c-4: ready-for-dev (5/5 stories)
     epic-c-5: ready-for-dev (2/2 stories)
     epic-c-6: ready-for-dev (4/4 stories)

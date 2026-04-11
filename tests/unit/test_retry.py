@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """Tests for retry logic utilities."""
 
 from unittest.mock import AsyncMock

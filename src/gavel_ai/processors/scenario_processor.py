@@ -46,16 +46,19 @@ class ScenarioProcessor(InputProcessor):
         aggregated_metadata: Dict[str, Any] = {"turns": len(inputs)}
 
         for turn_idx, input_item in enumerate(inputs):
+            # Create a deep copy to avoid mutating the original input
+            turn_input = input_item.model_copy(deep=True)
+
             # Add context from previous turns to current input
             if conversation_history:
-                input_item.metadata["conversation_history"] = conversation_history
+                turn_input.metadata["conversation_history"] = conversation_history
 
             # Process current turn
-            result = await self.inner_processor.process([input_item])
+            result = await self.inner_processor.process([turn_input])
 
             # Store turn in conversation history
             conversation_history.append(
-                {"turn": turn_idx + 1, "input": input_item.text, "output": result.output}
+                {"turn": turn_idx + 1, "input": turn_input.text, "output": result.output}
             )
 
             all_outputs.append(f"Turn {turn_idx + 1}: {result.output}")

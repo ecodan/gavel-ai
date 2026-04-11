@@ -29,9 +29,12 @@ from gavel_ai.models.conversation import (
     TurnMetadata,
     TurnResult,
 )
+from gavel_ai.conversational.errors import classify_error
+from gavel_ai.core.execution.retry_logic import call_with_retry
 from gavel_ai.models.runtime import OutputRecord
 from gavel_ai.processors.turn_generator import TurnGenerator
 from gavel_ai.providers.factory import ProviderFactory
+from gavel_ai.telemetry import get_tracer
 
 
 class ConversationalProcessingStep(Step):
@@ -57,6 +60,7 @@ class ConversationalProcessingStep(Step):
         """
         super().__init__(logger)
         self.provider_factory = ProviderFactory()
+        self.tracer = get_tracer(__name__)
 
     @property
     def phase(self) -> StepPhase:
@@ -147,7 +151,7 @@ class ConversationalProcessingStep(Step):
                     scenario=scenario,
                     variants=resolved_variants,
                     turn_generator=turn_generator,
-                    max_turns=conv_config.max_turns,
+                    conv_config=conv_config,
                 )
 
         # Gather results for all scenarios in parallel
@@ -293,7 +297,7 @@ class ConversationalProcessingStep(Step):
         scenario: ConversationScenario,
         variants: List[dict],
         turn_generator: TurnGenerator,
-        max_turns: int,
+        conv_config: ConversationalConfig,
     ) -> List[ConversationResult]:
         """
         Execute a scenario against multiple variants in parallel turn-by-turn.
@@ -346,11 +350,50 @@ class ConversationalProcessingStep(Step):
                 variant_errors[v_id] = f"Agent setup failed: {str(e)}"
 
         try:
-            # Generate initial user turn (once per scenario)
-            # Use the first variant's conversation state as initial context (it's empty)
-            generated_turn = await turn_generator.generate_turn(
-                scenario, list(variant_convs.values())[0]
-            )
+            try:
+                # Generate initial user turn (once per scenario)
+                # Use the first variant's conversation state as initial context (it's empty)
+                generated_turn, retry_count = await call_with_retry(
+                    lambda: turn_generator.generate_turn(scenario, list(variant_convs.values())[0]),
+                    conv_config.retry_config,
+                )
+
+                # Record turn generation telemetry
+                with self.tracer.start_as_current_span("initial_turn_generation") as span:
+                    span.set_attribute("scenario_id", scenario.scenario_id)
+                    span.set_attribute("retry_count", retry_count)
+            except Exception as e:
+                error_type, _ = classify_error(e)
+                error_msg = f"Initial turn generation failed: {str(e)}"
+                self.logger.error(error_msg)
+                
+                # Record telemetry
+                with self.tracer.start_as_current_span("initial_turn_generation_error") as span:
+                    span.record_exception(e)
+                    span.set_attribute("error_type", error_type)
+                    span.set_attribute("scenario_id", scenario.scenario_id)
+                    span.set_attribute("retry_count", conv_config.retry_config.max_retries)
+
+                # Persist to results_raw for all variants
+                for v_id in v_ids:
+                    context.results_raw.append(
+                        OutputRecord(
+                            test_subject=test_subject,
+                            variant_id=v_id,
+                            scenario_id=scenario.scenario_id,
+                            processor_output="",
+                            timing_ms=0,
+                            tokens_prompt=0,
+                            tokens_completion=0,
+                            error=error_msg,
+                            timestamp=datetime.now(UTC).isoformat(),
+                            metadata={
+                                "turn_number": 0,
+                                "error_type": error_type,
+                            },
+                        )
+                    )
+                raise # Re-raise to be caught by scenario-level handler which handles variant_errors and fallback results
 
             # Extract common turn metadata
             turn_gen_metadata = generated_turn.metadata or {}
@@ -366,7 +409,7 @@ class ConversationalProcessingStep(Step):
                 conv.add_turn("user", generated_turn.content, user_turn_metadata)
 
             turn_count = 0
-            while generated_turn.should_continue and turn_count < max_turns:
+            while generated_turn.should_continue and turn_count < conv_config.max_turns:
                 turn_count += 1
 
                 # Execute assistant responses in parallel for all variants
@@ -379,22 +422,57 @@ class ConversationalProcessingStep(Step):
                 for v_id in active_variants:
                     agent = variant_agents[v_id]
                     conv = variant_convs[v_id]
-                    assistant_tasks.append(self.provider_factory.call_agent(agent, conv.history))
+                    task = call_with_retry(
+                        lambda a=agent, c=conv: self.provider_factory.call_agent(a, c.history),
+                        conv_config.retry_config,
+                    )
+                    assistant_tasks.append(task)
 
-                assistant_responses = await asyncio.gather(*assistant_tasks, return_exceptions=True)
+                assistant_results = await asyncio.gather(*assistant_tasks, return_exceptions=True)
 
                 # Process results for each variant
-                for v_id, response in zip(active_variants, assistant_responses, strict=False):
+                for v_id, response in zip(active_variants, assistant_results, strict=False):
                     conv = variant_convs[v_id]
 
                     if isinstance(response, BaseException):
+                        error_type, _ = classify_error(response)
                         self.logger.error(f"Assistant call failed for variant {v_id}: {response}")
-                        variant_errors[v_id] = f"Assistant call failed: {str(response)}"
+                        error_msg = f"Assistant call failed: {str(response)}"
+                        variant_errors[v_id] = error_msg
+
+                        # Task 6: Add Telemetry for Errors
+                        with self.tracer.start_as_current_span("assistant_call_error") as span:
+                            span.record_exception(response)
+                            span.set_attribute("error_type", error_type)
+                            span.set_attribute("scenario_id", scenario.scenario_id)
+                            span.set_attribute("variant_id", v_id)
+                            span.set_attribute("turn_number", len(conv.turns))
+                            span.set_attribute("retry_count", conv_config.retry_config.max_retries)
+
+                        # Task 5: Track Errors in results_raw
+                        context.results_raw.append(
+                            OutputRecord(
+                                test_subject=test_subject,
+                                variant_id=v_id,
+                                scenario_id=scenario.scenario_id,
+                                processor_output="",
+                                timing_ms=0,
+                                tokens_prompt=0,
+                                tokens_completion=0,
+                                error=error_msg,
+                                timestamp=datetime.now(UTC).isoformat(),
+                                metadata={
+                                    "turn_number": len(conv.turns),
+                                    "error_type": error_type,
+                                },
+                            )
+                        )
                         continue
 
                     # Success: extract and add assistant response
-                    assistant_response = response.output
-                    meta = response.metadata
+                    actual_response, retry_count = response
+                    assistant_response = actual_response.output
+                    meta = actual_response.metadata
 
                     tokens_p = meta.get("tokens", {}).get("prompt", 0)
                     tokens_c = meta.get("tokens", {}).get("completion", 0)
@@ -409,6 +487,12 @@ class ConversationalProcessingStep(Step):
                             tokens_completion=tokens_c,
                         ),
                     )
+
+                    # Add success telemetry with retry count
+                    with self.tracer.start_as_current_span("assistant_call_success") as span:
+                        span.set_attribute("scenario_id", scenario.scenario_id)
+                        span.set_attribute("variant_id", v_id)
+                        span.set_attribute("retry_count", retry_count)
 
                     # Store in TurnResult (in-memory)
                     turn_result = TurnResult(
@@ -444,9 +528,65 @@ class ConversationalProcessingStep(Step):
                 if not lead_v_id:
                     break
 
-                generated_turn = await turn_generator.generate_turn(
-                    scenario, variant_convs[lead_v_id]
-                )
+                # Check duration timeout (AC #1)
+                elapsed_ms = (time.time() - start_time) * 1000
+                if elapsed_ms >= conv_config.max_duration_ms:
+                    self.logger.warning(
+                        f"Scenario {scenario.scenario_id} timed out after {elapsed_ms:.0f}ms"
+                    )
+                    with self.tracer.start_as_current_span("conversation_timeout") as span:
+                        span.set_attribute("scenario_id", scenario.scenario_id)
+                        span.set_attribute("duration_ms", elapsed_ms)
+                        span.set_attribute("max_duration_ms", conv_config.max_duration_ms)
+                        span.set_attribute("turn_count", turn_count)
+                    break
+
+                try:
+                    generated_turn, retry_count = await call_with_retry(
+                        lambda: turn_generator.generate_turn(scenario, variant_convs[lead_v_id]),
+                        conv_config.retry_config,
+                    )
+
+                    # Record turn generation telemetry
+                    with self.tracer.start_as_current_span("turn_generation") as span:
+                        span.set_attribute("scenario_id", scenario.scenario_id)
+                        span.set_attribute("retry_count", retry_count)
+                        span.set_attribute("turn_number", turn_count)
+                except Exception as e:
+                    error_type, _ = classify_error(e)
+                    error_msg = f"Turn generation failed: {str(e)}"
+                    self.logger.error(error_msg)
+
+                    # Record telemetry
+                    with self.tracer.start_as_current_span("turn_generation_error") as span:
+                        span.record_exception(e)
+                        span.set_attribute("error_type", error_type)
+                        span.set_attribute("scenario_id", scenario.scenario_id)
+                        span.set_attribute("turn_number", turn_count)
+                        span.set_attribute("retry_count", conv_config.retry_config.max_retries)
+
+                    # Persist to results_raw for all active variants
+                    for v_id in active_variants:
+                        if not variant_errors[v_id]:
+                            variant_errors[v_id] = error_msg
+                            context.results_raw.append(
+                                OutputRecord(
+                                    test_subject=test_subject,
+                                    variant_id=v_id,
+                                    scenario_id=scenario.scenario_id,
+                                    processor_output="",
+                                    timing_ms=0,
+                                    tokens_prompt=0,
+                                    tokens_completion=0,
+                                    error=error_msg,
+                                    timestamp=datetime.now(UTC).isoformat(),
+                                    metadata={
+                                        "turn_number": turn_count,
+                                        "error_type": error_type,
+                                    },
+                                )
+                            )
+                    break
 
                 if generated_turn.should_continue:
                     # Extract turn metadata
@@ -484,7 +624,8 @@ class ConversationalProcessingStep(Step):
                     results_raw=results_raw[v_id],
                     duration_ms=duration_ms,
                     completed=(
-                        not generated_turn.should_continue or turn_count >= max_turns
+                        not generated_turn.should_continue
+                        or turn_count >= conv_config.max_turns
                         if not error
                         else False
                     ),
@@ -501,6 +642,13 @@ class ConversationalProcessingStep(Step):
 
         except Exception as e:
             self.logger.exception(f"Fatal error in scenario {scenario.scenario_id} execution")
+            
+            error_type, _ = classify_error(e)
+            with self.tracer.start_as_current_span("scenario_fatal_error") as span:
+                span.record_exception(e)
+                span.set_attribute("scenario_id", scenario.scenario_id)
+                span.set_attribute("error_type", error_type)
+
             # Fallback for catastrophic failure
             duration_ms = int((time.time() - start_time) * 1000)
             fallback_results = [

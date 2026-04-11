@@ -68,7 +68,9 @@ class OneShotWorkflow:
             ProcessorError: If a workflow step fails
         """
         # Create run context - generates run_id and sets up artifacts
-        run_ctx = LocalRunContext(eval_ctx=self.eval_ctx, base_dir=Path(".gavel/runs"))
+        run_ctx = LocalRunContext(
+            eval_ctx=self.eval_ctx, base_dir=self.eval_ctx.eval_dir / "runs"
+        )
         run_id = run_ctx.run_id
 
         # Run context automatically:
@@ -78,7 +80,7 @@ class OneShotWorkflow:
 
         # Configure telemetry (OpenTelemetry exporter)
         telemetry_path = configure_run_telemetry(
-            run_id=run_id, eval_name=self.eval_ctx.eval_name, base_dir=".gavel/runs"
+            run_id=run_id, eval_name=self.eval_ctx.eval_name, base_dir=str(self.eval_ctx.eval_root.parent)
         )
 
         # Initialize metadata collector

@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """
 Test module for processor base classes and interfaces (Story 3.1 - Task 2).
 

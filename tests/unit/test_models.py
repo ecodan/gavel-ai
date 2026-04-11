@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """
 Test module for core data models (Story 3.1 - Task 1).
 

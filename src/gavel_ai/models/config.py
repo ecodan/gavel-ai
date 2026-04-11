@@ -110,6 +110,17 @@ class ElaborationConfig(BaseModel):
     )
 
 
+class RetryConfig(BaseModel):
+    """Configuration for retry behavior."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    max_retries: int = Field(3, ge=0, le=10, description="Maximum number of retry attempts")
+    initial_delay_ms: int = Field(1000, ge=100, description="Initial delay in milliseconds")
+    max_delay_ms: int = Field(30000, ge=1000, description="Maximum delay in milliseconds")
+    backoff_factor: float = Field(2.0, ge=1.0, description="Exponential backoff factor")
+
+
 class ConversationalConfig(BaseModel):
     """Configuration for conversational evaluation workflow."""
 
@@ -125,8 +136,11 @@ class ConversationalConfig(BaseModel):
     elaboration: Optional[ElaborationConfig] = Field(
         None, description="Configuration for scenario elaboration"
     )
-    timeout_seconds: int = Field(
-        300, ge=30, le=3600, description="Timeout for entire conversation execution"
+    max_duration_ms: int = Field(
+        300000, ge=30000, le=3600000, description="Timeout for entire conversation execution"
+    )
+    retry_config: Optional[RetryConfig] = Field(
+        default_factory=RetryConfig, description="Configuration for retry behavior"
     )
 
 

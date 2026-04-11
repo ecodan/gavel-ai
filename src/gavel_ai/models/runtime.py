@@ -274,3 +274,60 @@ class JudgedRecord(BaseModel):
     reasoning: Optional[str] = Field(None, description="Judge's explanation (null if error)")
     error: Optional[str] = Field(None, description="Error message if judging failed")
     timestamp: str = Field(..., description="ISO 8601 timestamp of evaluation")
+
+
+class Turn(BaseModel):
+    """
+    Standardized conversation turn for reporting.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    role: str = Field(..., description="Role: 'user' or 'assistant'")
+    content: str = Field(..., description="Text content of the turn")
+    duration_ms: float = Field(0.0, description="Duration in milliseconds")
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class VariantResult(BaseModel):
+    """
+    Comparison variant result for a specific scenario.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    variant_id: str
+    turns: List[Turn] = Field(default_factory=list)
+    judgments: List[Dict[str, Any]] = Field(default_factory=list)
+    metrics: Dict[str, float] = Field(default_factory=dict)
+    output: Optional[str] = None
+    timing: Dict[str, float] = Field(default_factory=dict)
+
+
+class ScenarioResult(BaseModel):
+    """
+    Scenario-level aggregation of variants for comparison.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    scenario_id: str
+    system_input: Optional[str] = None
+    test_subject: Optional[str] = None
+    variants: Dict[str, VariantResult] = Field(default_factory=dict)
+
+
+class ReportData(BaseModel):
+    """
+    Unified evaluation report data structure.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    title: str
+    run_id: str
+    generated_at: datetime = Field(default_factory=datetime.now)
+    summary_metrics: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    performance_metrics: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    scenarios: List[ScenarioResult] = Field(default_factory=list)
+    scenarios_by_subject: Dict[str, List[ScenarioResult]] = Field(default_factory=dict)

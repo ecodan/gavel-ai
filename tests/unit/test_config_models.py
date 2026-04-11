@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """
 Unit tests for config models.
 """
@@ -577,7 +580,7 @@ class TestConversationalConfig:
         )
         assert config.max_turns == 10
         assert config.max_turn_length == 2000
-        assert config.timeout_seconds == 300
+        assert config.max_duration_ms == 300000
         assert config.elaboration is None
         assert config.turn_generator.model_id == "claude-standard"
 
@@ -593,14 +596,14 @@ class TestConversationalConfig:
             max_turn_length=3000,
             turn_generator=TurnGeneratorConfig(model_id="gpt-4", temperature=0.7),
             elaboration=ElaborationConfig(enabled=True, elaboration_template="template.toml"),
-            timeout_seconds=600,
+            max_duration_ms=600000,
         )
         assert config.max_turns == 15
         assert config.max_turn_length == 3000
         assert config.turn_generator.model_id == "gpt-4"
         assert config.turn_generator.temperature == 0.7
         assert config.elaboration.enabled is True
-        assert config.timeout_seconds == 600
+        assert config.max_duration_ms == 600000
 
     def test_conversational_config_max_turns_validation(self):
         """ConversationalConfig validates max_turns range (1-100)."""
@@ -637,21 +640,21 @@ class TestConversationalConfig:
             ConversationalConfig(turn_generator=turn_gen, max_turn_length=10001)
 
     def test_conversational_config_timeout_validation(self):
-        """ConversationalConfig validates timeout_seconds range (30-3600)."""
+        """ConversationalConfig validates max_duration_ms range (30000-3600000)."""
         from gavel_ai.models.config import ConversationalConfig, TurnGeneratorConfig
 
         turn_gen = TurnGeneratorConfig(model_id="test")
 
         # Valid values
-        ConversationalConfig(turn_generator=turn_gen, timeout_seconds=30)
-        ConversationalConfig(turn_generator=turn_gen, timeout_seconds=3600)
+        ConversationalConfig(turn_generator=turn_gen, max_duration_ms=30000)
+        ConversationalConfig(turn_generator=turn_gen, max_duration_ms=3600000)
 
         # Invalid values
         with pytest.raises(ValidationError):
-            ConversationalConfig(turn_generator=turn_gen, timeout_seconds=29)
+            ConversationalConfig(turn_generator=turn_gen, max_duration_ms=29999)
 
         with pytest.raises(ValidationError):
-            ConversationalConfig(turn_generator=turn_gen, timeout_seconds=3601)
+            ConversationalConfig(turn_generator=turn_gen, max_duration_ms=3600001)
 
     def test_conversational_config_extra_ignore(self):
         """ConversationalConfig ignores extra fields."""
@@ -780,7 +783,7 @@ class TestEvalConfigConversationalExtension:
                     "max_tokens": 500,
                 },
                 "elaboration": {"enabled": True, "elaboration_template": "prompts/elaborate.toml"},
-                "timeout_seconds": 600,
+                "max_duration_ms": 600000,
             },
         }
 
@@ -809,7 +812,7 @@ class TestEvalConfigConversationalExtension:
             assert (
                 config.conversational.elaboration.elaboration_template == "prompts/elaborate.toml"
             )
-            assert config.conversational.timeout_seconds == 600
+            assert config.conversational.max_duration_ms == 600000
 
         finally:
             # Clean up temporary file

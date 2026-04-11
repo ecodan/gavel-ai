@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """
 Unit tests for multi-variant support in ConversationalProcessingStep (DEPRECATED).
 

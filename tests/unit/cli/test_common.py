@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """
 Unit tests for CLI common utilities and error handling.
 """

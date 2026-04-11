@@ -1,169 +1,174 @@
 """
 OneShot report generator.
 
-Generates reports for OneShot evaluations with winner indication,
-judge reasoning, and detailed results per scenario.
+Refactored to use the Unified Reporting Specification (Spec 4.1).
+Treats OneShot as a conversation of length 1.
 """
 
-from typing import Any, Dict, List
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from gavel_ai.models.runtime import ReporterConfig
+from gavel_ai.models.runtime import ReportData, ReporterConfig, ScenarioResult, Turn, VariantResult
 from gavel_ai.reporters.jinja_reporter import Jinja2Reporter
 
 
 class OneShotReporter(Jinja2Reporter):
     """
-    OneShot-specific report generator.
-
-    Extends Jinja2Reporter to add OneShot-specific features:
-    - Winner calculation based on total scores
-    - Judge list extraction
-    - Enhanced context formatting
+    OneShot-specific report generator using Unified Reporting Spec.
 
     Per Architecture Decision 8: Pluggable report formats with clean abstraction.
+    Aligns with Unified Reporting Spec v1.0.
     """
 
     def __init__(self, config: ReporterConfig):
         """
         Initialize OneShotReporter with configuration.
-
-        Args:
-            config: ReporterConfig with template_path and output_format
         """
         super().__init__(config)
 
     def _build_context(self, run: Any) -> Dict[str, Any]:
         """
         Build context dictionary for OneShot template rendering.
-
-        Extends parent _build_context() with OneShot-specific data:
-        - winner: Winning variant based on total scores
-        - judges: List of unique judges used in evaluation
-        - performance: Performance metrics from run metadata (timing, tokens, etc.)
-
-        Args:
-            run: Run instance with metadata, results, and telemetry
-
-        Returns:
-            Dict[str, Any]: Context dictionary with template variables
+        Converts OneShot results into the Unified ReportData format.
         """
-        # Get base context from parent
-        context = super()._build_context(run)
+        def get_val(obj, key, default=None):
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return getattr(obj, key, default)
 
-        # Add OneShot-specific context
-        context["winner"] = self._calculate_winner(context["summary"])
-        context["judges"] = self._extract_judges_list(run)
-        context["performance"] = self._extract_performance_metrics(run)
+        # Get run metadata
+        run_id = get_val(run, "run_id", "unknown")
+        title = get_val(run, "metadata", {}).get("eval_name", run_id)
+        
+        # Build scenarios mapping
+        scenario_map: Dict[str, ScenarioResult] = {}
+        
+        # Extract results from run
+        # results in Run are usually EvaluationResult objects
+        results = get_val(run, "results", [])
+        
+        # summary_metrics: {variant: {metric: score}}
+        summary_metrics: Dict[str, Dict[str, float]] = {}
+        performance_metrics: Dict[str, Dict[str, float]] = {}
 
-        return context
+        # First pass: Initialize scenario map and aggregate metrics
+        for result in results:
+            def get_val(obj, key, default=None):
+                if isinstance(obj, dict):
+                    return obj.get(key, default)
+                return getattr(obj, key, default)
 
-    def _calculate_winner(self, summary: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Calculate winning variant based on total scores.
+            scenario_id = get_val(result, "scenario_id", "unknown")
+            variant_id = get_val(result, "variant_id", "unknown")
+            subject_id = get_val(result, "subject_id") or get_val(result, "test_subject", "default")
+            
+            if scenario_id not in scenario_map:
+                scenario_map[scenario_id] = ScenarioResult(
+                    scenario_id=scenario_id,
+                    test_subject=subject_id,
+                    system_input=str(get_val(result, "scenario_input", ""))
+                )
+            
+            # Create VariantResult for this scenario
+            processor_output = get_val(result, "processor_output", "")
+            timing_ms = get_val(result, "timing_ms")
+            if timing_ms is None:
+                timing_ms = get_val(result, "metadata", {}).get("duration_ms", 0.0)
 
-        Args:
-            summary: Summary table with variant scores
+            timestamp = get_val(result, "timestamp")
+            if not timestamp:
+                timestamp = datetime.now().isoformat()
 
-        Returns:
-            Dict[str, Any]: Winner information with variant_id, total_score, avg_score, is_tie
-        """
-        if not summary:
-            return {
-                "variant_id": "N/A",
-                "total_score": 0,
-                "avg_score": 0,
-                "is_tie": False,
+            # Map judgments
+            judgments = []
+            for j in get_val(result, "judges", []):
+                j_id = get_val(j, "judge_id", "unknown")
+                j_score = get_val(j, "score", 0)
+                j_reasoning = get_val(j, "reasoning", "")
+                j_evidence = get_val(j, "evidence", "")
+
+                judgments.append({
+                    "judge_id": j_id,
+                    "score": j_score,
+                    "reasoning": j_reasoning,
+                    "evidence": j_evidence
+                })
+                
+                # Update summary_metrics
+                if variant_id not in summary_metrics:
+                    summary_metrics[variant_id] = {}
+                
+                metric_name = j_id
+                if metric_name not in summary_metrics[variant_id]:
+                    summary_metrics[variant_id][metric_name] = 0.0
+                
+                summary_metrics[variant_id][metric_name] += float(j_score)
+
+            # Build turns: OneShot is a 1-turn conversation (user input → assistant output)
+            turns = []
+            scenario_input_str = str(get_val(result, "scenario_input", "") or "")
+            if scenario_input_str:
+                turns.append(Turn(role="user", content=scenario_input_str))
+            if processor_output:
+                turns.append(Turn(
+                    role="assistant",
+                    content=str(processor_output),
+                    duration_ms=float(timing_ms or 0.0),
+                ))
+
+            variant_result = VariantResult(
+                variant_id=variant_id,
+                turns=turns,
+                output=str(processor_output),
+                judgments=judgments,
+                metrics={},
+                timing={"total_time": float(timing_ms or 0.0) / 1000.0}
+            )
+            
+            # Store in map
+            scenario_map[scenario_id].variants[variant_id] = variant_result
+
+        # Calculate averages for summary_metrics
+        variant_scenario_counts: Dict[str, int] = {}
+        for result in results:
+            vid = get_val(result, "variant_id", "unknown")
+            variant_scenario_counts[vid] = variant_scenario_counts.get(vid, 0) + 1
+
+        for variant, metrics in summary_metrics.items():
+            count = variant_scenario_counts.get(variant, 1)
+            for mname in metrics:
+                metrics[mname] /= count
+
+        # Populate performance_metrics
+        for variant, count in variant_scenario_counts.items():
+            total_timing = 0.0
+            for scenario in scenario_map.values():
+                if variant in scenario.variants:
+                    total_timing += scenario.variants[variant].timing.get("total_time", 0.0)
+            
+            performance_metrics[variant] = {
+                "avg_turn_time": total_timing / count if count > 0 else 0.0,
+                "total_time": total_timing
             }
 
-        # Sort by total score descending
-        sorted_summary = sorted(summary, key=lambda x: x["total_score"], reverse=True)
+        # Build scenarios_by_subject
+        scenarios_by_subject: Dict[str, List[ScenarioResult]] = {}
+        for scenario in scenario_map.values():
+            subj = scenario.test_subject or "default"
+            if subj not in scenarios_by_subject:
+                scenarios_by_subject[subj] = []
+            scenarios_by_subject[subj].append(scenario)
 
-        winner = sorted_summary[0]
-
-        # Check for tie: multiple variants with same top score
-        top_score = winner["total_score"]
-        tied_variants = [v for v in sorted_summary if v["total_score"] == top_score]
-        is_tie = len(tied_variants) > 1
-
-        return {
-            "variant_id": winner["variant_id"],
-            "total_score": winner["total_score"],
-            "avg_score": winner["avg_score"],
-            "is_tie": is_tie,
-        }
-
-    def _extract_judges_list(self, run: Any) -> List[Dict[str, str]]:
-        """
-        Extract unique judges from results.
-
-        Args:
-            run: Run instance with results
-
-        Returns:
-            List[Dict[str, str]]: List of judges with judge_id and judge_name
-        """
-        results = getattr(run, "results", [])
-
-        if not results:
-            return []
-
-        # Collect unique judge IDs
-        judge_ids = set()
-        judges = []
-
-        for result in results:
-            result_judges = result.get("judges", [])
-            for judge in result_judges:
-                judge_id = judge.get("judge_id", "unknown")
-                if judge_id not in judge_ids:
-                    judge_ids.add(judge_id)
-                    judges.append(
-                        {
-                            "judge_id": judge_id,
-                            "judge_name": judge_id,  # For now, name == id
-                        }
-                    )
-
-        return judges
-
-    def _extract_performance_metrics(self, run: Any) -> Dict[str, Any]:
-        """
-        Extract performance metrics from run metadata (Story 7.2).
-
-        Args:
-            run: Run instance with metadata
-
-        Returns:
-            Dict[str, Any]: Performance metrics for template rendering
-        """
-        import json
-        from pathlib import Path
-
-        # Try to load run_metadata.json if it exists
-        try:
-            # Check if run has run_dir attribute (LocalFilesystemRun)
-            run_dir = getattr(run, "run_dir", None)
-            if run_dir:
-                metadata_file = Path(run_dir) / "run_metadata.json"
-                if metadata_file.exists():
-                    with open(metadata_file, "r", encoding="utf-8") as f:
-                        metadata_data = json.load(f)
-                    return {
-                        "has_metrics": True,
-                        "total_duration_seconds": metadata_data.get("total_duration_seconds", 0),
-                        "scenario_timing": metadata_data.get("scenario_timing", {}),
-                        "llm_calls": metadata_data.get("llm_calls", {}),
-                        "execution": metadata_data.get("execution", {}),
-                    }
-        except Exception:
-            # If metadata file not found or parsing fails, continue with empty metrics
-            pass
-
-        # Return empty metrics structure if not found
-        return {
-            "has_metrics": False,
-            "total_duration_seconds": 0,
-            "scenario_timing": {},
-            "llm_calls": {},
-            "execution": {},
-        }
+        # Create ReportData object
+        report_data = ReportData(
+            title=title,
+            run_id=run_id,
+            generated_at=datetime.now(),
+            summary_metrics=summary_metrics,
+            performance_metrics=performance_metrics,
+            scenarios=list(scenario_map.values()),
+            scenarios_by_subject=scenarios_by_subject
+        )
+        
+        # Return as dict for Jinja2
+        return report_data.model_dump()

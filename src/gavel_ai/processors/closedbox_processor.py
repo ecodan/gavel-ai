@@ -4,6 +4,7 @@ ClosedBoxInputProcessor implementation for HTTP endpoint evaluation.
 Processes inputs by sending them to deployed in-situ systems via HTTP.
 """
 
+import json
 import time
 from typing import Any, Dict, List, Optional
 
@@ -106,7 +107,7 @@ class ClosedBoxInputProcessor(InputProcessor):
                     try:
                         response_data = response.json()
                         output = response_data.get("response", response.text)
-                    except Exception:
+                    except json.JSONDecodeError:
                         # If not JSON, use raw text
                         output = response.text
 
@@ -127,7 +128,7 @@ class ClosedBoxInputProcessor(InputProcessor):
                     ) from e
                 except ProcessorError:
                     raise
-                except Exception as e:
+                except httpx.RequestError as e:
                     raise ProcessorError(
                         f"Failed to process input {input_item.id}: {e} - "
                         f"Check endpoint response format and network connectivity"

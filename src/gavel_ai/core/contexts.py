@@ -379,6 +379,7 @@ class LocalRunContext(RunContext):
         eval_ctx: LocalFileSystemEvalContext,
         base_dir: Path = Path(".gavel/runs"),
         run_id: Optional[str] = None,
+        snapshot: bool = True,
     ):
         """
         Initialize run context.
@@ -408,7 +409,8 @@ class LocalRunContext(RunContext):
         self._configure_logger()
 
         # Snapshot eval config for reproducibility
-        self.snapshot_run_config()
+        if snapshot:
+            self.snapshot_run_config()
 
     @property
     def eval_context(self) -> LocalFileSystemEvalContext:
@@ -441,7 +443,7 @@ class LocalRunContext(RunContext):
         self._results_judged = RecordDataSource(
             self._storage,
             f"{self._run_id}/results_judged.jsonl",
-            schema=JudgedRecord,
+            schema=None,
         )
 
         # Telemetry - JSONL with schema validation

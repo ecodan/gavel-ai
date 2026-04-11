@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """Tests for automatic .env loading in CLI."""
 
 import sys

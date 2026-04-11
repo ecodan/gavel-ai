@@ -1,6 +1,6 @@
 # Story C-3-5: Implement Conversation Timeout and Error Handling
 
-**Status:** ready-for-dev
+**Status:** done
 
 ## Story
 
@@ -32,58 +32,58 @@ So that long conversations don't hang and errors are clearly reported.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement Max Turns Limit (AC: #1)
-  - [ ] Load max_turns from eval_config.conversational
-  - [ ] Track turn_number in conversation loop
-  - [ ] Break loop when turn_number >= max_turns
-  - [ ] Log: "Conversation reached max_turns limit"
+- [x] Task 1: Implement Max Turns Limit (AC: #1)
+  - [x] Load max_turns from eval_config.conversational
+  - [x] Track turn_number in conversation loop
+  - [x] Break loop when turn_number >= max_turns
+  - [x] Log: "Conversation reached max_turns limit"
 
-- [ ] Task 2: Implement Max Duration Limit (AC: #1)
-  - [ ] Load max_duration_ms from eval_config.conversational (default: 5 minutes)
-  - [ ] Track start_time when conversation begins
-  - [ ] Check elapsed_time in each loop iteration
-  - [ ] Break loop when elapsed_time >= max_duration_ms
-  - [ ] Log: "Conversation timeout reached {elapsed_ms}ms"
+- [x] Task 2: Implement Max Duration Limit (AC: #1)
+  - [x] Load max_duration_ms from eval_config.conversational (default: 5 minutes)
+  - [x] Track start_time when conversation begins
+  - [x] Check elapsed_time in each loop iteration
+  - [x] Break loop when elapsed_time >= max_duration_ms
+  - [x] Log: "Conversation timeout reached {elapsed_ms}ms"
 
-- [ ] Task 3: Wrap TurnGenerator with Error Handling (AC: #2)
-  - [ ] Wrap turn_generator.generate_turn() in try/except
-  - [ ] Catch exceptions: network errors, parsing errors, LLM errors
-  - [ ] Log error with context: scenario_id, variant_id, turn_number
-  - [ ] Set should_continue=False to end conversation
-  - [ ] Create error results_raw entry with error field populated
-  - [ ] Continue to next scenario × variant
+- [x] Task 3: Wrap TurnGenerator with Error Handling (AC: #2)
+  - [x] Wrap turn_generator.generate_turn() in try/except
+  - [x] Catch exceptions: network errors, parsing errors, LLM errors
+  - [x] Log error with context: scenario_id, variant_id, turn_number
+  - [x] Set should_continue=False to end conversation
+  - [x] Create error results_raw entry with error field populated
+  - [x] Continue to next scenario × variant
 
-- [ ] Task 4: Implement LLM Call Retry Logic (AC: #3)
-  - [ ] Wrap executor.run() LLM calls in retry wrapper (asyncio-retry or similar)
-  - [ ] Classify errors:
-    - [ ] Transient (timeout, rate limit, temporary service error) → Retry
-    - [ ] Permanent (auth failure, invalid request, 4xx errors) → Fail immediately
-  - [ ] Configure max_retries (default: 3)
-  - [ ] Exponential backoff: 1s, 2s, 4s, 8s (with jitter)
-  - [ ] Log retry attempts: "Retrying LLM call {attempt}/{max_retries}"
+- [x] Task 4: Implement LLM Call Retry Logic (AC: #3)
+  - [x] Wrap executor.run() LLM calls in retry wrapper (asyncio-retry or similar)
+  - [x] Classify errors:
+    - [x] Transient (timeout, rate limit, temporary service error) → Retry
+    - [x] Permanent (auth failure, invalid request, 4xx errors) → Fail immediately
+  - [x] Configure max_retries (default: 3)
+  - [x] Exponential backoff: 1s, 2s, 4s, 8s (with jitter)
+  - [x] Log retry attempts: "Retrying LLM call {attempt}/{max_retries}"
 
-- [ ] Task 5: Track Errors in Results (AC: #4)
-  - [ ] For failed turns, create results_raw entry with:
-    - [ ] error: str (error message)
-    - [ ] error_type: str (timeout, network, parsing, etc.)
-    - [ ] processor_output: null or partial output if available
-  - [ ] Maintain conversation transcript even with failed turns
-  - [ ] Continue execution to collect as much data as possible
+- [x] Task 5: Track Errors in Results (AC: #4)
+  - [x] For failed turns, create results_raw entry with:
+    - [x] error: str (error message)
+    - [x] error_type: str (timeout, network, parsing, etc.)
+    - [x] processor_output: null or partial output if available
+  - [x] Maintain conversation transcript even with failed turns
+  - [x] Continue execution to collect as much data as possible
 
-- [ ] Task 6: Add Telemetry for Errors (AC: #2, #3)
-  - [ ] Emit OT span: "conversation.error"
-  - [ ] Include: error_type, scenario_id, variant_id, turn_number
-  - [ ] Track: retry_count (if applicable), total_duration_ms
-  - [ ] Set span status to ERROR for failures
+- [x] Task 6: Add Telemetry for Errors (AC: #2, #3)
+  - [x] Emit OT span: "conversation.error"
+  - [x] Include: error_type, scenario_id, variant_id, turn_number
+  - [x] Track: retry_count (if applicable), total_duration_ms
+  - [x] Set span status to ERROR for failures
 
-- [ ] Task 7: Integration Tests (AC: #1, #2, #3, #4)
-  - [ ] Test max_turns enforcement: conversation stops at limit
-  - [ ] Test max_duration enforcement: conversation times out
-  - [ ] Test TurnGenerator failure handling: conversation marked failed, next scenario proceeds
-  - [ ] Test LLM call timeout with retry: eventual success after retries
-  - [ ] Test LLM call permanent failure: immediate failure, no retries
-  - [ ] Verify error entries in results_raw
-  - [ ] Verify error telemetry spans emitted
+- [x] Task 7: Integration Tests (AC: #1, #2, #3, #4)
+  - [x] Test max_turns enforcement: conversation stops at limit
+  - [x] Test max_duration enforcement: conversation times out
+  - [x] Test TurnGenerator failure handling: conversation marked failed, next scenario proceeds
+  - [x] Test LLM call timeout with retry: eventual success after retries
+  - [x] Test LLM call permanent failure: immediate failure, no retries
+  - [x] Verify error entries in results_raw
+  - [x] Verify error telemetry spans emitted
 
 ## Dev Notes
 
@@ -297,21 +297,26 @@ None yet - story not started
 
 ### Completion Notes List
 
-- [ ] Max turns limit implemented and tested
-- [ ] Max duration limit implemented and tested
-- [ ] TurnGenerator error handling working correctly
-- [ ] LLM call retry logic implemented with exponential backoff
-- [ ] Error classification (transient vs permanent) implemented
-- [ ] Error fields in results_raw populated correctly
-- [ ] Conversation continues gracefully on errors
-- [ ] Telemetry spans for errors emitted
-- [ ] Integration tests covering all error scenarios
-- [ ] All acceptance criteria verified
-- [ ] Code review completed
+- [x] Max turns limit implemented and tested
+- [x] Max duration limit implemented and tested
+- [x] TurnGenerator error handling working correctly
+- [x] LLM call retry logic implemented with exponential backoff
+- [x] Error classification (transient vs permanent) implemented
+- [x] Error fields in results_raw populated correctly
+- [x] Conversation continues gracefully on errors
+- [x] Telemetry spans for errors emitted
+- [x] Integration tests covering all error scenarios
+- [x] All acceptance criteria verified
+- [x] Code review completed
+- [x] Review Fixes: Telemetry retry_count corrected to reflect actual attempts
+- [x] Review Fixes: Added results_raw persistence for TurnGenerator failures
+- [x] Review Fixes: Aligned config name to `max_duration_ms` as per spec
+- [x] Review Fixes: Improved error classification robustness
 
 ### File List
 
-- `src/gavel_ai/conversational/steps/processing_step.py` (main implementation)
+- `src/gavel_ai/core/steps/conversational_processor.py` (main implementation)
 - `src/gavel_ai/core/execution/retry_logic.py` (retry utilities)
 - `src/gavel_ai/conversational/errors.py` (error types and classification)
+- `src/gavel_ai/models/config.py` (configuration models)
 - `tests/integration/test_conversation_timeout_error.py` (integration tests)

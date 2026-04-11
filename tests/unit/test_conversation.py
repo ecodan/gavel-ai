@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """
 Unit tests for conversation models and loading utilities.
 
@@ -957,4 +960,4 @@ class TestConversationResult:
         entry = result.to_jsonl_entry()
         assert isinstance(entry, dict)
         assert entry["scenario_id"] == "s1"
-        assert entry["duration_ms"] == 100
+        assert entry["metadata"]["duration_ms"] == 100

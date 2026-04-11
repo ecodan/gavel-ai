@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """Unit tests for workflow step implementations.
 
 Tests ValidatorStep, ScenarioProcessorStep, JudgeRunnerStep, and ReportRunnerStep.

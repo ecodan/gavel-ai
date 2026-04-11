@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """Unit tests for agents configuration schema."""
 
 import json

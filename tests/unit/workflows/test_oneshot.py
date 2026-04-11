@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """
 Unit tests for OneShotWorkflow orchestrator.
 """
@@ -42,6 +45,7 @@ class TestOneShotWorkflow:
         """execute() creates LocalRunContext with correct parameters."""
         mock_eval_ctx = MagicMock()
         mock_eval_ctx.eval_name = "test_eval"
+        mock_eval_ctx.eval_dir = Path(".gavel/evaluations/test_eval")
 
         mock_run_ctx = MagicMock()
         mock_run_ctx.run_id = "run-123"
@@ -57,7 +61,7 @@ class TestOneShotWorkflow:
         await workflow.execute()
 
         mock_run_context_class.assert_called_once_with(
-            eval_ctx=mock_eval_ctx, base_dir=Path(".gavel/runs")
+            eval_ctx=mock_eval_ctx, base_dir=Path(".gavel/evaluations/test_eval/runs")
         )
 
     @pytest.mark.asyncio
@@ -78,6 +82,7 @@ class TestOneShotWorkflow:
         """execute() configures telemetry for the run."""
         mock_eval_ctx = MagicMock()
         mock_eval_ctx.eval_name = "test_eval"
+        mock_eval_ctx.eval_root = Path(".gavel/evaluations")
 
         mock_run_ctx = MagicMock()
         mock_run_ctx.run_id = "run-123"
@@ -93,7 +98,7 @@ class TestOneShotWorkflow:
         await workflow.execute()
 
         mock_configure_telemetry.assert_called_once_with(
-            run_id="run-123", eval_name="test_eval", base_dir=".gavel/runs"
+            run_id="run-123", eval_name="test_eval", base_dir=".gavel"
         )
 
     @pytest.mark.asyncio

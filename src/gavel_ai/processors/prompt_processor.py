@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 from pydantic_ai import Agent
 
 from gavel_ai.core.exceptions import ProcessorError
+from gavel_ai.core.retry import RetryConfig, retry_with_backoff
 from gavel_ai.models.agents import ModelDefinition
 from gavel_ai.models.runtime import Input, ProcessorConfig, ProcessorResult
 from gavel_ai.processors.base import InputProcessor
@@ -118,41 +119,35 @@ class PromptInputProcessor(InputProcessor):
             prompt = input_item.text
 
             # Call LLM with retry logic
-            max_retries = 3
+            retry_config = RetryConfig(max_retries=3)
+            
+            async def call_llm_attempt() -> tuple[str, Dict[str, Any]]:
+                return await self._call_llm(prompt)
+                
+            try:
+                output, metadata = await retry_with_backoff(
+                    func=call_llm_attempt,
+                    retry_config=retry_config,
+                    transient_exceptions=(TimeoutError,),
+                    error_message_template="LLM call timed out after {max_retries} retries - Increase timeout_seconds in config or check provider status",
+                )
+                
+                all_outputs.append(output)
+                last_metadata = metadata
 
-            for attempt in range(max_retries + 1):
-                try:
-                    output, metadata = await self._call_llm(prompt)
-                    all_outputs.append(output)
-                    last_metadata = metadata
-
-                    # Aggregate metadata
-                    if "tokens" in metadata and isinstance(metadata["tokens"], dict):
-                        aggregated_metadata["total_tokens"] += metadata["tokens"].get("total", 0)
-                    if "latency_ms" in metadata:
-                        aggregated_metadata["total_latency_ms"] += metadata["latency_ms"]
-
-                    # Success - break retry loop
-                    break
-
-                except TimeoutError as e:
-                    if attempt < max_retries:
-                        # Exponential backoff
-                        delay = min(1.0 * (2**attempt), 30.0)
-                        await asyncio.sleep(delay)
-                    else:
-                        raise ProcessorError(
-                            f"LLM call timed out after {max_retries} retries - "
-                            f"Increase timeout_seconds in config or check provider status"
-                        ) from e
-                except ProcessorError:
-                    # Re-raise ProcessorError as-is
-                    raise
-                except Exception as e:
-                    raise ProcessorError(
-                        f"Failed to process input {input_item.id}: {e} - "
-                        f"Check input format and LLM configuration"
-                    ) from e
+                # Aggregate metadata
+                if "tokens" in metadata and isinstance(metadata["tokens"], dict):
+                    aggregated_metadata["total_tokens"] += metadata["tokens"].get("total", 0)
+                if "latency_ms" in metadata:
+                    aggregated_metadata["total_latency_ms"] += metadata["latency_ms"]
+                    
+            except ProcessorError:
+                raise
+            except Exception as e:
+                raise ProcessorError(
+                    f"Failed to process input {input_item.id}: {e} - "
+                    f"Check input format and LLM configuration"
+                ) from e
 
         # Preserve detailed metadata from last response
         if last_metadata:

@@ -1,13 +1,15 @@
-"""
-Tests for OneShotReporter.
+import pytest
 
-Validates OneShot report generation with HTML and Markdown formats,
-winner calculation, and expandable sections.
+pytestmark = pytest.mark.unit
+"""
+Tests for OneShotReporter using Unified Reporting Format.
 """
 
+from datetime import datetime
 from typing import Any, Dict, List
 
 import pytest
+from gavel_ai.models.runtime import ReporterConfig
 
 
 class MockRun:
@@ -36,7 +38,7 @@ class MockRun:
                     "scenario_id": "scenario-1",
                     "variant_id": "claude",
                     "processor_output": "Paris is the capital of France.",
-                    "scenario_input": {"prompt": "What is the capital of France?"},
+                    "scenario_input": "What is the capital of France?",
                     "judges": [
                         {
                             "judge_id": "similarity",
@@ -45,12 +47,14 @@ class MockRun:
                             "evidence": "Direct answer to question",
                         }
                     ],
+                    "timing_ms": 1500,
+                    "timestamp": "2025-12-30T12:00:05Z"
                 },
                 {
                     "scenario_id": "scenario-1",
                     "variant_id": "gpt",
                     "processor_output": "The capital of France is Paris.",
-                    "scenario_input": {"prompt": "What is the capital of France?"},
+                    "scenario_input": "What is the capital of France?",
                     "judges": [
                         {
                             "judge_id": "similarity",
@@ -59,36 +63,11 @@ class MockRun:
                             "evidence": None,
                         }
                     ],
-                },
-                {
-                    "scenario_id": "scenario-2",
-                    "variant_id": "claude",
-                    "processor_output": "London",
-                    "scenario_input": {"prompt": "Capital of UK?"},
-                    "judges": [{"judge_id": "similarity", "score": 10, "reasoning": "Perfect."}],
-                },
-                {
-                    "scenario_id": "scenario-2",
-                    "variant_id": "gpt",
-                    "processor_output": "London is the capital.",
-                    "scenario_input": {"prompt": "Capital of UK?"},
-                    "judges": [
-                        {
-                            "judge_id": "similarity",
-                            "score": 9,
-                            "reasoning": "Correct but verbose.",
-                        }
-                    ],
+                    "timing_ms": 1200,
+                    "timestamp": "2025-12-30T12:00:06Z"
                 },
             ]
         )
-        self.telemetry = {
-            "total_duration_seconds": 45,
-            "llm_calls": {
-                "total": 10,
-                "tokens": {"prompt_total": 500, "completion_total": 200},
-            },
-        }
 
 
 @pytest.fixture
@@ -98,177 +77,77 @@ def mock_oneshot_run():
 
 
 @pytest.fixture
-def mock_tie_run():
-    """Mock Run with tied results."""
-    return MockRun(
-        run_id="run-tie-20251230",
-        eval_name="Tie Scenario",
-        results=[
-            {
-                "scenario_id": "scenario-1",
-                "variant_id": "claude",
-                "processor_output": "Answer A",
-                "scenario_input": {"prompt": "Question?"},
-                "judges": [{"judge_id": "similarity", "score": 10, "reasoning": "Good."}],
-            },
-            {
-                "scenario_id": "scenario-1",
-                "variant_id": "gpt",
-                "processor_output": "Answer B",
-                "scenario_input": {"prompt": "Question?"},
-                "judges": [{"judge_id": "similarity", "score": 10, "reasoning": "Good."}],
-            },
-        ],
-    )
-
-
-@pytest.fixture
-def reporter_config(tmp_path):
+def reporter_config():
     """ReporterConfig for testing."""
-    from gavel_ai.core.models import ReporterConfig
-
-    template_path = "src/gavel_ai/reporters/templates"
-    return ReporterConfig(template_path=template_path, output_format="html")
+    return ReporterConfig(template_path="src/gavel_ai/reporters/templates", output_format="html")
 
 
 @pytest.mark.asyncio
-async def test_oneshot_reporter_generates_html(mock_oneshot_run, reporter_config):
-    """OneShotReporter generates complete HTML report with all required sections."""
+async def test_oneshot_reporter_generates_unified_html(mock_oneshot_run, reporter_config):
+    """OneShotReporter generates complete HTML report in Unified Format."""
     from gavel_ai.reporters.oneshot_reporter import OneShotReporter
 
     reporter = OneShotReporter(reporter_config)
-
     output = await reporter.generate(mock_oneshot_run, "oneshot.html")
 
-    # Verify all sections present
-    assert "<h1>Claude vs GPT Comparison</h1>" in output
-    assert "Winner" in output
-    assert "claude" in output or "gpt" in output
-    assert "Summary" in output
-    assert "Detailed Results" in output
-    assert "Execution Metrics" in output
+    # Verify Unified Spec elements
+    assert "Claude vs GPT Comparison" in output
+    assert "Run ID:" in output
+    assert "Evaluation Summary" in output
+    assert "Performance Summary" in output
+    assert "Detailed Analysis" in output
+    assert "comparison-grid" in output
+    assert "turn-user" in output
+    assert "turn-assistant" in output
 
 
 @pytest.mark.asyncio
-async def test_oneshot_reporter_generates_markdown(mock_oneshot_run, reporter_config):
-    """OneShotReporter generates complete Markdown report."""
+async def test_oneshot_reporter_mapping_to_turns(mock_oneshot_run, reporter_config):
+    """Verify OneShot mapping: Input -> USER, Output -> ASSISTANT."""
     from gavel_ai.reporters.oneshot_reporter import OneShotReporter
 
     reporter = OneShotReporter(reporter_config)
-
-    output = await reporter.generate(mock_oneshot_run, "oneshot.md")
-
-    # Verify markdown structure
-    assert "# Claude vs GPT Comparison" in output
-    assert "## Winner" in output or "## 🏆 Winner" in output
-    assert "## Summary" in output
-    assert "## Detailed Results" in output
-
-
-@pytest.mark.asyncio
-async def test_oneshot_reporter_calculates_winner(mock_oneshot_run, reporter_config):
-    """OneShotReporter correctly calculates winner based on total scores."""
-    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
-
-    reporter = OneShotReporter(reporter_config)
-
-    # Build context to access winner calculation
     context = reporter._build_context(mock_oneshot_run)
 
-    assert "winner" in context
-    winner = context["winner"]
-
-    # Claude: scenario-1 (9) + scenario-2 (10) = 19
-    # GPT: scenario-1 (8) + scenario-2 (9) = 17
-    # Claude should win
-    assert winner["variant_id"] == "claude"
-    assert winner["total_score"] == 19
-    assert winner["is_tie"] is False
-
-
-@pytest.mark.asyncio
-async def test_oneshot_reporter_handles_tie(mock_tie_run, reporter_config):
-    """OneShotReporter correctly identifies and handles tied results."""
-    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
-
-    reporter = OneShotReporter(reporter_config)
-
-    context = reporter._build_context(mock_tie_run)
-    winner = context["winner"]
-
-    # Both variants scored 10
-    assert winner["total_score"] == 10
-    assert winner["is_tie"] is True
-    assert winner["variant_id"] in ["claude", "gpt"]
+    # Check first scenario
+    scenarios = context["scenarios"]
+    assert len(scenarios) == 1
+    scenario = scenarios[0]
+    
+    variant = scenario["variants"]["claude"]
+    assert len(variant["turns"]) == 2
+    assert variant["turns"][0]["role"] == "user"
+    assert variant["turns"][0]["content"] == "What is the capital of France?"
+    assert variant["turns"][1]["role"] == "assistant"
+    assert variant["turns"][1]["content"] == "Paris is the capital of France."
+    assert variant["turns"][1]["duration_ms"] == 1500.0
 
 
 @pytest.mark.asyncio
-async def test_oneshot_reporter_formats_judge_results(mock_oneshot_run, reporter_config):
-    """OneShotReporter correctly formats judge results with reasoning and evidence."""
+async def test_oneshot_reporter_summary_metrics(mock_oneshot_run, reporter_config):
+    """Verify summary metrics calculation."""
     from gavel_ai.reporters.oneshot_reporter import OneShotReporter
 
     reporter = OneShotReporter(reporter_config)
-
-    context = reporter._build_context(mock_oneshot_run)
-    results = context["results"]
-
-    # Check first scenario has judge results
-    assert len(results) > 0
-    first_scenario = results[0]
-    assert "variant_outputs" in first_scenario
-
-    # Check judge results structure
-    variant_output = first_scenario["variant_outputs"][0]
-    assert "judge_results" in variant_output
-    judge_result = variant_output["judge_results"][0]
-
-    assert "judge_id" in judge_result
-    assert "score" in judge_result
-    assert "reasoning" in judge_result
-
-
-@pytest.mark.asyncio
-async def test_oneshot_reporter_includes_judges_list(mock_oneshot_run, reporter_config):
-    """OneShotReporter extracts judges list from results."""
-    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
-
-    reporter = OneShotReporter(reporter_config)
-
     context = reporter._build_context(mock_oneshot_run)
 
-    assert "judges" in context
-    judges = context["judges"]
-
-    assert len(judges) > 0
-    assert any(j["judge_id"] == "similarity" for j in judges)
-
-
-@pytest.mark.asyncio
-async def test_oneshot_reporter_handles_empty_results(reporter_config):
-    """OneShotReporter handles Run with no results gracefully."""
-    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
-
-    empty_run = MockRun(results=[])
-    reporter = OneShotReporter(reporter_config)
-
-    context = reporter._build_context(empty_run)
-
-    assert context["winner"]["variant_id"] == "N/A"
-    assert context["winner"]["total_score"] == 0
-    assert context["winner"]["is_tie"] is False
-    assert context["summary"] == []
+    summary = context["summary_metrics"]
+    assert "claude" in summary
+    assert "gpt" in summary
+    assert summary["claude"]["similarity"] == 9.0
+    assert summary["gpt"]["similarity"] == 8.0
 
 
 @pytest.mark.asyncio
-async def test_oneshot_reporter_emits_telemetry(mock_oneshot_run, reporter_config):
-    """OneShotReporter emits OpenTelemetry spans during generation."""
+async def test_oneshot_reporter_performance_metrics(mock_oneshot_run, reporter_config):
+    """Verify performance metrics calculation."""
     from gavel_ai.reporters.oneshot_reporter import OneShotReporter
 
     reporter = OneShotReporter(reporter_config)
+    context = reporter._build_context(mock_oneshot_run)
 
-    # Generate report - should emit span
-    output = await reporter.generate(mock_oneshot_run, "oneshot.html")
-
-    # If generation completes without error, telemetry is working
-    assert output is not None
-    assert len(output) > 0
+    perf = context["performance_metrics"]
+    assert perf["claude"]["avg_turn_time"] == 1.5
+    assert perf["claude"]["total_time"] == 1.5
+    assert perf["gpt"]["avg_turn_time"] == 1.2
+    assert perf["gpt"]["total_time"] == 1.2

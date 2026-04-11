@@ -1410,39 +1410,42 @@ So that users can customize report format and layout.
 
 ---
 
-### Story 5.3: Implement OneShot Report Format
+### Story 5.3: Implement Unified Report Format for OneShot
 
 As a user,
-I want OneShot reports to show which variant is better and why,
-So that I can make confident decisions about model/prompt choices.
+I want OneShot reports to match the Unified Reporting Specification,
+So that I have a consistent, high-quality viewing experience across all evaluation types.
 
 **Acceptance Criteria:**
 
 - **Given** a completed OneShot evaluation
   **When** report is generated
-  **Then** the report includes:
-  - Title: Evaluation name and date
-  - Overview: Variants tested, judge definitions
-  - Summary: One table showing each variant's scores and total
-  - Detail: One section per scenario with:
-    - Scenario input (expandable)
-    - Variant outputs table with judge scores
-    - Judge reasoning (expandable)
-  - Winner indication: Prominent display of best variant
+  **Then** it follows the `_bmad-output/planning-artifacts/tech-specs/unified-reporting-spec.md` specification exactly
 
-- **Given** the report is opened in a browser
+- **Given** OneShot is a single turn
+  **When** rendered in the Conversation View component
+  **Then** it is mapped to:
+  - Input -> Turn 1 (Role: USER)
+  - Output -> Turn 2 (Role: ASSISTANT)
+  - Timestamps, duration, and error states are preserved
+
+- **Given** multiple variants
+  **When** rendered
+  **Then** they are shown side-by-side (or responsive equivalent) just like conversational evaluations
+
+- **Given** the report is opened
   **When** viewed
-  **Then** it's readable, formatted clearly, and expandable sections work
-
-- **Given** the report is converted to Markdown
-  **When** examined
-  **Then** it's readable and includes all information
+  **Then** it includes:
+  - Header with run metadata
+  - Eval Summary Table (Metrics)
+  - Performance Summary Table (Timing)
+  - Detailed Scenario Cards with Conversation View
 
 **Report Output:**
 - Default: HTML (report.html in run directory)
-- Alternative: Markdown (report.md)
+- Template: Jinja2 template implementing the Unified Spec
 
-**Related Requirements:** FR-5.2, FR-5.5, FR-5.6
+**Related Requirements:** FR-5.2, FR-5.5, FR-5.6, Unified Reporting Spec
 
 ---
 

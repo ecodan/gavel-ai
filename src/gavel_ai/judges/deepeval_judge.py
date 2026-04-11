@@ -8,6 +8,7 @@ Per Architecture Decision 5: DeepEval-native judges with sequential execution.
 """
 
 import asyncio
+import os
 from typing import Any, Dict, Optional
 
 from deepeval.metrics import (
@@ -51,10 +52,10 @@ class DeepEvalJudge(Judge):
         Create appropriate DeepEval model instance with cost tracking disabled.
 
         Uses model_family from agents.json to select the correct model class:
-        - "claude" → AnthropicModel (uses ANTHROPIC_API_KEY)
-        - "gemini" → GeminiModel (uses GOOGLE_API_KEY)
+        - "claude" → AnthropicModel (uses api_key if provided, else ANTHROPIC_API_KEY)
+        - "gemini" → GeminiModel (uses api_key if provided, else GOOGLE_API_KEY)
         - "qwen" (or other Ollama) → OllamaModel (uses base_url)
-        - "gpt" or None → GPTModel (uses OPENAI_API_KEY, default)
+        - "gpt" or None → GPTModel (uses api_key if provided, else OPENAI_API_KEY)
 
         Args:
             model_name: Model identifier string (e.g., "claude-sonnet-4-5-20250929")
@@ -64,6 +65,25 @@ class DeepEvalJudge(Judge):
         Returns:
             Configured DeepEvalBaseLLM subclass with cost tracking disabled (cost=0)
         """
+        # Extract auth from config
+        metric_config = self.config.config or {}
+        api_key = metric_config.get("api_key")
+        base_url = metric_config.get("base_url")
+
+        # Resolve environment variables in API key (supports {{VAR}} and ${VAR} formats)
+        if api_key:
+            env_var_name = None
+            if api_key.startswith("{{") and api_key.endswith("}}"):
+                env_var_name = api_key[2:-2]
+            elif api_key.startswith("${") and api_key.endswith("}"):
+                env_var_name = api_key[2:-1]
+
+            if env_var_name:
+                resolved_key = os.getenv(env_var_name)
+                # If not found in env, we'll let it be as is (maybe it's a literal for some reason, 
+                # though unlikely. But deepeval will fail anyway if invalid).
+                if resolved_key:
+                    api_key = resolved_key
         # Model family detection - use explicit family if available
         if model_family:
             family = model_family.lower()
@@ -81,30 +101,42 @@ class DeepEvalJudge(Judge):
 
         # Create model-family-specific instance with cost=0
         if family == "claude":
-            return AnthropicModel(
-                model=model_name,
-                cost_per_input_token=0,
-                cost_per_output_token=0,
-            )
+            kwargs = {
+                "model": model_name,
+                "cost_per_input_token": 0,
+                "cost_per_output_token": 0,
+            }
+            if api_key:
+                kwargs["api_key"] = api_key
+            return AnthropicModel(**kwargs)
         elif family == "gemini":
-            return GeminiModel(
-                model=model_name,
-                cost_per_input_token=0,
-                cost_per_output_token=0,
-            )
+            kwargs = {
+                "model": model_name,
+                "cost_per_input_token": 0,
+                "cost_per_output_token": 0,
+            }
+            if api_key:
+                kwargs["api_key"] = api_key
+            return GeminiModel(**kwargs)
         elif family in ("qwen", "ollama"):
-            return OllamaModel(
-                model=model_name,
-                cost_per_input_token=0,
-                cost_per_output_token=0,
-            )
+            kwargs = {
+                "model": model_name,
+                "cost_per_input_token": 0,
+                "cost_per_output_token": 0,
+            }
+            if base_url:
+                kwargs["base_url"] = base_url
+            return OllamaModel(**kwargs)
         else:
             # Default to GPTModel for GPT and unknown families
-            return GPTModel(
-                model=model_name,
-                cost_per_input_token=0,
-                cost_per_output_token=0,
-            )
+            kwargs = {
+                "model": model_name,
+                "cost_per_input_token": 0,
+                "cost_per_output_token": 0,
+            }
+            if api_key:
+                kwargs["api_key"] = api_key
+            return GPTModel(**kwargs)
 
     def __init__(self, config: JudgeConfig):
         """

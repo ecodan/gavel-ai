@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """
 Tests for storage base classes (Run, Config, Prompt ABCs).
 

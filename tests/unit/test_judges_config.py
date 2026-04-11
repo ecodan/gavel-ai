@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """Unit tests for judges configuration models."""
 
 from typing import Any, Dict

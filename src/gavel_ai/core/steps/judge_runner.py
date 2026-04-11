@@ -118,6 +118,13 @@ class JudgeRunnerStep(Step):
                     if judge_config.config:
                         judge_config.config["model"] = resolved_model
                         judge_config.config["model_family"] = model_family
+                        
+                        # Pass auth details if available
+                        provider_auth = model_def.get("provider_auth", {})
+                        if "api_key" in provider_auth:
+                            judge_config.config["api_key"] = provider_auth["api_key"]
+                        if "base_url" in provider_auth:
+                            judge_config.config["base_url"] = provider_auth["base_url"]
 
                     self.logger.debug(
                         f"Resolved judge '{judge_config.name}' model "

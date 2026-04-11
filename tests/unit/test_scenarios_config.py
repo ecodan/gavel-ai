@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """Unit tests for scenarios configuration and loading."""
 
 import csv

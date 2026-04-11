@@ -754,96 +754,91 @@ So that judges can be applied without re-execution.
 ### Story C6.1: Implement Report Structure with Eval Summary and Performance Summary
 
 As a developer,
-I want ReportingStep to generate reports with Eval Summary and Performance Summary sections,
-So that users can quickly see judge scores and timing metrics across variants.
+I want ReportingStep to generate reports strictly following the Unified Reporting Spec,
+So that users get the standardized Eval Summary and Performance Summary sections.
 
 **Acceptance Criteria:**
 
 - **Given** ReportingStep receives conversational results
   **When** execute() called
-  **Then** generates HTML report with sections: Header, Eval Summary, Performance Summary, Scenario Detail
+  **Then** generates HTML report matching `_bmad-output/planning-artifacts/tech-specs/unified-reporting-spec.md`
 
 - **Given** Eval Summary section rendered
   **When** viewed
-  **Then** displays table with: Variant | Judge Score 1 | Judge Score 2 | ... | Overall Avg (aggregated from results_judged.jsonl)
+  **Then** displays table matches Spec 3.2: Variant | [Metric 1] | [Metric 2] | ... | Overall Avg
 
 - **Given** Performance Summary section rendered
   **When** viewed
-  **Then** displays table with: Variant | Avg Turn Time | Avg Conversation Time | Total Time (calculated from results_raw.jsonl)
+  **Then** displays table matches Spec 3.3: Variant | Avg Turn Time | Avg Conversation Time | Total Time
 
 - **Given** report header rendered
   **When** viewed
-  **Then** shows: Evaluation name, Run ID, Generated timestamp
+  **Then** shows: Evaluation name, Run ID, Generated timestamp badge
 
 - **Given** report generation completes
   **When** saved
-  **Then** report.html written to run directory; readable in browser
+  **Then** report.html written to run directory
 
-**Related Requirements:** FR-C5.1
+**Related Requirements:** FR-C5.1, Unified Reporting Spec
 
 ---
 
-### Story C6.2: Implement Scenario Detail Sections with Side-by-Side Variant Comparison
+### Story C6.2: Implement Scenario Detail Sections with Comparisons
 
 As a developer,
-I want scenario detail sections to show side-by-side variant comparison,
-So that users can compare how different variants performed on the same scenario.
+I want scenario detail sections to show side-by-side variant comparison using the Conversation View,
+So that users can compare performance on the same scenario.
 
 **Acceptance Criteria:**
 
 - **Given** scenario detail section rendered
   **When** viewed
-  **Then** section contains: Scenario header (with initial user message), side-by-side table with one column per variant
-
-- **Given** side-by-side table created
-  **When** examined
-  **Then** each column header is variant name (e.g., "ai_gateway_claude", "ai_gateway_gemini")
+  **Then** it follows Unified Spec 3.4
+  - Scenario Header
+  - Collapsible System Prompt / Context
+  - Side-by-side comparison table (one column per variant)
 
 - **Given** variant column populated
   **When** viewed
-  **Then** contains full conversation transcript (all turns) for that variant
-
-- **Given** scenario has N variants
-  **When** rendered
-  **Then** table has N columns for variants (each column same width)
+  **Then** contains full conversation transcript using the Conversation View Component (Spec 3.5)
 
 - **Given** template uses CSS for styling
   **When** viewed
-  **Then** responsive, professional appearance with clear column separation
+  **Then** uses responsive Flexbox/Grid as defined in the HTML Reference
 
-**Related Requirements:** FR-C5.1, FR-C5.2
+**Related Requirements:** FR-C5.1, FR-C5.2, Unified Reporting Spec
 
 ---
 
-### Story C6.3: Implement Turn-Level Display with Duration and Judge Score Badges
+### Story C6.3: Implement Conversation View Component
 
 **As a** developer,
-**I want** turn-level display to show turn text, duration, and judge score badges,
-**So that** users can see detailed turn-by-turn performance.
+**I want** a standardized Conversation View component for both OneShot and Conversational runs,
+**So that** turn text, role, and duration are displayed consistently.
 
 **Acceptance Criteria:**
 
 - **Given** conversation transcript rendered
   **When** viewed
-  **Then** each turn displays: role (USER/ASSISTANT), turn text, duration (e.g., "Duration: 3.77s")
+  **Then** follows Unified Spec 3.5 structure:
+  - Wrapper: `.conversation-turns`
+  - Item: `.turn`
+  - User: `.turn-user` (Blue style)
+  - Assistant: `.turn-assistant` (Purple style)
 
 - **Given** turn displayed
   **When** examined
-  **Then** user turns colored blue (background #e3f2fd, left border #1976d2); assistant turns purple (background #f3e5f5, left border #7b1fa2)
-
-- **Given** judge scores for conversation
-  **When** rendered below conversation
-  **Then** displays score badges for each judge (e.g., "0.88/10" badge)
-
-- **Given** score badge clicked
-  **When** expanded
-  **Then** shows: judge name, score, detailed reasoning (expandable/collapsible)
+  **Then** shows Role Badge, Content, and Duration (`3.77s`) in gray footer
 
 - **Given** long turn text provided
   **When** rendered
-  **Then** text can be expanded/collapsed with "expand"/"collapse" button to show preview vs full text
+  **Then** text uses `.truncated-content` logic (expand/collapse) from the Spec
 
-**Related Requirements:** FR-C5.2, FR-C5.3
+- **Given** judge scores available
+  **When** rendered
+  **Then** displayed below the conversation trace as per Spec 3.4
+
+**Related Requirements:** FR-C5.2, FR-C5.3, Unified Reporting Spec
 
 ---
 

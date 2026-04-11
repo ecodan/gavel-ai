@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """
 Additional tests for C-2.2 LLM integration functionality.
 

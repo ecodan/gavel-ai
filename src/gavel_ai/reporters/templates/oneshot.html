@@ -1,320 +1,392 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - OneShot Evaluation</title>
+    <title>{{ title }} - Evaluation Report</title>
     <style>
-        /* Base styles */
+        /* Unified Reporting Spec CSS */
+        :root {
+            --primary-bg: #f5f7fa;
+            --container-bg: #ffffff;
+            --header-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --user-bg: #e3f2fd;
+            --user-border: #1976d2;
+            --assistant-bg: #f3e5f5;
+            --assistant-border: #7b1fa2;
+            --text-secondary: #7f8c8d;
+            --border-light: #dee2e6;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 12px;
+            background: var(--primary-bg);
             margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
             color: #333;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: var(--container-bg);
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
         }
 
-        /* Header styles */
+        header {
+            padding: 20px 24px;
+            background: var(--header-gradient);
+            color: white;
+        }
+
         header h1 {
-            margin: 0 0 10px 0;
-            color: #2c3e50;
-            font-size: 2em;
-        }
-
-        header p {
-            margin: 5px 0;
-            color: #7f8c8d;
-        }
-
-        /* Section styles */
-        section {
-            margin: 30px 0;
-        }
-
-        section h2 {
-            color: #34495e;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 8px;
-            margin-bottom: 15px;
-        }
-
-        /* Winner section */
-        #winner {
-            background-color: #d4edda;
-            border-left: 4px solid #28a745;
-            padding: 15px;
-            border-radius: 4px;
-        }
-
-        #winner p {
             margin: 0;
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #155724;
+            font-size: 24px;
         }
 
-        /* Table styles */
+        .metadata-badge {
+            margin-top: 8px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 24px;
+        }
+
+        h2 {
+            margin: 32px 0 16px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+            font-size: 20px;
+        }
+
+        h2:first-child {
+            margin-top: 0;
+        }
+
+        /* Tables */
         .summary-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 15px 0;
+            margin-bottom: 24px;
+            background: white;
         }
 
         .summary-table th,
         .summary-table td {
-            padding: 12px;
+            padding: 12px 16px;
             text-align: left;
-            border: 1px solid #ddd;
+            border-bottom: 1px solid var(--border-light);
         }
 
         .summary-table th {
-            background-color: #3498db;
-            color: white;
+            background: #f8f9fa;
             font-weight: 600;
-        }
-
-        .summary-table tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
-
-        .summary-table tr.winner {
-            background-color: #d4edda;
-            font-weight: bold;
-        }
-
-        /* Details/Summary (expandable sections) */
-        details {
-            margin: 10px 0;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 4px;
-        }
-
-        summary {
-            cursor: pointer;
-            font-weight: bold;
-            padding: 8px;
-            user-select: none;
-        }
-
-        summary:hover {
-            background-color: #e9ecef;
-            border-radius: 4px;
-        }
-
-        details[open] summary {
-            margin-bottom: 10px;
-        }
-
-        /* Scenario styles */
-        .scenario {
-            border: 1px solid #dee2e6;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 6px;
-            background-color: #ffffff;
-        }
-
-        .scenario h3 {
-            margin-top: 0;
             color: #495057;
         }
 
-        /* Judge reasoning */
-        .judge-reasoning {
-            background-color: #f1f3f5;
-            padding: 10px;
-            margin-top: 8px;
-            border-radius: 4px;
-            border-left: 3px solid #6c757d;
+        .summary-table tr:last-child td {
+            border-bottom: none;
         }
 
-        .judge-reasoning summary {
-            font-weight: normal;
-            color: #495057;
+        /* Scenario Cards */
+        .scenario-card {
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            margin-bottom: 32px;
+            overflow: hidden;
         }
 
-        .judge-reasoning p {
+        .scenario-header {
+            background: #f8f9fa;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .scenario-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .system-prompt {
+            padding: 12px 16px;
+            background: #fff9db;
+            border-bottom: 1px solid #fee08b;
+            font-size: 13px;
+        }
+
+        /* Comparison Grid */
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1px;
+            background: var(--border-light);
+        }
+
+        .variant-column {
+            background: white;
+            padding: 16px;
+        }
+
+        .variant-name {
+            font-weight: bold;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed var(--border-light);
+            color: #667eea;
+        }
+
+        /* Conversation View */
+        .conversation-turns {
             margin: 8px 0;
-            color: #6c757d;
         }
 
-        /* Pre-formatted text */
-        pre {
-            background-color: #f8f9fa;
+        .turn {
+            margin: 12px 0;
             padding: 12px;
             border-radius: 4px;
-            overflow-x: auto;
+            position: relative;
+        }
+
+        .turn-role {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .turn-user {
+            background: var(--user-bg);
+            border-left: 4px solid var(--user-border);
+            margin-left: 20px;
+        }
+
+        .turn-user .turn-role {
+            color: var(--user-border);
+        }
+
+        .turn-assistant {
+            background: var(--assistant-bg);
+            border-left: 4px solid var(--assistant-border);
+            margin-right: 20px;
+        }
+
+        .turn-assistant .turn-role {
+            color: var(--assistant-border);
+        }
+
+        .turn-content {
+            font-size: 14px;
+            line-height: 1.5;
             white-space: pre-wrap;
-            word-wrap: break-word;
         }
 
-        /* List styles */
-        ul {
-            line-height: 1.8;
+        .turn-footer {
+            margin-top: 8px;
+            display: flex;
+            justify-content: flex-end;
+            font-size: 11px;
+            color: var(--text-secondary);
         }
 
-        ul li {
-            margin: 5px 0;
+        /* Judge Results */
+        .judge-results {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-light);
         }
 
-        /* Footer */
+        .judge-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 0 4px 4px 0;
+            cursor: pointer;
+        }
+
+        .judge-badge:hover {
+            background: #dee2e6;
+        }
+
+        .score-val {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .judge-reasoning {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-left: 2px solid #667eea;
+            display: none;
+        }
+
+        /* Standard Utilities */
+        .expand-toggle {
+            color: var(--user-border);
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 12px;
+        }
+
         footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #dee2e6;
+            padding: 24px;
             text-align: center;
-            color: #6c757d;
-            font-size: 0.9em;
+            font-size: 12px;
+            color: var(--text-secondary);
         }
 
-        /* Responsive design */
         @media (max-width: 768px) {
-            body {
-                padding: 10px;
-            }
-
-            .container {
-                padding: 15px;
-            }
-
-            header h1 {
-                font-size: 1.5em;
-            }
-
-            .summary-table {
-                font-size: 0.9em;
-            }
-
-            .summary-table th,
-            .summary-table td {
-                padding: 8px;
+            .comparison-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
+    <script>
+        function toggleReasoning(id) {
+            const el = document.getElementById(id);
+            el.style.display = el.style.display === 'block' ? 'none' : 'block';
+        }
+    </script>
 </head>
+
 <body>
     <div class="container">
         <header>
             <h1>{{ title }}</h1>
-            <p><strong>Generated:</strong> {{ metadata.timestamp }}</p>
+            <div class="metadata-badge">
+                Run ID: <strong>{{ run_id }}</strong> &nbsp;|&nbsp;
+                Generated: <strong>{{ generated_at.strftime('%Y-%m-%d %H:%M:%S') }}</strong>
+            </div>
         </header>
 
-        <section id="overview">
-            <h2>Overview</h2>
-            <ul>
-                <li><strong>Variants Tested:</strong> {{ overview.variant_count }}</li>
-                <li><strong>Scenarios:</strong> {{ overview.scenario_count }}</li>
-                <li><strong>Judges:</strong>
-                    <ul>
-                    {% for judge in judges %}
-                        <li>{{ judge.judge_id }} ({{ judge.judge_name }})</li>
-                    {% endfor %}
-                    </ul>
-                </li>
-            </ul>
-        </section>
-
-        <section id="winner">
-            <h2>🏆 Winner</h2>
-            {% if winner.is_tie %}
-            <p>TIE: {{ winner.variant_id }} and others (Score: {{ winner.total_score }})</p>
-            {% else %}
-            <p>{{ winner.variant_id }} (Total Score: {{ winner.total_score }}, Avg: {{ winner.avg_score|round(2) }})</p>
-            {% endif %}
-        </section>
-
-        <section id="summary">
-            <h2>Summary</h2>
-            <table class="summary-table">
-                <thead>
-                    <tr>
-                        <th>Variant</th>
-                        <th>Avg Score</th>
-                        <th>Total Score</th>
-                        <th>Scenarios</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for variant in summary %}
-                    <tr {% if variant.variant_id == winner.variant_id %}class="winner"{% endif %}>
-                        <td>{{ variant.variant_id }}</td>
-                        <td>{{ variant.avg_score|round(2) }}</td>
-                        <td>{{ variant.total_score|round(2) }}</td>
-                        <td>{{ variant.scenario_count }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </section>
-
-        <section id="results">
-            <h2>Detailed Results</h2>
-            {% for result in results %}
-            <div class="scenario">
-                <h3>Scenario: {{ result.scenario_id }}</h3>
-                <details>
-                    <summary>Show Input</summary>
-                    <pre>{{ result.input }}</pre>
-                </details>
-
+        <div class="content">
+            {% if summary_metrics %}
+            <section id="summary">
+                <h2>Evaluation Summary</h2>
                 <table class="summary-table">
                     <thead>
                         <tr>
                             <th>Variant</th>
-                            <th>Output</th>
-                            <th>Scores</th>
+                            {% set first_variant_id = summary_metrics.keys()|first %}
+                            {% for metric in summary_metrics[first_variant_id].keys() %}
+                            <th>{{ metric }}</th>
+                            {% endfor %}
+                            <th>Overall Avg</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for output in result.variant_outputs %}
+                        {% for variant, metrics in summary_metrics.items() %}
                         <tr>
-                            <td>{{ output.variant_id }}</td>
-                            <td>{{ output.output }}</td>
-                            <td>
-                                {% for judge_result in output.judge_results %}
-                                <div>
-                                    <strong>{{ judge_result.judge_id }}:</strong> {{ judge_result.score }}/10
-                                    <details class="judge-reasoning">
-                                        <summary>Reasoning</summary>
-                                        <p>{{ judge_result.reasoning }}</p>
-                                        {% if judge_result.evidence %}
-                                        <p><em>Evidence:</em> {{ judge_result.evidence }}</p>
-                                        {% endif %}
-                                    </details>
-                                </div>
-                                {% endfor %}
+                            <td><strong>{{ variant }}</strong></td>
+                            {% for metric, val in metrics.items() %}
+                            <td>{{ "%.2f"|format(val) }}</td>
+                            {% endfor %}
+                            <td><strong>{{ "%.2f"|format(metrics.values()|sum / metrics.values()|length) if
+                                    metrics.values()|length > 0 else '0.00' }}</strong>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-            </div>
-            {% endfor %}
-        </section>
+            </section>
+            {% endif %}
 
-        <section id="telemetry">
-            <h2>Execution Metrics</h2>
-            <ul>
-                <li><strong>Total Duration:</strong> {{ telemetry.total_duration_seconds }}s</li>
-                <li><strong>LLM Calls:</strong> {{ telemetry.llm_calls.total }}</li>
-                <li><strong>Tokens:</strong> {{ telemetry.llm_calls.tokens.prompt_total }} prompt, {{ telemetry.llm_calls.tokens.completion_total }} completion</li>
-            </ul>
-        </section>
+            <!-- Performance Metrics -->
+            {% if performance_metrics %}
+            <section id="performance">
+                <h2>Performance Summary</h2>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Variant</th>
+                            <th>Avg Turn Time</th>
+                            <th>Total Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for variant, perf in performance_metrics.items() %}
+                        <tr>
+                            <td>{{ variant }}</td>
+                            <td>{{ "%.2fs"|format(perf.avg_turn_time) }}</td>
+                            <td>{{ "%.2fs"|format(perf.total_time) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+            {% endif %}
+
+            <!-- Detailed Scenarios -->
+            <section id="scenarios">
+                <h2>Detailed Analysis</h2>
+                {% for subject, subject_scenarios in scenarios_by_subject.items() %}
+                <div class="subject-group">
+                    <h3 class="subject-title">Subject: {{ subject }}</h3>
+                    {% for scenario in subject_scenarios %}
+                    <div class="scenario-card">
+                        <div class="scenario-header">
+                            <h3>Scenario: {{ scenario.scenario_id }}</h3>
+                        </div>
+                        {% if scenario.system_input %}
+                        <div class="prompt-box">
+                            <strong>Prompt:</strong>
+                            <div class="prompt-content">{{ scenario.system_input }}</div>
+                        </div>
+                        {% endif %}
+
+                        <div class="comparison-grid">
+                            {% for variant_id, variant in scenario.variants.items() %}
+                            <div class="variant-column">
+                                <div class="variant-name">{{ variant_id }}</div>
+
+                                <div class="response-content">
+                                    {{ variant.output }}
+                                </div>
+
+                                <div class="judge-results">
+                                    {% for judge in variant.judgments %}
+                                    <div class="judge-badge"
+                                        onclick="toggleReasoning('reason-{{ scenario.scenario_id }}-{{ variant_id }}-{{ loop.index }}')">
+                                        {{ judge.judge_id }}: <span class="score-val">{{ judge.score }}</span>
+                                    </div>
+                                    <div class="judge-reasoning"
+                                        id="reason-{{ scenario.scenario_id }}-{{ variant_id }}-{{ loop.index }}">
+                                        {{ judge.reasoning }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="variant-footer">
+                                    {% if variant.timing.total_time %}
+                                    Time: {{ "%.2fs"|format(variant.timing.total_time) }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </section>
+        </div>
 
         <footer>
-            <p>Config Hash: {{ metadata.config_hash }}</p>
+            Generated by gavel-ai &bull; Unified Reporting Format v1.0
         </footer>
     </div>
 </body>
+
 </html>

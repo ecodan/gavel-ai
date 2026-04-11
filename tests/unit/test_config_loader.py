@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """Unit tests for config loading and validation using new storage abstraction.
 
 Tests the StructDataSource and config model functionality that replaced

@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """Unit tests for workflow execution framework.
 
 Tests LocalFileSystemEvalContext, LocalRunContext, Step ABC, StepPhase enum, and GavelWorkflow.

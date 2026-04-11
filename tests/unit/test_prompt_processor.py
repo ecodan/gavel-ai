@@ -1,3 +1,6 @@
+import pytest
+
+pytestmark = pytest.mark.unit
 """
 Test module for PromptInputProcessor (Story 3.2).
 
