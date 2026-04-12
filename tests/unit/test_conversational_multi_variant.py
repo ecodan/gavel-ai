@@ -22,7 +22,7 @@ from gavel_ai.models.conversation import (
     ConversationState,
     DialogueGuidance,
 )
-from gavel_ai.models.runtime import Input, ProcessorConfig
+from gavel_ai.models.runtime import ProcessorConfig, PromptInput
 from gavel_ai.processors.turn_generator import GeneratedTurn, TurnGenerator
 
 
@@ -170,7 +170,7 @@ class TestConversationalMultiVariantDeprecated:
             ]
 
             # Execute
-            inputs = [Input(id="test-scenario-1", text="test")]
+            inputs = [PromptInput(id="test-scenario-1", user="test")]
             result = await processor.process(inputs)
 
             # Verify we got 3 conversations (one per variant)
@@ -260,7 +260,7 @@ class TestConversationalMultiVariantDeprecated:
             ]
 
             # Execute
-            inputs = [Input(id="test-scenario-1", text="test")]
+            inputs = [PromptInput(id="test-scenario-1", user="test")]
             result = await processor.process(inputs)
 
             # Note: The deprecated implementation sets span attribute, not metadata

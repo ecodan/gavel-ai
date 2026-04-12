@@ -1,5 +1,23 @@
 {
   "schema_version": "2.0",
-  "initiatives": {},
-  "branches": {}
+  "initiatives": {
+    "processor-chain-refactor": {
+      "intent": "Fix critical bug: prompt templates never loaded/rendered; LLM receives stringified input instead of rendered prompts",
+      "owner": "unknown",
+      "signals": [],
+      "created_at": "2026-04-12T19:14:27.433115+00:00"
+    }
+  },
+  "branches": {
+    "feat/input-subclass": {
+      "intent": "Create Input subclass hierarchy (PromptInput, RemoteSystemInput, ConversationalInput)",
+      "modules": [
+        "src/gavel_ai/models/runtime.py",
+        "tests/unit/models"
+      ],
+      "owner": "unknown",
+      "created_at": "2026-04-12T19:14:33.306183+00:00",
+      "initiative": "processor-chain-refactor"
+    }
+  }
 }

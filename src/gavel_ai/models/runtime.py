@@ -22,16 +22,77 @@ from gavel_ai.models.config import JudgeConfig  # noqa: F401
 
 class Input(BaseModel):
     """
-    Input data model for processor execution.
+    Base input data model for processor execution.
 
-    Represents a single input to be processed, with associated metadata.
+    Abstract base class for specialized input types. All inputs have an id,
+    metadata for debugging, and type-specific content fields.
+
+    Subclasses:
+    - PromptInput: LLM processor inputs (user prompt, optional system prompt)
+    - RemoteSystemInput: External API processor inputs (endpoint, method, body)
+    - ConversationalInput: Multi-turn conversation inputs (list of turns)
     """
 
     model_config = ConfigDict(extra="ignore")
 
     id: str
-    text: str
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PromptInput(Input):
+    """
+    Input for LLM processors.
+
+    Represents a prepared prompt ready for LLM consumption. The user field
+    contains the main prompt/message, and the optional system field contains
+    system instructions (e.g., "You are a helpful assistant").
+
+    Typically created by ScenarioProcessorStep after template rendering.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    user: str = Field(..., description="User-facing prompt message (pre-rendered)")
+    system: Optional[str] = Field(None, description="System instructions (optional)")
+
+
+class RemoteSystemInput(Input):
+    """
+    Input for external API processors.
+
+    Represents an HTTP request to an external API with endpoint, method,
+    headers, body, and optional authentication details.
+
+    Typically created by ScenarioProcessorStep for closed-box API calls.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    endpoint: str = Field(..., description="API endpoint URL")
+    method: str = Field(..., description="HTTP method (GET, POST, PUT, DELETE, etc.)")
+    headers: Dict[str, str] = Field(default_factory=dict, description="Request headers")
+    body: Dict[str, Any] = Field(default_factory=dict, description="Request body")
+    auth: Optional[Dict[str, str]] = Field(
+        None, description="Authentication config (e.g., bearer_token, api_key)"
+    )
+
+
+class ConversationalInput(Input):
+    """
+    Input for conversational/multi-turn processors.
+
+    Represents a conversation with multiple turns, each with a role and content.
+    Supports system instructions for the entire conversation.
+
+    Future-proofing for conversational evaluation workflows.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    turns: List[Dict[str, str]] = Field(
+        ..., description='Conversation turns: [{"role": "user|assistant", "content": "..."}]'
+    )
+    system: Optional[str] = Field(None, description="System instructions for the conversation")
 
 
 class ProcessorConfig(BaseModel):

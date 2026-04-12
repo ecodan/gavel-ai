@@ -1,0 +1,45 @@
+#!/bin/bash
+# Cicadas pre-commit hook
+# Warns if source files are staged but none of the canonical doc files are.
+# Non-blocking: always exits 0.
+
+DOC_FILES=(
+    "README.md"
+    "HOW-TO.md"
+    "src/cicadas/README.md"
+    "release-notes.md"
+    "agents.md"
+    "CLAUDE.md"
+)
+
+STAGED=$(git diff --cached --name-only 2>/dev/null)
+
+if [ -z "$STAGED" ]; then
+    exit 0
+fi
+
+# Check if any non-doc source files are staged
+DOC_PATTERN="^(README\.md|HOW-TO\.md|src/cicadas/README\.md|release-notes\.md|agents\.md|CLAUDE\.md)$"
+SOURCE_STAGED=$(echo "$STAGED" | grep -vE "$DOC_PATTERN" || true)
+
+if [ -z "$SOURCE_STAGED" ]; then
+    exit 0
+fi
+
+# Check if any doc files are staged
+DOCS_STAGED=""
+for doc in "${DOC_FILES[@]}"; do
+    if echo "$STAGED" | grep -qF "$doc"; then
+        DOCS_STAGED="yes"
+        break
+    fi
+done
+
+if [ -z "$DOCS_STAGED" ]; then
+    echo ""
+    echo "  ⚠️  Cicadas: source files changed but no docs updated."
+    echo "     Consider running /update-docs before committing."
+    echo ""
+fi
+
+exit 0
