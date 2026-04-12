@@ -42,6 +42,13 @@
       "summary": "Completed judge-dry-fix: DRY refactored oneshot pipeline on OutputRecord, multi-variant loop, variant-grouped judging, inline join in report, simplified judge CLI. Deleted ReJudge + ResultsExporter. 905 tests, 83% coverage.",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-04-12T15:09:07.719901+00:00",
+      "branch": "initiative/judge-rate-limit-retry",
+      "summary": "Completed: Added gavel-ai-level rate-limit retry for DeepEval judge evaluations. Generalized retry_with_backoff() for reuse across processors, judges, and future layers. 910 tests pass at 83% coverage.",
+      "decisions": "",
+      "modules": []
     }
   ]
 }
