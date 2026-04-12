@@ -1,6 +1,7 @@
 """
 PromptInputProcessor implementation for local prompt evaluation.
 
+Phase 3: Simplified to accept PromptInput with pre-rendered prompts.
 Processes prompts against scenarios using Pydantic-AI provider abstraction.
 """
 
@@ -12,7 +13,7 @@ from pydantic_ai import Agent
 from gavel_ai.core.exceptions import ProcessorError
 from gavel_ai.core.retry import RetryConfig, retry_with_backoff
 from gavel_ai.models.agents import ModelDefinition
-from gavel_ai.models.runtime import Input, ProcessorConfig, ProcessorResult
+from gavel_ai.models.runtime import ProcessorConfig, ProcessorResult, PromptInput
 from gavel_ai.processors.base import InputProcessor
 from gavel_ai.providers.factory import ProviderFactory
 from gavel_ai.telemetry import get_tracer
@@ -45,36 +46,13 @@ class PromptInputProcessor(InputProcessor):
         self.model_def = model_def
         self.agent: Agent = self.provider_factory.create_agent(model_def)
 
-    def _render_prompt(self, template: str, variables: Dict[str, Any]) -> str:
+    async def _call_llm(self, messages: List[Dict[str, str]]) -> tuple[str, Dict[str, Any]]:
         """
-        Render prompt template with scenario variables.
+        Call LLM with structured messages and return response with metadata.
 
         Args:
-            template: Prompt template string with {variable} placeholders
-            variables: Dictionary of variable values to substitute
-
-        Returns:
-            Rendered prompt string
-
-        Raises:
-            ProcessorError: If required variables are missing from scenario
-        """
-        try:
-            rendered = template.format(**variables)
-            return rendered
-        except KeyError as e:
-            missing_var = e.args[0]
-            raise ProcessorError(
-                f"Missing required variable '{missing_var}' in scenario input - "
-                f"Add '{missing_var}' to scenario data or update template"
-            ) from e
-
-    async def _call_llm(self, prompt: str) -> tuple[str, Dict[str, Any]]:
-        """
-        Call LLM with prompt and return response with metadata.
-
-        Args:
-            prompt: Rendered prompt text
+            messages: List of message dicts with 'role' and 'content' keys
+                     [{"role": "system|user|assistant", "content": "..."}]
 
         Returns:
             Tuple of (response_text, metadata_dict)
@@ -83,7 +61,12 @@ class PromptInputProcessor(InputProcessor):
             ProcessorError: On LLM call failures
         """
         try:
-            result = await self.provider_factory.call_agent(self.agent, prompt)
+            # Extract user message (combined with system prompt if present)
+            user_content = next(
+                (msg["content"] for msg in messages if msg.get("role") == "user"),
+                ""
+            )
+            result = await self.provider_factory.call_agent(self.agent, user_content)
             return (result.output, result.metadata)
         except ProcessorError:
             raise
@@ -92,12 +75,15 @@ class PromptInputProcessor(InputProcessor):
                 f"Unexpected error during LLM call: {e} - Check logs for details"
             ) from e
 
-    async def process(self, inputs: List[Input]) -> ProcessorResult:
+    async def process(self, inputs: List[PromptInput]) -> ProcessorResult:
         """
-        Execute processor against batch of inputs.
+        Execute processor against batch of PromptInput instances.
+
+        Phase 3: Accepts PromptInput with pre-rendered prompts (from ScenarioProcessorStep).
+        Constructs messages from user/system prompts and calls LLM.
 
         Args:
-            inputs: List of Input instances to process
+            inputs: List of PromptInput instances with rendered prompts
 
         Returns:
             ProcessorResult with output, metadata, and optional error
@@ -114,16 +100,18 @@ class PromptInputProcessor(InputProcessor):
         last_metadata: Dict[str, Any] = {}
 
         for input_item in inputs:
-            # For now, use the input text directly as the prompt
-            # Real implementation will load template and render with variables
-            prompt = input_item.text
+            # Construct messages from PromptInput
+            messages: List[Dict[str, str]] = []
+            if input_item.system:
+                messages.append({"role": "system", "content": input_item.system})
+            messages.append({"role": "user", "content": input_item.user})
 
             # Call LLM with retry logic
             retry_config = RetryConfig(max_retries=3)
-            
+
             async def call_llm_attempt() -> tuple[str, Dict[str, Any]]:
-                return await self._call_llm(prompt)
-                
+                return await self._call_llm(messages)
+
             try:
                 output, metadata = await retry_with_backoff(
                     func=call_llm_attempt,
@@ -131,7 +119,7 @@ class PromptInputProcessor(InputProcessor):
                     transient_exceptions=(TimeoutError,),
                     error_message_template="LLM call timed out after {max_retries} retries - Increase timeout_seconds in config or check provider status",
                 )
-                
+
                 all_outputs.append(output)
                 last_metadata = metadata
 
@@ -140,7 +128,7 @@ class PromptInputProcessor(InputProcessor):
                     aggregated_metadata["total_tokens"] += metadata["tokens"].get("total", 0)
                 if "latency_ms" in metadata:
                     aggregated_metadata["total_latency_ms"] += metadata["latency_ms"]
-                    
+
             except ProcessorError:
                 raise
             except Exception as e:
