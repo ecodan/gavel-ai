@@ -355,3 +355,99 @@ class TestGEvalExpectedOutputTemplate:
 
         # Should use scenario.expected_behavior
         assert expected == "Paris"
+
+
+class TestRateLimitRetry:
+    """Test rate-limit retry logic for DeepEval judge evaluation."""
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_retries_and_succeeds(
+        self, mock_deepeval_metrics, answer_relevancy_config, mock_scenario
+    ):
+        """Test that rate-limit errors are retried and eventually succeed."""
+        from unittest.mock import AsyncMock, patch
+        import tenacity
+
+        mock_metric = mock_deepeval_metrics["relevancy_instance"]
+        mock_metric.score = 0.85
+        mock_metric.reason = "Good match"
+
+        # Create RetryError with rate-limit cause
+        future = tenacity.Future(1)
+        future.set_exception(RuntimeError("anthropic.RateLimitError: 429 too many requests"))
+        retry_error = tenacity.RetryError(future)
+
+        call_count = 0
+
+        async def mock_to_thread(fn, *args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:  # First 2 calls raise
+                raise retry_error
+            # 3rd call succeeds (actually run the metric measure)
+            return fn(*args, **kwargs)
+
+        judge = DeepEvalJudge(answer_relevancy_config)
+        with patch("asyncio.to_thread", side_effect=mock_to_thread), patch(
+            "asyncio.sleep", new_callable=AsyncMock
+        ) as mock_sleep:
+            result = await judge.evaluate(mock_scenario, "Paris is the capital of France")
+
+            # Verify result is returned (metric.measure was eventually called)
+            assert isinstance(result, JudgeResult)
+            assert result.score == 9  # 0.85 normalized
+
+            # Verify sleep was called twice (on first and second failure)
+            assert mock_sleep.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_all_retries_exhausted(
+        self, answer_relevancy_config, mock_scenario
+    ):
+        """Test that rate-limit errors raise JudgeError when all retries exhausted."""
+        from unittest.mock import patch, AsyncMock
+        import tenacity
+
+        # Create RetryError with rate-limit cause
+        future = tenacity.Future(1)
+        future.set_exception(RuntimeError("anthropic.RateLimitError: too many requests"))
+        retry_error = tenacity.RetryError(future)
+
+        async def mock_to_thread(fn, *args, **kwargs):
+            raise retry_error
+
+        judge = DeepEvalJudge(answer_relevancy_config)
+        with patch("asyncio.to_thread", side_effect=mock_to_thread), patch(
+            "asyncio.sleep", new_callable=AsyncMock
+        ) as mock_sleep:
+            with pytest.raises(JudgeError, match="exhausted rate-limit retries"):
+                await judge.evaluate(mock_scenario, "test output")
+
+            # Should have retried 3 times (initial + 3 retries), so 3 sleeps
+            assert mock_sleep.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_non_rate_limit_retry_error_raises_immediately(
+        self, answer_relevancy_config, mock_scenario
+    ):
+        """Test that non-rate-limit RetryErrors (e.g. auth) fail immediately."""
+        from unittest.mock import patch, AsyncMock
+        import tenacity
+
+        # Create RetryError with auth error cause (not rate-limit)
+        future = tenacity.Future(1)
+        future.set_exception(RuntimeError("anthropic.AuthenticationError: invalid key"))
+        retry_error = tenacity.RetryError(future)
+
+        async def mock_to_thread(fn, *args, **kwargs):
+            raise retry_error
+
+        judge = DeepEvalJudge(answer_relevancy_config)
+        with patch("asyncio.to_thread", side_effect=mock_to_thread), patch(
+            "asyncio.sleep", new_callable=AsyncMock
+        ) as mock_sleep:
+            with pytest.raises(JudgeError, match="DeepEval evaluation failed"):
+                await judge.evaluate(mock_scenario, "test output")
+
+            # Should NOT have slept (no retries for auth error)
+            assert mock_sleep.call_count == 0

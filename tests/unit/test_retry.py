@@ -70,7 +70,7 @@ class TestRetryWithBackoff:
     async def test_non_transient_error_fails_immediately(self):
         """Test non-transient errors fail without retry."""
         mock_func = AsyncMock(side_effect=ValueError("Non-transient"))
-        with pytest.raises(ProcessorError, match="Non-transient"):
+        with pytest.raises(ValueError, match="Non-transient"):
             await retry_with_backoff(mock_func)
         mock_func.assert_called_once()
 
@@ -80,3 +80,28 @@ class TestRetryWithBackoff:
         mock_func = AsyncMock(side_effect=ProcessorError("Already wrapped"))
         with pytest.raises(ProcessorError, match="Already wrapped"):
             await retry_with_backoff(mock_func)
+
+    @pytest.mark.asyncio
+    async def test_error_class_used_for_exhausted_retries(self):
+        """Test custom error_class is used when max retries exhausted."""
+        from gavel_ai.core.exceptions import JudgeError
+
+        mock_func = AsyncMock(side_effect=TimeoutError("Always times out"))
+        with pytest.raises(JudgeError, match="failed after 2 retries"):
+            await retry_with_backoff(
+                mock_func,
+                retry_config=RetryConfig(max_retries=2, initial_delay=0.01),
+                error_class=JudgeError,
+            )
+
+    @pytest.mark.asyncio
+    async def test_transient_predicate_skips_non_transient_match(self):
+        """Test transient_predicate can reject exceptions that match type."""
+        mock_func = AsyncMock(side_effect=TimeoutError("auth timeout"))
+        with pytest.raises(TimeoutError):  # bare re-raise, no retry
+            await retry_with_backoff(
+                mock_func,
+                transient_exceptions=(TimeoutError,),
+                transient_predicate=lambda e: False,
+            )
+        mock_func.assert_called_once()

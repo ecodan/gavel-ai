@@ -22,6 +22,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "jsonlines>=4.0.0",
     "tqdm>=4.65.0",
+    "tenacity>=8.0.0",
 ]
 
 [project.optional-dependencies]
