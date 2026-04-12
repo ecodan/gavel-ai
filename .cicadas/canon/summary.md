@@ -23,7 +23,7 @@ Supports two evaluation modes: **OneShot** (single-turn prompt→response) and *
   - `core/execution/retry_logic.py`: Async exponential-backoff retry helper.
   - `core/steps/conversational_processor.py`: Multi-turn, multi-variant conversation execution with `max_turns` and `max_duration_ms` enforcement.
 - `processors`: Domain logic for OneShot, Conversational, and Autotune.
-- `judges`: Evaluation logic and adapters for GEval/DeepEval. `ReJudge` supports re-running judges on existing `results_raw.jsonl`.
+- `judges`: Evaluation logic and adapters for GEval/DeepEval. No standalone re-judge class; use `gavel oneshot judge` (reuses `JudgeRunnerStep` + `ReportRunnerStep` via `LocalRunContext`).
 - `reporters`: Jinja2-based HTML/Markdown reports. `OneShotReporter` maps results to Unified ReportData (1-turn conversation model).
 - `storage`: Persistence interface and filesystem implementation.
 - `providers`: Provider-agnostic factory using Pydantic-AI.
@@ -34,6 +34,8 @@ Supports two evaluation modes: **OneShot** (single-turn prompt→response) and *
 - **Snake case**: Mandatory for code, config fields, and telemetry attributes.
 - **Span emission**: LLM calls and judge evaluations must emit OTel spans.
 - **Immutability**: `results_raw.jsonl` remains unchanged after final processor exit.
+- **OutputRecord as pipeline type**: `ScenarioProcessorStep` emits `List[OutputRecord]` into `context.processor_results`. `JudgeRunnerStep` groups by `variant_id` (not by zip position). `ReportRunnerStep` joins by `(scenario_id, variant_id)`.
+- **No ResultsExporter/ReJudge**: Deleted. Hash utility lives in `storage/utils.py::compute_config_hash`.
 - **Judge config**: Use `name` and `type` fields (not `id`/`judge_type`). Registered via `JudgeRegistry`.
 - **Duration fields**: `max_duration_ms` (ms, 30000–3600000) in `ConversationalConfig`; `timing_ms` on results.
 - **Test markers**: All tests tagged `@pytest.mark.unit` or `@pytest.mark.integration`. Run with `pytest -m unit` / `pytest -m integration`.

@@ -14,6 +14,34 @@
       "summary": "Complete oneshot workflow convergence: fixed processor bugs (deep copy, retry backoff, exception handling), implemented judge/list/milestone CLI commands, added integration tests (927 pass), implemented C-3-5 conversation timeout/error handling with retry logic and error classification",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-04-12T14:10:03.988356+00:00",
+      "branch": "feat/foundation",
+      "summary": "Added typed step-result attrs (processor_results, evaluation_results, test_subject, model_variant) to LocalRunContext; extracted compute_config_hash to storage/utils.py; migrated 5 hash tests to test_utils.py",
+      "decisions": "",
+      "modules": []
+    },
+    {
+      "timestamp": "2026-04-12T14:26:36.069256+00:00",
+      "branch": "feat/foundation",
+      "summary": "Added typed step-result attrs to LocalRunContext and extracted compute_config_hash to storage/utils.py. Foundation for multi-variant DRY refactor.",
+      "decisions": "",
+      "modules": []
+    },
+    {
+      "timestamp": "2026-04-12T14:26:39.289262+00:00",
+      "branch": "feat/steps-and-cleanup",
+      "summary": "Completed DRY refactor: multi-variant loop in ScenarioProcessorStep, variant-grouped JudgeRunnerStep, inline join in ReportRunnerStep, simplified judge CLI. Deleted ReJudge, ResultsExporter. 905 tests pass at 83% coverage.",
+      "decisions": "",
+      "modules": []
+    },
+    {
+      "timestamp": "2026-04-12T14:31:38.592603+00:00",
+      "branch": "initiative/judge-dry-fix",
+      "summary": "Completed judge-dry-fix: DRY refactored oneshot pipeline on OutputRecord, multi-variant loop, variant-grouped judging, inline join in report, simplified judge CLI. Deleted ReJudge + ResultsExporter. 905 tests, 83% coverage.",
+      "decisions": "",
+      "modules": []
     }
   ]
 }

@@ -75,16 +75,24 @@ CLI → Config Discovery → [Executor] → [Processor] → LLM Provider → [Ju
 
 ## Data Models
 
-### ProcessorResult
+### OutputRecord
+
+`OutputRecord` is the unified in-pipeline type emitted by `ScenarioProcessorStep` and consumed by `JudgeRunnerStep` and `ReportRunnerStep`.
 
 ```python
-class ProcessorResult(BaseModel):
-    output: str                       # The literal LLM response
+class OutputRecord(BaseModel):
+    scenario_id: str
+    variant_id: str
+    test_subject: str
+    processor_output: str             # The literal LLM response
     timing_ms: float                  # Wall-clock latency
-    tokens_prompt: int                # Input usage
-    tokens_completion: int            # Output usage
-    error: Optional[str] = None       # Error details, if any
+    tokens_prompt: int
+    tokens_completion: int
+    error: Optional[str] = None
+    metadata: Dict[str, Any] = {}
 ```
+
+Key invariant: records are grouped by `variant_id` in `JudgeRunnerStep` and joined by `(scenario_id, variant_id)` in `ReportRunnerStep`. `metadata` is excluded from `results_judged.jsonl` entries.
 
 ### JudgeResult
 
