@@ -2,8 +2,7 @@
 Report runner step for OneShot workflow.
 
 Responsibilities:
-- Export results_raw.jsonl (immutable processor outputs)
-- Export results_judged.jsonl (judge evaluations)
+- Write results_judged.jsonl (inline join on scenario_id, variant_id)
 - Generate manifest.json with config hash
 - Compute and save run_metadata.json
 - Generate report.html via OneShotReporter
@@ -26,9 +25,9 @@ from gavel_ai.core.steps.base import (
     Step,
     StepPhase,
 )
-from gavel_ai.models.runtime import ReporterConfig
+from gavel_ai.models.runtime import OutputRecord, ReporterConfig
 from gavel_ai.reporters.oneshot_reporter import OneShotReporter
-from gavel_ai.storage.results_exporter import ResultsExporter
+from gavel_ai.storage.utils import compute_config_hash
 from gavel_ai.telemetry import get_metadata_collector
 
 
@@ -72,8 +71,7 @@ class ReportRunnerStep(Step):
             ConfigError: If required data is missing
         """
         eval_config = run_context.eval_context.eval_config.read()
-        scenarios = run_context.eval_context.scenarios.read()
-        processor_results = run_context.processor_results
+        processor_results: List[OutputRecord] = run_context.processor_results
         evaluation_results = run_context.evaluation_results or []
 
         if processor_results is None:
@@ -85,43 +83,30 @@ class ReportRunnerStep(Step):
         model_variant: str = run_context.model_variant or "unknown"
         run_dir: Path = run_context.run_dir
 
-        # Derive processor type from test_subject_type
-        processor_type: str = (
-            "prompt_input" if eval_config.test_subject_type == "local" else "closedbox_input"
-        )
+        self.logger.info("Exporting judged results and generating report")
 
-        self.logger.info("Exporting results and generating report")
+        # Build evaluation lookup by (scenario_id, variant_id) for correct multi-variant join
+        eval_by_key: Dict[tuple, Dict[str, Any]] = {
+            (e["scenario_id"], e["variant_id"]): e for e in evaluation_results
+        }
 
-        # 1. Export raw processor results
-        exporter = ResultsExporter(run_dir, processor_type=processor_type)
-
-        self.logger.debug(
-            f"Exporting {len(processor_results)} processor results to results_raw.jsonl"
-        )
-        exporter.export_raw_results(
-            scenarios,
-            processor_results,
-            test_subject=test_subject,
-            variant_id=model_variant,
-        )
-
-        # 2. Export judged results
+        # Write results_judged.jsonl — one entry per OutputRecord, joined with judge results
         self.logger.debug(
             f"Exporting {len(processor_results)} judged results to results_judged.jsonl"
         )
-        exporter.export_judged_results(
-            scenarios=scenarios,
-            processor_results=processor_results,
-            judge_evaluations=evaluation_results,
-            test_subject=test_subject,
-            variant_id=model_variant,
-        )
+        for record in processor_results:
+            eval_entry = eval_by_key.get((record.scenario_id, record.variant_id), {})
+            entry = {
+                **record.model_dump(exclude={"metadata"}),
+                "judges": eval_entry.get("judges", []),
+            }
+            run_context.results_judged.append(entry)
 
         # Get start time from metadata collector for duration calculation
         metadata_collector = get_metadata_collector()
         start_time_epoch = metadata_collector.run_start_time or time.time()
 
-        # 3. Generate manifest.json
+        # Generate manifest.json
         manifest_file = run_dir / "manifest.json"
         try:
             config_files_for_hash: Dict[str, Path] = {
@@ -143,7 +128,7 @@ class ReportRunnerStep(Step):
                     config_files_for_hash["scenarios"] = alt_scenarios
 
             config_hash: str = (
-                exporter.compute_config_hash(config_files_for_hash)
+                compute_config_hash(config_files_for_hash)
                 if len(config_files_for_hash) >= 2
                 else "unknown"
             )
@@ -170,12 +155,16 @@ class ReportRunnerStep(Step):
                 "run_id": run_context.run_id,
                 "eval_name": run_context.eval_context.eval_name,
                 "config_hash": config_hash,
-                "scenario_count": len(scenarios),
-                "variant_count": 1,
+                "scenario_count": len(processor_results) // max(len(eval_config.variants), 1),
+                "variant_count": len(eval_config.variants),
                 "judge_count": judge_count,
-                "processor_type": processor_type,
+                "processor_type": (
+                    "prompt_input"
+                    if eval_config.test_subject_type == "local"
+                    else "closedbox_input"
+                ),
                 "status": status,
-                "completed_count": len(scenarios) - failed_count,
+                "completed_count": len(processor_results) - failed_count,
                 "failed_count": failed_count,
                 "duration_seconds": time.time() - start_time_epoch,
             }
@@ -189,7 +178,7 @@ class ReportRunnerStep(Step):
             timestamp = datetime.now(timezone.utc).isoformat()
             config_hash = "unknown"
 
-        # 4. Record run end and compute metadata
+        # Record run end and compute metadata
         self.logger.debug("Computing run metadata statistics")
         metadata_collector.record_run_end()
         run_metadata_stats = metadata_collector.compute_statistics(
@@ -203,7 +192,7 @@ class ReportRunnerStep(Step):
 
         self.logger.debug(f"Run metadata saved to {metadata_file}")
 
-        # 5. Generate report
+        # Generate report
         report_path = run_dir / "report.html"
         templates_dir = Path(__file__).parent.parent.parent / "reporters" / "templates"
         reporter_config = ReporterConfig(
@@ -212,14 +201,13 @@ class ReportRunnerStep(Step):
         )
         reporter = OneShotReporter(reporter_config)
 
-        # Create run data object for reporter
         run_data = RunData(
             metadata={
                 "eval_name": run_context.eval_context.eval_name,
                 "timestamp": timestamp,
                 "config_hash": config_hash,
-                "scenario_count": len(scenarios),
-                "variant_count": 1,
+                "scenario_count": len(processor_results) // max(len(eval_config.variants), 1),
+                "variant_count": len(eval_config.variants),
                 "eval_type": "oneshot",
             },
             results=evaluation_results,

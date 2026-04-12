@@ -6,6 +6,7 @@ Unit tests for JudgeRunnerStep.
 """
 
 import logging
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -15,6 +16,7 @@ from gavel_ai.core.steps.base import StepPhase
 from gavel_ai.core.steps.judge_runner import JudgeRunnerStep, get_model_definition
 from gavel_ai.models import EvalConfig, JudgeConfig
 from gavel_ai.models.config import TestSubject
+from gavel_ai.models.runtime import OutputRecord
 
 
 class TestGetModelDefinition:
@@ -243,7 +245,7 @@ class TestJudgeRunnerStep:
 
     @pytest.mark.asyncio
     async def test_execute_sets_evaluation_results_in_context(self, mock_logger: logging.Logger):
-        """execute sets evaluation_results in context."""
+        """execute sets evaluation_results in context using OutputRecord inputs."""
         step = JudgeRunnerStep(mock_logger)
 
         mock_judge = MagicMock(spec=JudgeConfig)
@@ -260,19 +262,30 @@ class TestJudgeRunnerStep:
         mock_scenario = MagicMock()
         mock_scenario.id = "s1"
 
-        mock_processor_result = MagicMock()
-        mock_processor_result.output = "output"
+        record = OutputRecord(
+            test_subject="test-subject",
+            variant_id="test-variant",
+            scenario_id="s1",
+            processor_output="output",
+            timing_ms=0,
+            tokens_prompt=0,
+            tokens_completion=0,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
 
         mock_context = MagicMock()
         mock_context.eval_context.eval_config.read.return_value = mock_eval_config
         mock_context.eval_context.agents.read.return_value = {"_models": {}}
         mock_context.eval_context.scenarios.read.return_value = [mock_scenario]
-        mock_context.processor_results = [mock_processor_result]
+        mock_context.processor_results = [record]
         mock_context.test_subject = "test-subject"
 
-        # Mock JudgeExecutor
         mock_eval_result = MagicMock()
-        mock_eval_result.model_dump.return_value = {"judges": [{"name": "judge1", "score": 8}]}
+        mock_eval_result.model_dump.return_value = {
+            "judges": [{"name": "judge1", "score": 8}],
+            "scenario_id": "s1",
+            "variant_id": "test-variant",
+        }
 
         with patch("gavel_ai.core.steps.judge_runner.JudgeExecutor") as mock_executor_class:
             mock_executor = MagicMock()
@@ -281,5 +294,90 @@ class TestJudgeRunnerStep:
 
             await step.execute(mock_context)
 
-        # Verify evaluation_results was set
-        assert mock_context.evaluation_results == [{"judges": [{"name": "judge1", "score": 8}]}]
+        assert mock_context.evaluation_results is not None
+        assert len(mock_context.evaluation_results) == 1
+        assert mock_context.evaluation_results[0]["judges"] == [{"name": "judge1", "score": 8}]
+
+    @pytest.mark.asyncio
+    async def test_execute_groups_by_variant_id(self, mock_logger: logging.Logger):
+        """execute groups records by variant_id and calls execute_batch once per variant."""
+        step = JudgeRunnerStep(mock_logger)
+
+        mock_judge = MagicMock(spec=JudgeConfig)
+        mock_judge.name = "test-judge"
+        mock_judge.model = None
+        mock_judge.config = None
+
+        mock_subject = MagicMock(spec=TestSubject)
+        mock_subject.judges = [mock_judge]
+
+        mock_eval_config = MagicMock(spec=EvalConfig)
+        mock_eval_config.test_subjects = [mock_subject]
+
+        # 3 scenarios
+        scenarios = [MagicMock() for _ in range(3)]
+        for i, s in enumerate(scenarios):
+            s.id = f"s{i + 1}"
+
+        ts = datetime.now(timezone.utc).isoformat()
+
+        def _make_record(scenario_id: str, variant_id: str) -> OutputRecord:
+            return OutputRecord(
+                test_subject="subj",
+                variant_id=variant_id,
+                scenario_id=scenario_id,
+                processor_output="out",
+                timing_ms=0,
+                tokens_prompt=0,
+                tokens_completion=0,
+                timestamp=ts,
+            )
+
+        # 2 variants × 3 scenarios = 6 records
+        records = [_make_record(f"s{i + 1}", "v1") for i in range(3)] + [
+            _make_record(f"s{i + 1}", "v2") for i in range(3)
+        ]
+
+        mock_context = MagicMock()
+        mock_context.eval_context.eval_config.read.return_value = mock_eval_config
+        mock_context.eval_context.agents.read.return_value = {"_models": {}}
+        mock_context.eval_context.scenarios.read.return_value = scenarios
+        mock_context.processor_results = records
+        mock_context.test_subject = "subj"
+
+        def _make_eval_result(scenario_id: str, variant_id: str):
+            mock_r = MagicMock()
+            mock_r.model_dump.return_value = {
+                "scenario_id": scenario_id,
+                "variant_id": variant_id,
+                "judges": [],
+            }
+            return mock_r
+
+        variant_results = {
+            "v1": [_make_eval_result(f"s{i + 1}", "v1") for i in range(3)],
+            "v2": [_make_eval_result(f"s{i + 1}", "v2") for i in range(3)],
+        }
+
+        call_count = 0
+
+        async def _fake_execute_batch(evaluations, subject_id, test_subject):
+            nonlocal call_count
+            variant_id = evaluations[0][2] if evaluations else "v1"
+            call_count += 1
+            return variant_results[variant_id]
+
+        with patch("gavel_ai.core.steps.judge_runner.JudgeExecutor") as mock_executor_class:
+            mock_executor = MagicMock()
+            mock_executor.execute_batch = _fake_execute_batch
+            mock_executor_class.return_value = mock_executor
+
+            await step.execute(mock_context)
+
+        # execute_batch called once per variant (2 variants)
+        assert call_count == 2
+
+        # 6 EvaluationResult dicts in context.evaluation_results
+        assert len(mock_context.evaluation_results) == 6
+        result_keys = {(r["scenario_id"], r["variant_id"]) for r in mock_context.evaluation_results}
+        assert len(result_keys) == 6
