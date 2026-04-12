@@ -18,6 +18,7 @@ from deepeval.metrics import (
     GEval,
     HallucinationMetric,
 )
+from deepeval.errors import MissingTestCaseParamsError
 from deepeval.models import AnthropicModel, GeminiModel, GPTModel, OllamaModel
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from jinja2 import Template
@@ -294,10 +295,15 @@ class DeepEvalJudge(Judge):
 
             except JudgeError:
                 raise
+            except MissingTestCaseParamsError as e:
+                raise JudgeError(
+                    f"Judge '{judge_type}' requires fields not present in scenario '{scenario.id}': {e}. "
+                    f"Add the required field to your scenario data or use a different judge."
+                ) from e
             except Exception as e:
                 raise JudgeError(
-                    f"DeepEval evaluation failed for scenario '{scenario.id}': {e} - "
-                    f"Check API credentials and judge configuration"
+                    f"DeepEval evaluation failed for scenario '{scenario.id}' "
+                    f"(judge: '{judge_type}', error: {type(e).__name__}): {e}"
                 ) from e
 
     def _create_test_case(self, scenario: Scenario, subject_output: str) -> LLMTestCase:

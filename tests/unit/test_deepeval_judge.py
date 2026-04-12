@@ -246,7 +246,6 @@ class TestDeepEvalJudgeErrorHandling:
 
         assert "DeepEval evaluation failed" in str(exc_info.value)
         assert "API error" in str(exc_info.value)
-        assert "Check API credentials" in str(exc_info.value)
 
 
 class TestDeepEvalJudgeScoreNormalization:
