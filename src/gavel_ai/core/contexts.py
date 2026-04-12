@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from gavel_ai.core.adapters.backends import LocalStorageBackend
 from gavel_ai.core.adapters.data_sources import (
@@ -404,6 +404,12 @@ class LocalRunContext(RunContext):
 
         # Initialize all artifact data sources
         self._init_artifacts()
+
+        # Typed step-result attributes — set by pipeline steps, consumed by downstream steps
+        self.processor_results: Optional[List[OutputRecord]] = None
+        self.evaluation_results: Optional[List[Dict[str, Any]]] = None
+        self.test_subject: Optional[str] = None
+        self.model_variant: Optional[str] = None
 
         # Configure run-specific logger
         self._configure_logger()
