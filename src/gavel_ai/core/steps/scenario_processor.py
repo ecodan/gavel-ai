@@ -3,30 +3,39 @@ Scenario processor step for OneShot workflow.
 
 Responsibilities:
 - Instantiate processor (PromptInputProcessor or ClosedBoxInputProcessor)
-- Convert scenarios to Input[]
+- Load prompt templates and render them with scenario variables
+- Convert scenarios to PromptInput[] with rendered prompts
 - Execute via Executor with parallelism/error handling
 - Store processor_results in context
 
 Per Tech Spec 3.9: Extracted from run() lines 173-244.
+Phase 2: Template rendering added to fix prompt loading bug.
 """
 
 import logging
 from datetime import datetime, timezone
-from typing import List
+from typing import Any, Dict, List
+
+from jinja2 import Template, TemplateError
 
 from gavel_ai.core.contexts import RunContext
-from gavel_ai.core.exceptions import ConfigError
+from gavel_ai.core.exceptions import ConfigError, ProcessorError
 from gavel_ai.core.executor import Executor
 from gavel_ai.core.steps.base import Step, StepPhase
 from gavel_ai.models.agents import ModelDefinition
-from gavel_ai.models.runtime import Input, OutputRecord, ProcessorConfig, ProcessorResult
+from gavel_ai.models.runtime import (
+    OutputRecord,
+    ProcessorConfig,
+    ProcessorResult,
+    PromptInput,
+)
 from gavel_ai.processors.closedbox_processor import ClosedBoxInputProcessor
 from gavel_ai.processors.prompt_processor import PromptInputProcessor
 
 
 def _make_output_record(
     proc_result: ProcessorResult,
-    input_item: Input,
+    input_item: PromptInput,
     test_subject: str,
     variant_id: str,
 ) -> OutputRecord:
@@ -34,7 +43,7 @@ def _make_output_record(
 
     Args:
         proc_result: Raw processor output
-        input_item: The input that was processed (carries scenario_id)
+        input_item: The PromptInput that was processed (carries scenario_id)
         test_subject: Prompt/system under test name
         variant_id: Model variant identifier
 
@@ -63,6 +72,9 @@ class ScenarioProcessorStep(Step):
     """
     Executes scenarios through the appropriate processor.
 
+    Phase 2 (Template Rendering): Loads prompt templates, renders with scenario variables,
+    creates PromptInput with rendered prompts.
+
     Sets context.processor_results with execution results.
     Sets context.test_subject and context.model_variant for downstream steps.
     """
@@ -73,6 +85,32 @@ class ScenarioProcessorStep(Step):
     @property
     def phase(self) -> StepPhase:
         return StepPhase.SCENARIO_PROCESSING
+
+    def _render_template(self, template_text: str, variables: Dict[str, Any]) -> str:
+        """
+        Render Jinja2 template with scenario variables.
+
+        Args:
+            template_text: Jinja2 template string (e.g., "You are... {{ scenario.html }}")
+            variables: Dict of scenario variables (e.g., {"site": "...", "html": "..."})
+
+        Returns:
+            Rendered prompt with variables substituted
+
+        Raises:
+            ProcessorError: If template rendering fails
+        """
+        try:
+            tmpl = Template(template_text)
+            # Use 'scenario' as context var name to avoid conflict with built-in input()
+            return tmpl.render(scenario=variables)
+        except TemplateError as e:
+            raise ProcessorError(
+                f"Failed to render prompt template: {str(e)}. "
+                f"Template variables: {variables}"
+            ) from e
+        except Exception as e:
+            raise ProcessorError(f"Unexpected error rendering template: {str(e)}") from e
 
     async def execute(self, context: RunContext) -> None:
         """
@@ -96,15 +134,44 @@ class ScenarioProcessorStep(Step):
         if not test_subject_config:
             raise ConfigError("No test_subjects configured in eval_config")
 
-        # Convert scenarios to inputs (shared across all variants)
-        inputs: List[Input] = [
-            Input(
+        # Load prompt template (once per test_subject, not per scenario)
+        prompt_ref = test_subject_config.prompt_name or "unknown"
+        self.logger.info(f"Loading prompt template: {prompt_ref}")
+        try:
+            template_text = context.eval_context.get_prompt(prompt_ref)
+        except Exception as e:
+            raise ConfigError(
+                f"Failed to load prompt template '{prompt_ref}': {str(e)}. "
+                f"Ensure the template exists in config/prompts/"
+            ) from e
+
+        # Convert scenarios to PromptInput with rendered prompts (shared across all variants)
+        inputs: List[PromptInput] = []
+        for scenario in scenarios:
+            # Extract variables from scenario input
+            if isinstance(scenario.input, dict):
+                variables = scenario.input
+            else:
+                # If input is string, try to parse as JSON or use as-is
+                variables = {"raw": str(scenario.input)}
+
+            # Render template with scenario variables
+            rendered_prompt = self._render_template(template_text, variables)
+
+            # Create PromptInput with rendered prompt
+            prompt_input = PromptInput(
                 id=scenario.scenario_id,
-                text=scenario.input if isinstance(scenario.input, str) else str(scenario.input),
-                metadata=scenario.metadata or {},
+                user=rendered_prompt,
+                system=None,  # Can be added in future if needed
+                metadata={
+                    "scenario_input": scenario.input,  # Preserve original for debugging
+                    "template": prompt_ref,
+                    **(scenario.metadata or {}),
+                },
             )
-            for scenario in scenarios
-        ]
+            inputs.append(prompt_input)
+
+        self.logger.info(f"Created {len(inputs)} PromptInput objects with rendered templates")
 
         models = agents_config.get("_models", {})
         all_records: List[OutputRecord] = []
@@ -169,7 +236,7 @@ class ScenarioProcessorStep(Step):
                     f"Use 'prompt_input' or 'closedbox_input'"
                 )
 
-            def _spool_result(input_item: Input, result: ProcessorResult) -> None:
+            def _spool_result(input_item: PromptInput, result: ProcessorResult) -> None:
                 """Convert result to OutputRecord, stream to disk, accumulate in list."""
                 record = _make_output_record(result, input_item, test_subject, model_variant)
                 context.results_raw.append(record)
