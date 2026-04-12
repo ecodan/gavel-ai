@@ -135,7 +135,12 @@ class ScenarioProcessorStep(Step):
             raise ConfigError("No test_subjects configured in eval_config")
 
         # Load prompt template (once per test_subject, not per scenario)
-        prompt_ref = test_subject_config.prompt_name or "unknown"
+        prompt_name = test_subject_config.prompt_name or "unknown"
+        # Ensure prompt reference includes version (e.g., "default:v1" or "default:latest")
+        if ":" not in prompt_name:
+            prompt_ref = f"{prompt_name}:latest"
+        else:
+            prompt_ref = prompt_name
         self.logger.info(f"Loading prompt template: {prompt_ref}")
         try:
             template_text = context.eval_context.get_prompt(prompt_ref)
