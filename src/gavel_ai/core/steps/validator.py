@@ -176,6 +176,30 @@ class ValidatorStep(Step):
         #         f"Check scenarios file exists and is valid"
         #     ) from e
 
+        # 6. Validate scenario IDs are unique
+        try:
+            scenarios = context.eval_context.scenarios.read()
+            ids = [s.scenario_id for s in scenarios]
+            seen: set[str] = set()
+            duplicates: List[str] = []
+            for sid in ids:
+                if sid in seen:
+                    duplicates.append(sid)
+                seen.add(sid)
+            if duplicates:
+                errors.append(f"Duplicate scenario IDs: {duplicates}")
+                context.validation_result = ValidationResult(
+                    is_valid=False, errors=errors, warnings=warnings
+                )
+                raise ConfigError(
+                    f"Validation failed: duplicate scenario IDs {duplicates} - "
+                    f"Each scenario must have a unique id"
+                )
+        except ConfigError:
+            raise
+        except Exception:
+            pass  # Scenarios may not be present for all workflow types
+
         # All validations passed
         context.validation_result = ValidationResult(is_valid=True, errors=[], warnings=warnings)
 

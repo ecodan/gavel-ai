@@ -14,15 +14,15 @@ Phase 2: Template rendering added to fix prompt loading bug.
 
 import logging
 from datetime import datetime, timezone
+from string import Template
 from typing import Any, Dict, List
-
-from jinja2 import Template, TemplateError
 
 from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError, ProcessorError
 from gavel_ai.core.executor import Executor
 from gavel_ai.core.steps.base import Step, StepPhase
 from gavel_ai.models.agents import ModelDefinition
+from gavel_ai.models.config import AsyncConfig
 from gavel_ai.models.runtime import (
     OutputRecord,
     ProcessorConfig,
@@ -88,11 +88,11 @@ class ScenarioProcessorStep(Step):
 
     def _render_template(self, template_text: str, variables: Dict[str, Any]) -> str:
         """
-        Render Jinja2 template with scenario variables.
+        Render a prompt template with scenario variables using string.Template.
 
         Args:
-            template_text: Jinja2 template string (e.g., "You are... {{ scenario.html }}")
-            variables: Dict of scenario variables (e.g., {"site": "...", "html": "..."})
+            template_text: Template string using $var or ${var} syntax (e.g., "... $html")
+            variables: Dict of scenario variables (e.g., {"html": "...", "url": "..."})
 
         Returns:
             Rendered prompt with variables substituted
@@ -101,16 +101,15 @@ class ScenarioProcessorStep(Step):
             ProcessorError: If template rendering fails
         """
         try:
-            tmpl = Template(template_text)
-            # Use 'scenario' as context var name to avoid conflict with built-in input()
-            return tmpl.render(scenario=variables)
-        except TemplateError as e:
+            return Template(template_text).substitute(variables)
+        except KeyError as e:
+            keys = list(variables.keys())
             raise ProcessorError(
-                f"Failed to render prompt template: {str(e)}. "
-                f"Template variables: {variables}"
+                f"Template variable {e} not found in scenario. "
+                f"Available keys: {keys}"
             ) from e
-        except Exception as e:
-            raise ProcessorError(f"Unexpected error rendering template: {str(e)}") from e
+        except ValueError as e:
+            raise ProcessorError(f"Malformed template placeholder: {str(e)}") from e
 
     async def execute(self, context: RunContext) -> None:
         """
@@ -125,7 +124,7 @@ class ScenarioProcessorStep(Step):
         eval_config = context.eval_context.eval_config.read()
         agents_config = context.eval_context.agents.read()
         scenarios = context.eval_context.scenarios.read()
-        async_config = eval_config.async_config
+        async_config = eval_config.async_config or AsyncConfig()
 
         if not eval_config.variants:
             raise ConfigError("No variants configured in eval_config")
@@ -157,8 +156,8 @@ class ScenarioProcessorStep(Step):
             if isinstance(scenario.input, dict):
                 variables = scenario.input
             else:
-                # If input is string, try to parse as JSON or use as-is
-                variables = {"raw": str(scenario.input)}
+                # String input: expose as $input in the template
+                variables = {"input": str(scenario.input)}
 
             # Render template with scenario variables
             rendered_prompt = self._render_template(template_text, variables)
