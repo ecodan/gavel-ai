@@ -250,6 +250,7 @@ class TestJudgeRunnerStep:
 
         mock_judge = MagicMock(spec=JudgeConfig)
         mock_judge.name = "test-judge"
+        mock_judge.type = "deepeval.answer_relevancy"
         mock_judge.model = None
         mock_judge.config = None
 
@@ -305,6 +306,7 @@ class TestJudgeRunnerStep:
 
         mock_judge = MagicMock(spec=JudgeConfig)
         mock_judge.name = "test-judge"
+        mock_judge.type = "deepeval.answer_relevancy"
         mock_judge.model = None
         mock_judge.config = None
 

@@ -5,7 +5,7 @@ Provides centralized registration and instantiation of judge implementations.
 Per Epic 4 Story 4.4: Registry pattern for pluggable judge discovery.
 """
 
-from typing import Dict, Type
+from typing import Any, Dict, Type, Union
 
 from gavel_ai.core.exceptions import JudgeError
 from gavel_ai.judges.base import Judge
@@ -17,19 +17,20 @@ class JudgeRegistry:
     Registry for judge implementations.
 
     Allows judges to be registered and instantiated by type name without
-    modifying core code.
+    modifying core code. Supports both LLM-based Judge subclasses and
+    DeterministicMetric subclasses.
     """
 
-    _registry: Dict[str, Type[Judge]] = {}
+    _registry: Dict[str, Type[Any]] = {}
 
     @classmethod
-    def register(cls, judge_type: str, judge_class: Type[Judge]) -> None:
+    def register(cls, judge_type: str, judge_class: Type[Any]) -> None:
         """
         Register a judge implementation.
 
         Args:
             judge_type: The judge type identifier (e.g., "deepeval.similarity")
-            judge_class: The Judge class implementation
+            judge_class: The Judge or DeterministicMetric class implementation
 
         Raises:
             JudgeError: If judge_type is already registered
@@ -42,7 +43,7 @@ class JudgeRegistry:
         cls._registry[judge_type] = judge_class
 
     @classmethod
-    def create(cls, config: JudgeConfig) -> Judge:
+    def create(cls, config: JudgeConfig) -> Any:
         """
         Create a judge instance from configuration.
 
@@ -50,7 +51,7 @@ class JudgeRegistry:
             config: JudgeConfig specifying the judge type and parameters
 
         Returns:
-            Instantiated Judge implementation
+            Instantiated Judge or DeterministicMetric implementation
 
         Raises:
             JudgeError: If judge type is not found in registry
