@@ -120,6 +120,18 @@ BMAD includes comprehensive test architecture workflows:
 - Test quality reviews are part of the development process
 - CI/CD pipelines are scaffolded before implementation
 
+### Test Layout
+
+- `tests/unit/` — fast, no external dependencies; marked `@pytest.mark.unit`
+- `tests/integration/` — real filesystem + mocked LLM calls; marked `@pytest.mark.integration`
+  - `test_oneshot_pipeline_e2e.py` — end-to-end `ScenarioProcessorStep` coverage (happy path, prompt version resolution, error cases)
+
+Run with:
+```bash
+pytest -m unit          # unit tests only
+pytest -m integration   # integration tests only
+```
+
 ## Agent Customizations
 
 Claude Code integrates with BMAD agents through `.claude/_config/agents/`:

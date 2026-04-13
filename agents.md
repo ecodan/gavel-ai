@@ -79,4 +79,8 @@ gavel oneshot report --eval my_eval    # Generate reports
 
 Use the **Cicadas** skill (`/cicadas`) for feature development, bug fixes, and project coordination. Cicadas handles spec drafting, approval, kickoff, branch management, reflect/code-review, and synthesis.
 
-See `.claude/skills/cicadas/SKILL.md` for complete Cicadas workflow and orchestration details.
+Use the **gavel-skill** (`/gavel-skill`) for evaluation setup, scenario authoring, CLI usage, debugging runs, and interpreting results.
+
+Use the **update-docs** skill (`/update-docs`) before committing to sync `README.md`, `release-notes.md`, `agents.md`, and `CLAUDE.md` with recent changes.
+
+See `.claude/skills/` for complete skill documentation.

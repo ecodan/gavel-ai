@@ -262,3 +262,6 @@ cython_debug/
 /.cursor/
 /.opencode/
 /.agent/
+/context.md
+/ref/
+/coverage_reports/
