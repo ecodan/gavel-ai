@@ -219,6 +219,8 @@ def _base_eval_context(variants=None, num_scenarios=1):
     mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
     mock_eval_context.agents = _create_mock_data_source(agents_config)
     mock_eval_context.scenarios = _create_mock_data_source(scenarios)
+    # get_prompt must return a valid string.Template-compatible string
+    mock_eval_context.get_prompt.return_value = "process: $input"
 
     return mock_eval_context, scenarios
 

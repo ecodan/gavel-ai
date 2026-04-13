@@ -31,101 +31,70 @@ def step(logger: logging.Logger) -> ScenarioProcessorStep:
 
 @pytest.mark.unit
 class TestScenarioProcessorStep:
-    """Test ScenarioProcessorStep functionality."""
+    """Test ScenarioProcessorStep functionality (uses string.Template syntax)."""
 
     def test_render_template_basic(self, step: ScenarioProcessorStep) -> None:
         """Test basic template rendering with dict variables."""
-        template = "Extract headlines from: {{ scenario.html }}"
+        template = "Extract headlines from: $html"
         variables = {"html": "<h1>Breaking News</h1>"}
 
         result = step._render_template(template, variables)
 
         assert result == "Extract headlines from: <h1>Breaking News</h1>"
 
-    def test_render_template_with_loop(self, step: ScenarioProcessorStep) -> None:
-        """Test template rendering with loop over list."""
-        template = (
-            "Analyze {{ scenario.site }} content:\n"
-            "{% for item in scenario.articles %}"
-            "- {{ item }}\n"
-            "{% endfor %}"
-        )
-        variables = {
-            "site": "www.example.com",
-            "articles": ["Article 1", "Article 2"],
-        }
+    def test_render_template_braced_syntax(self, step: ScenarioProcessorStep) -> None:
+        """Test template rendering with ${var} braced syntax."""
+        template = "Site: ${site}, Count: ${count}"
+        variables = {"site": "www.example.com", "count": "3"}
 
         result = step._render_template(template, variables)
 
-        assert "www.example.com" in result
-        assert "Article 1" in result
-        assert "Article 2" in result
+        assert result == "Site: www.example.com, Count: 3"
 
-    def test_render_template_conditional(self, step: ScenarioProcessorStep) -> None:
-        """Test template rendering with conditional logic."""
-        template = (
-            "{% if scenario.type == 'news' %}"
-            "Analyze this news article: {{ scenario.content }}"
-            "{% else %}"
-            "Process this content: {{ scenario.content }}"
-            "{% endif %}"
-        )
+    def test_render_template_multiple_vars(self, step: ScenarioProcessorStep) -> None:
+        """Test template rendering with multiple variables."""
+        template = "Analyze $site: $content"
+        variables = {"site": "news.com", "content": "Breaking story"}
 
-        variables_news = {"type": "news", "content": "Breaking news here"}
-        variables_other = {"type": "blog", "content": "Blog post here"}
+        result = step._render_template(template, variables)
 
-        result_news = step._render_template(template, variables_news)
-        result_other = step._render_template(template, variables_other)
-
-        assert "Analyze this news article" in result_news
-        assert "Process this content" in result_other
+        assert "news.com" in result
+        assert "Breaking story" in result
 
     def test_render_template_missing_variable(self, step: ScenarioProcessorStep) -> None:
-        """Test that missing variables render as empty."""
-        template = "Site: {{ scenario.site }}, HTML: {{ scenario.html }}"
+        """Test that missing variable raises ProcessorError."""
+        template = "Site: $site, HTML: $html"
         variables = {"site": "www.example.com"}  # html is missing
 
-        result = step._render_template(template, variables)
-
-        assert "www.example.com" in result
-        assert result.endswith(", HTML: ")  # html renders as empty string
+        with pytest.raises(ProcessorError, match="not found in scenario"):
+            step._render_template(template, variables)
 
     def test_render_template_invalid_syntax_error(self, step: ScenarioProcessorStep) -> None:
-        """Test that invalid Jinja2 syntax raises ProcessorError."""
-        template = "{{ scenario.site | undefined_filter }}"
+        """Test that malformed template placeholder raises ProcessorError."""
+        template = "bad placeholder: $"
         variables = {"site": "www.example.com"}
 
-        with pytest.raises(ProcessorError, match="Failed to render prompt template"):
+        with pytest.raises(ProcessorError, match="Malformed template placeholder"):
             step._render_template(template, variables)
 
     def test_render_template_empty_variables(self, step: ScenarioProcessorStep) -> None:
-        """Test template rendering with empty variables dict."""
-        template = "Process this: {{ scenario }}"
+        """Test template rendering with no substitution markers."""
+        template = "Process this static prompt"
         variables: dict = {}
 
         result = step._render_template(template, variables)
 
-        # Should render without error, with empty scenario
-        assert "Process this:" in result
+        assert result == "Process this static prompt"
 
-    def test_render_template_complex_nested_structure(
+    def test_render_template_complex_flat_vars(
         self, step: ScenarioProcessorStep
     ) -> None:
-        """Test template rendering with complex nested variables."""
-        template = (
-            "Analyze {{ scenario.metadata.domain }} with context:\n"
-            "{% for ctx in scenario.metadata.contexts %}"
-            "- {{ ctx.name }}: {{ ctx.value }}\n"
-            "{% endfor %}"
-        )
+        """Test template rendering with multiple flat variables."""
+        template = "Domain: $domain, Topic: $topic, Sentiment: $sentiment"
         variables = {
-            "metadata": {
-                "domain": "news.com",
-                "contexts": [
-                    {"name": "topic", "value": "technology"},
-                    {"name": "sentiment", "value": "positive"},
-                ],
-            }
+            "domain": "news.com",
+            "topic": "technology",
+            "sentiment": "positive",
         }
 
         result = step._render_template(template, variables)
@@ -184,8 +153,8 @@ class TestScenarioProcessorStepIntegration:
         template = (
             "You are a news content analyzer. Extract headlines from the following HTML.\n"
             "Return ONLY a JSON object with a 'stories' array.\n\n"
-            "HTML Content:\n{{ scenario.html }}\n\n"
-            "Website: {{ scenario.site }}"
+            "HTML Content:\n$html\n\n"
+            "Website: $site"
         )
         variables = {
             "html": "<h1>Breaking News</h1>\n<h2>Story 2</h2>",
@@ -197,24 +166,24 @@ class TestScenarioProcessorStepIntegration:
         assert "You are a news content analyzer" in result
         assert "Breaking News" in result
         assert "www.bbc.com" in result
-        assert "{{ scenario" not in result  # No unrendered variables
+        assert "$" not in result  # No unrendered variables
 
     def test_render_api_call_prompt(self, step: ScenarioProcessorStep) -> None:
         """Test rendering a prompt for API-based evaluation."""
         template = (
             "Call the following API:\n"
-            "Endpoint: {{ scenario.endpoint }}\n"
-            "Method: {{ scenario.method }}\n"
-            "Body: {{ scenario.body | tojson }}"
+            "Endpoint: $endpoint\n"
+            "Method: $method\n"
+            "Body: $body"
         )
         variables = {
             "endpoint": "https://api.example.com/analyze",
             "method": "POST",
-            "body": {"text": "sample", "language": "en"},
+            "body": '{"text": "sample", "language": "en"}',
         }
 
         result = step._render_template(template, variables)
 
         assert "https://api.example.com/analyze" in result
         assert "POST" in result
-        assert '"text": "sample"' in result or "'text': 'sample'" in result
+        assert "sample" in result

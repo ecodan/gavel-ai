@@ -40,7 +40,7 @@ next_section: "## Initiative Boundary"
 - [x] Add `scikit-learn>=1.4,<2.0` to `pyproject.toml` dependencies; verify install with `pip install -e .` <!-- id: 9 -->
 - [x] Modify `src/gavel_ai/core/steps/judge_runner.py`: import `DeterministicMetric`; after building `judges_list`, partition into `llm_configs` and `det_configs`; pass `llm_configs` to `JudgeExecutor` as before; add inline loop for `det_configs` that instantiates each metric, calls `evaluate_sample()` per record in scenario order, then calls `compute()`; store all results in `context.deterministic_metrics: Dict[str, DeterministicRunResult]` <!-- id: 10 -->
 - [x] Write `tests/unit/judges/test_deterministic_metric.py`: cover match/mismatch, case-insensitivity, unbounded regression error, all three skip conditions, `population_score=None` when all skipped, correct `accuracy` for known 3-sample fixture, correct `mean_absolute_error` for known numeric fixture, `fbeta` missing beta raises `ConfigError`, registry returns correct types <!-- id: 11 -->
-- [ ] Write integration test confirming `JudgeRunnerStep` sets `context.deterministic_metrics` correctly when a mix of LLM and deterministic judge configs are present; confirm `context.evaluation_results` is still populated for LLM judges <!-- id: 12 -->
+- [x] Write integration test confirming `JudgeRunnerStep` sets `context.deterministic_metrics` correctly when a mix of LLM and deterministic judge configs are present; confirm `context.evaluation_results` is still populated for LLM judges <!-- id: 12 -->
 - [x] Run `pytest -m unit` and `pytest -m integration` — all pass <!-- id: 13 -->
 
 ## Partition: feat/pipeline-hardening

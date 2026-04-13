@@ -90,25 +90,35 @@ class ProviderFactory:
             # Extract API key or base URL from provider_auth
             api_key = model_def.provider_auth.get("api_key")
             base_url = model_def.provider_auth.get("base_url")
+            gcp_project = model_def.provider_auth.get("project")
+            gcp_location = model_def.provider_auth.get("location")
 
-            # Resolve environment variables in API key (supports {{VAR}} and ${VAR} formats)
-            if api_key:
-                env_var_name = None
-                if api_key.startswith("{{") and api_key.endswith("}}"):
-                    env_var_name = api_key[2:-2]
-                elif api_key.startswith("${") and api_key.endswith("}"):
-                    env_var_name = api_key[2:-1]
+            # Resolve environment variables in string values (supports {{VAR}} and ${VAR} formats)
+            def _resolve_env_template(value: str, field_name: str) -> str:
+                env_var_name: str | None = None
+                if value.startswith("{{") and value.endswith("}}"):
+                    env_var_name = value[2:-2]
+                elif value.startswith("${") and value.endswith("}"):
+                    env_var_name = value[2:-1]
 
                 if env_var_name:
-                    resolved_key = os.getenv(env_var_name)
-                    if not resolved_key:
+                    resolved: str | None = os.getenv(env_var_name)
+                    if not resolved:
                         from gavel_ai.core.exceptions import ConfigError
 
                         raise ConfigError(
                             f"Environment variable '{env_var_name}' not set - "
-                            f"Set {env_var_name} or provide api_key directly in provider_auth"
+                            f"Set {env_var_name} or provide {field_name} directly in provider_auth"
                         )
-                    api_key = resolved_key
+                    return resolved
+                return value
+
+            if api_key:
+                api_key = _resolve_env_template(api_key, "api_key")
+            if gcp_project:
+                gcp_project = _resolve_env_template(gcp_project, "project")
+            if gcp_location:
+                gcp_location = _resolve_env_template(gcp_location, "location")
 
             try:
                 # Build model string: "provider:model_version"
@@ -169,15 +179,14 @@ class ProviderFactory:
                                 "Google provider not available - "
                                 "Install pydantic-ai with google support"
                             )
-                        if not api_key:
-                            raise ProcessorError(
-                                "Google API key required - "
-                                "Set 'api_key' in provider_auth or GOOGLE_API_KEY env var"
-                            )
-                        # Google provider: Only api_key and base_url parameters
+                        # Supports AI Studio (api_key / GOOGLE_API_KEY env var) and
+                        # Vertex AI (project + location, uses GOOGLE_APPLICATION_CREDENTIALS ADC).
+                        # GoogleProvider reads GOOGLE_API_KEY from env automatically when api_key=None.
                         return GoogleProvider(
-                            api_key=api_key,
-                            base_url=base_url,
+                            api_key=api_key or None,
+                            project=gcp_project or None,
+                            location=gcp_location or None,
+                            base_url=base_url or None,
                         )
 
                     elif provider_name == "ollama":
