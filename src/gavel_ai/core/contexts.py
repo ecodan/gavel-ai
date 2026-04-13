@@ -159,6 +159,24 @@ class RunContext(ABC):
         even if the eval config is later modified.
         """
 
+    @abstractmethod
+    def mark_step_complete(self, phase: "StepPhase") -> None:
+        """
+        Record a step phase as complete in append-only workflow status log.
+
+        Args:
+            phase: The StepPhase that completed successfully.
+        """
+
+    @abstractmethod
+    def get_completed_steps(self) -> List["StepPhase"]:
+        """
+        Return list of completed step phases in order.
+
+        Returns:
+            List of StepPhase values; empty list if none recorded.
+        """
+
 
 class LocalFileSystemEvalContext(EvalContext):
     """
@@ -358,6 +376,34 @@ class LocalFileSystemEvalContext(EvalContext):
 
         return self._judge_cache[judge_name]
 
+    def get_judge_config(self, name: str) -> Dict[str, Any]:
+        """
+        Load judge config from config/judges/{name}.toml (cached).
+
+        Args:
+            name: Judge config name (filename without .toml extension)
+
+        Returns:
+            Parsed TOML dict with judge configuration.
+
+        Raises:
+            ConfigError: If the TOML file does not exist.
+        """
+        if not hasattr(self, "_judge_config_cache"):
+            self._judge_config_cache: Dict[str, Dict[str, Any]] = {}
+
+        if name not in self._judge_config_cache:
+            import toml
+            toml_path = self.config_dir / "judges" / f"{name}.toml"
+            if not toml_path.exists():
+                raise ConfigError(
+                    f"Judge config file not found: config/judges/{name}.toml - "
+                    "Create the file or remove the config_ref field"
+                )
+            self._judge_config_cache[name] = toml.load(str(toml_path))
+
+        return self._judge_config_cache[name]
+
 
 class LocalRunContext(RunContext):
     """
@@ -423,6 +469,8 @@ class LocalRunContext(RunContext):
         # Snapshot eval config for reproducibility
         if snapshot:
             self.snapshot_run_config()
+            from gavel_ai.core.steps.base import StepPhase
+            self.mark_step_complete(StepPhase.PREPARE)
 
     @property
     def eval_context(self) -> LocalFileSystemEvalContext:
@@ -539,6 +587,73 @@ class LocalRunContext(RunContext):
             f"{config_snapshot_dir}/scenarios.json",
         )
         scenarios_snapshot.write(scenarios_content)
+
+        import shutil
+        import json as _json
+        from datetime import timezone
+
+        # Copy prompts directory
+        prompts_src = self._eval_ctx.config_dir / "prompts"
+        prompts_dst = self.run_dir / ".config" / "prompts"
+        copied_files: List[str] = []
+
+        if prompts_src.exists():
+            shutil.copytree(str(prompts_src), str(prompts_dst), dirs_exist_ok=True)
+            for f in prompts_dst.rglob("*"):
+                if f.is_file():
+                    copied_files.append(str(f.relative_to(self.run_dir / ".config")))
+
+        # Write snapshot_metadata.json
+        metadata = {
+            "snapshotted_at": datetime.now(tz=timezone.utc).isoformat(),
+            "files": copied_files,
+        }
+        metadata_path = self.run_dir / ".config" / "snapshot_metadata.json"
+        metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        metadata_path.write_text(_json.dumps(metadata, indent=2), encoding="utf-8")
+
+    def mark_step_complete(self, phase: "StepPhase") -> None:
+        """
+        Append phase completion entry to {run_dir}/.workflow_status (JSONL, append-only).
+
+        Creates the file on first write.
+        """
+        import json
+        from datetime import timezone
+        status_file = self.run_dir / ".workflow_status"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "step": phase.value,
+            "completed_at": datetime.now(tz=timezone.utc).isoformat(),
+        }
+        with open(status_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+
+    def get_completed_steps(self) -> List["StepPhase"]:
+        """
+        Read .workflow_status and return completed StepPhase values in order.
+
+        Returns empty list if file does not exist.
+        """
+        import json
+        from gavel_ai.core.steps.base import StepPhase
+        status_file = self.run_dir / ".workflow_status"
+        if not status_file.exists():
+            return []
+        steps: List[StepPhase] = []
+        with open(status_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    step_val = entry.get("step")
+                    if step_val:
+                        steps.append(StepPhase(step_val))
+                except (json.JSONDecodeError, ValueError):
+                    pass
+        return steps
 
     # Artifact properties - expose DataSources to steps
     @property

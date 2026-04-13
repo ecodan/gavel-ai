@@ -15,7 +15,7 @@ import logging
 from typing import List
 
 from gavel_ai.core.contexts import RunContext
-from gavel_ai.core.exceptions import ConfigError
+from gavel_ai.core.exceptions import ConfigError, ValidationError
 from gavel_ai.core.steps.base import Step, StepPhase, ValidationResult
 
 
@@ -110,75 +110,70 @@ class ValidatorStep(Step):
                 "Validation failed: eval_config missing 'variants' - Add at least one variant"
             )
 
-        # DEC: this works for local prompt testing but not in-situ
-        # TODO: remove this or refactor to handle in-situ
-        # # 6. Validate first variant resolves to a model or agent
-        # variant = eval_config.variants[0]
-        #
-        # # Check if variant is a model name in _models
-        # if variant not in models:
-        #     # Check if it's an agent name
-        #     if variant not in agents_config:
-        #         errors.append(f"variant '{variant}' not found in _models or agents")
-        #         context.validation_result = ValidationResult(
-        #             is_valid=False, errors=errors, warnings=warnings
-        #         )
-        #         raise ConfigError(
-        #             f"Validation failed: variant '{variant}' not in _models or agents - "
-        #             f"Add '{variant}' to _models or define as agent"
-        #         )
-        #     # If it's an agent, validate it has model_id
-        #     agent = agents_config.get(variant, {})
-        #     model_id = agent.get("model_id")
-        #     if not model_id:
-        #         errors.append(f"agent '{variant}' missing 'model_id' field")
-        #         context.validation_result = ValidationResult(
-        #             is_valid=False, errors=errors, warnings=warnings
-        #         )
-        #         raise ConfigError(
-        #             f"Validation failed: agent '{variant}' missing 'model_id' - "
-        #             f"Add 'model_id' referencing a model in _models"
-        #         )
-        #     if model_id not in models:
-        #         errors.append(f"agent '{variant}' model_id '{model_id}' not found in _models")
-        #         context.validation_result = ValidationResult(
-        #             is_valid=False, errors=errors, warnings=warnings
-        #         )
-        #         raise ConfigError(
-        #             f"Validation failed: model_id '{model_id}' not in _models - "
-        #             f"Add '{model_id}' to _models or use existing model"
-        #         )
-        # else:
-        #     model_id = variant
+        # 6. Validate variants resolve to models or agents (local evals only)
+        if eval_config.test_subject_type == "local":
+            for variant in eval_config.variants:
+                if variant not in models:
+                    if variant not in agents_config:
+                        errors.append(f"variant '{variant}' not found in _models or agents")
+                        context.validation_result = ValidationResult(
+                            is_valid=False, errors=errors, warnings=warnings
+                        )
+                        raise ConfigError(
+                            f"Validation failed: variant '{variant}' not in _models or agents - "
+                            f"Add '{variant}' to _models or define as agent"
+                        )
+                    agent = agents_config.get(variant, {})
+                    model_id = agent.get("model_id")
+                    if not model_id or model_id not in models:
+                        errors.append(f"agent '{variant}' model_id not found in _models")
+                        context.validation_result = ValidationResult(
+                            is_valid=False, errors=errors, warnings=warnings
+                        )
+                        raise ConfigError(
+                            f"Validation failed: agent '{variant}' model_id not in _models - "
+                            f"Add or fix model_id in agents.json"
+                        )
 
-        # DC: this is only true for one-shot; may not be true for conv
-        # TODO: remove this or refactor to handle workflows without scenarios
-        # # 7. Validate scenarios not empty
-        # try:
-        #     scenarios = context.eval_context.scenarios
-        #     if not scenarios:
-        #         errors.append("No scenarios found")
-        #         context.validation_result = ValidationResult(
-        #             is_valid=False, errors=errors, warnings=warnings
-        #         )
-        #         raise ValidationError(
-        #             "Validation failed: No scenarios found - "
-        #             "Add scenarios to data/scenarios.json or scenarios.csv"
-        #         )
-        #     self.logger.debug(f"Loaded {len(scenarios)} scenarios")
-        # except ConfigError as e:
-        #     errors.append(f"Failed to load scenarios: {e}")
-        #     context.validation_result = ValidationResult(
-        #         is_valid=False, errors=errors, warnings=warnings
-        #     )
-        #     raise ConfigError(
-        #         f"Validation failed: {errors[-1]} - "
-        #         f"Check scenarios file exists and is valid"
-        #     ) from e
+        # 7. Validate prompts exist for each test_subject (local evals only)
+        if eval_config.test_subject_type == "local":
+            for subject in eval_config.test_subjects:
+                if subject.prompt_name:
+                    try:
+                        context.eval_context.get_prompt(f"{subject.prompt_name}:latest")
+                    except Exception:
+                        errors.append(f"Prompt '{subject.prompt_name}' not found in config/prompts/")
+                        context.validation_result = ValidationResult(
+                            is_valid=False, errors=errors, warnings=warnings
+                        )
+                        raise ConfigError(
+                            f"Validation failed: prompt '{subject.prompt_name}' not found - "
+                            f"Add config/prompts/{subject.prompt_name}.toml"
+                        )
 
-        # 6. Validate scenario IDs are unique
+        # 8. Warn for unregistered judge types (no raise - advisory only)
+        from gavel_ai.judges.judge_registry import JudgeRegistry
+        available_judges = set(JudgeRegistry.list_available())
+        for subject in eval_config.test_subjects:
+            for judge in (subject.judges or []):
+                if judge.type not in available_judges:
+                    warnings.append(f"Judge type '{judge.type}' is not registered in JudgeRegistry")
+                    self.logger.warning(
+                        f"Judge type '{judge.type}' is not registered - may fail at runtime"
+                    )
+
+        # 9. Validate scenarios not empty and IDs are unique
         try:
             scenarios = context.eval_context.scenarios.read()
+            if not scenarios:
+                errors.append("No scenarios found")
+                context.validation_result = ValidationResult(
+                    is_valid=False, errors=errors, warnings=warnings
+                )
+                raise ValidationError(
+                    "Validation failed: No scenarios found - "
+                    "Add scenarios to data/scenarios.json"
+                )
             ids = [s.scenario_id for s in scenarios]
             seen: set[str] = set()
             duplicates: List[str] = []
@@ -195,7 +190,7 @@ class ValidatorStep(Step):
                     f"Validation failed: duplicate scenario IDs {duplicates} - "
                     f"Each scenario must have a unique id"
                 )
-        except ConfigError:
+        except (ValidationError, ConfigError):
             raise
         except Exception:
             pass  # Scenarios may not be present for all workflow types
