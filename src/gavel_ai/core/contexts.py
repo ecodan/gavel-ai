@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from gavel_ai.core.adapters.backends import LocalStorageBackend
 from gavel_ai.core.adapters.data_sources import (
@@ -24,7 +24,7 @@ from gavel_ai.core.adapters.data_sources import (
     RecordDataSource,
     StructDataSource,
 )
-from gavel_ai.core.exceptions import ResourceNotFoundError
+from gavel_ai.core.exceptions import ConfigError, ResourceNotFoundError
 from gavel_ai.models import ConversationResult, EvalConfig, OutputRecord, Scenario
 from gavel_ai.models.runtime import JudgedRecord
 from gavel_ai.telemetry.metadata import RunMetadataSchema, TelemetrySpan
@@ -256,7 +256,7 @@ class LocalFileSystemEvalContext(EvalContext):
     @property
     def scenarios(self) -> RecordDataSource[Scenario]:
         """
-        Scenarios data source (data/scenarios.json or .csv).
+        Scenarios data source. Path is required and resolved from eval_config.scenarios.name.
 
         Returns DataSource - steps can:
         - Call .read() to load all scenarios into memory
@@ -264,15 +264,21 @@ class LocalFileSystemEvalContext(EvalContext):
         Lazy-loaded on first access.
         """
         if self._scenarios_source is None:
-            # Auto-detect format from file extension
-            scenarios_path = "data/scenarios.json"
-            if not (self.eval_dir / scenarios_path).exists():
-                scenarios_path = "data/scenarios.csv"
-
+            scenarios_path: str = self._resolve_scenarios_path()
             self._scenarios_source = RecordDataSource(
                 self._storage, scenarios_path, schema=Scenario
             )
         return self._scenarios_source
+
+    def _resolve_scenarios_path(self) -> str:
+        """Resolve scenarios file path from eval_config.scenarios.name."""
+        eval_config = self.eval_config.read()
+        if not eval_config.scenarios or not eval_config.scenarios.name:
+            raise ConfigError(
+                "eval_config.scenarios.name is required - "
+                "specify the scenarios file in eval_config.json"
+            )
+        return f"data/{eval_config.scenarios.name}"
 
     def get_prompt(self, prompt_ref: str) -> str:
         """
@@ -404,6 +410,12 @@ class LocalRunContext(RunContext):
 
         # Initialize all artifact data sources
         self._init_artifacts()
+
+        # Typed step-result attributes — set by pipeline steps, consumed by downstream steps
+        self.processor_results: Optional[List[OutputRecord]] = None
+        self.evaluation_results: Optional[List[Dict[str, Any]]] = None
+        self.test_subject: Optional[str] = None
+        self.model_variant: Optional[str] = None
 
         # Configure run-specific logger
         self._configure_logger()

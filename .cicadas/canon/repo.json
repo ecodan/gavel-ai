@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "scan_version": 1,
+  "generated_at": "2026-04-11T02:59:20.414513+00:00",
+  "repo_mode": "large-repo",
+  "scan": {
+    "tree_path": "repo-tree.jsonl",
+    "context_path": "repo-context.md",
+    "repo_file_count": 20176,
+    "meaningful_file_count": 565,
+    "estimated_loc": 101190,
+    "top_level_entries": 6,
+    "dominant_languages": [
+      "python",
+      "json",
+      "markdown"
+    ],
+    "build_systems": [
+      "python"
+    ],
+    "declared_modules": [
+      "gavel-ai"
+    ],
+    "major_code_zones": [
+      "src",
+      "src/gavel_ai"
+    ],
+    "build_paths": [
+      "pyproject.toml"
+    ],
+    "test_paths": [
+      "tests"
+    ],
+    "runtime_package_surfaces": [
+      "pyproject.toml",
+      "src",
+      "src/gavel_ai"
+    ],
+    "runtime_paths": [
+      "pyproject.toml",
+      "src",
+      "src/gavel_ai"
+    ],
+    "ownership_zone_candidates": [
+      "src",
+      "src/gavel_ai",
+      "_bmad",
+      "_bmad-output",
+      "coverage_reports",
+      "tests"
+    ]
+  },
+  "classification": {
+    "decision": "large-repo",
+    "scale_class": "large-repo",
+    "topology_class": "normal-repo",
+    "confidence": "medium",
+    "heuristic_scores": {
+      "meaningful_file_count": 565,
+      "estimated_loc": 101190,
+      "declared_module_count": 1,
+      "major_code_zone_count": 2,
+      "test_surface_count": 1,
+      "runtime_surface_count": 3,
+      "build_system_count": 1,
+      "language_count": 10,
+      "topology_score": 1
+    },
+    "evidence": [
+      {
+        "signal": "scale_floor",
+        "observation": "Detected 565 meaningful files and 101190 estimated LoC, giving a scale floor of `large-repo`.",
+        "weight": "high"
+      },
+      {
+        "signal": "build_structure",
+        "observation": "Detected build systems python and 1 declared modules.",
+        "weight": "high"
+      },
+      {
+        "signal": "routing_surfaces",
+        "observation": "Observed 2 major code zones, 1 test surfaces, and 3 runtime/package surfaces.",
+        "weight": "medium"
+      }
+    ],
+    "ambiguous_with": [],
+    "decision_note": "Auto-classified from build-first structural scan of gavel-ai."
+  },
+  "canon_plan": {
+    "strategy": "locality-first",
+    "orientation": [
+      "product-overview.md",
+      "tech-overview.md",
+      "summary.md"
+    ],
+    "historical_context": {
+      "hand_edit_recommended": true,
+      "why": "Preserve repo history, intent, and local rationale that scan evidence cannot infer safely."
+    },
+    "slice_dirs": [
+      "slices/"
+    ],
+    "seeded_slice_count": 3,
+    "minimum_slice_files": [
+      "summary.md",
+      "boundaries.md",
+      "architecture.md",
+      "invariants.md",
+      "change-guide.md"
+    ],
+    "module_dirs": [],
+    "module_snapshots": "minimal",
+    "generated_targets": [
+      "product-overview.md",
+      "tech-overview.md",
+      "summary.md",
+      "slices/"
+    ]
+  },
+  "slice_strategy": {
+    "unit": "slice",
+    "bootstrap_mode": "seeded-lazy",
+    "path_policy": "contiguous-by-default",
+    "allow_multi_path_when": "Only when repeated real work shows strong co-change across paths.",
+    "deepen_on": [
+      "initiative-start",
+      "tweak-start",
+      "bug-start"
+    ]
+  },
+  "candidate_slices": [
+    {
+      "name": "src",
+      "paths": [
+        "src"
+      ],
+      "status": "seeded",
+      "reason": "major-code-zone"
+    },
+    {
+      "name": "src-gavel_ai",
+      "paths": [
+        "src/gavel_ai"
+      ],
+      "status": "seeded",
+      "reason": "major-code-zone"
+    },
+    {
+      "name": "_bmad",
+      "paths": [
+        "_bmad"
+      ],
+      "status": "seeded",
+      "reason": "top-level-code-root"
+    },
+    {
+      "name": "_bmad-output",
+      "paths": [
+        "_bmad-output"
+      ],
+      "status": "deferred",
+      "reason": "top-level-code-root"
+    },
+    {
+      "name": "coverage_reports",
+      "paths": [
+        "coverage_reports"
+      ],
+      "status": "deferred",
+      "reason": "top-level-code-root"
+    },
+    {
+      "name": "tests",
+      "paths": [
+        "tests"
+      ],
+      "status": "deferred",
+      "reason": "top-level-code-root"
+    }
+  ],
+  "depth_policy": {
+    "seeded": [
+      "src",
+      "src-gavel_ai",
+      "_bmad"
+    ],
+    "deferred": [
+      "_bmad-output",
+      "coverage_reports",
+      "tests"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "checks": [
+      "planned docs exist",
+      "seeded slices point to real code paths",
+      "orientation docs reflect real repo history and boundaries"
+    ],
+    "autocorrections": []
+  },
+  "graph_follow_on": {
+    "status": "not_available",
+    "parking_lot_topics": [
+      "dependency adjacency traversal",
+      "blast-radius queries",
+      "inside-out symbol routing"
+    ]
+  }
+}

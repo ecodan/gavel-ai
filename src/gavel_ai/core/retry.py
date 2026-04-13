@@ -64,6 +64,8 @@ async def retry_with_backoff(
     func: Callable[[], Any],
     retry_config: Optional[RetryConfig] = None,
     transient_exceptions: Tuple[Type[Exception], ...] = (TimeoutError,),
+    transient_predicate: Optional[Callable[[Exception], bool]] = None,
+    error_class: Type[Exception] = ProcessorError,
     error_message_template: str = "Operation failed after {max_retries} retries - {error}",
 ) -> Any:
     """
@@ -72,45 +74,45 @@ async def retry_with_backoff(
     Args:
         func: Async callable to execute
         retry_config: RetryConfig instance (defaults to standard config)
-        transient_exceptions: Tuple of exception types to retry on
-        error_message_template: Template for error message on final failure
+        transient_exceptions: Tuple of exception types that are candidates for retry
+        transient_predicate: Optional callable that receives a matching exception and
+            returns True if it should actually be retried. Use this when an exception
+            type is only sometimes transient (e.g. tenacity.RetryError wraps both
+            rate-limit errors and auth errors; the predicate can distinguish them).
+            If the predicate returns False, the exception is re-raised immediately.
+        error_class: Exception class to raise when all retries are exhausted.
+            Defaults to ProcessorError. Pass JudgeError, etc. for other callers.
+        error_message_template: Template for error message on final failure.
+            Supports {max_retries} and {error} placeholders.
 
     Returns:
         Result from successful function call
 
     Raises:
-        ProcessorError: On non-transient errors or max retries exceeded
+        error_class: When all retries are exhausted
+        Original exception: On non-transient errors (re-raised as-is)
     """
     config = retry_config or RetryConfig()
-    last_error: Optional[Exception] = None
 
     for attempt in range(config.max_retries + 1):
         try:
-            result = await func()
-            return result
+            return await func()
 
         except transient_exceptions as e:
-            last_error = e
+            # If a predicate is provided, let it decide whether this specific
+            # instance is actually transient (e.g. rate limit vs auth failure)
+            if transient_predicate is not None and not transient_predicate(e):
+                raise
 
             if attempt < config.max_retries:
                 delay = config.calculate_delay(attempt)
                 await asyncio.sleep(delay)
             else:
-                # Max retries exceeded
                 error_msg = error_message_template.format(
                     max_retries=config.max_retries, error=str(e)
                 )
-                raise ProcessorError(error_msg) from e
+                raise error_class(error_msg) from e
 
-        except ProcessorError:
-            # Re-raise ProcessorError as-is
+        except Exception:
+            # Non-transient — re-raise original without wrapping
             raise
-
-        except Exception as e:
-            # Non-transient error - fail immediately
-            raise ProcessorError(f"Non-transient error: {e}") from e
-
-    # Should never reach here, but satisfy type checker
-    if last_error:
-        raise ProcessorError("Retry logic failed unexpectedly") from last_error
-    raise ProcessorError("Retry logic failed unexpectedly - no error recorded")

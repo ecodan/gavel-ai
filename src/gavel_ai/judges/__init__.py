@@ -11,7 +11,6 @@ from gavel_ai.judges.base import Judge
 from gavel_ai.judges.deepeval_judge import DeepEvalJudge
 from gavel_ai.judges.judge_executor import JudgeExecutor
 from gavel_ai.judges.judge_registry import JudgeRegistry
-from gavel_ai.judges.rejudge import ReJudge
 
 
 def _register_default_judges() -> None:
@@ -25,4 +24,4 @@ def _register_default_judges() -> None:
 _register_default_judges()
 
 # Export public API
-__all__ = ["Judge", "DeepEvalJudge", "JudgeRegistry", "JudgeExecutor", "ReJudge"]
+__all__ = ["Judge", "DeepEvalJudge", "JudgeRegistry", "JudgeExecutor"]

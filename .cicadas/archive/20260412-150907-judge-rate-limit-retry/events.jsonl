@@ -1,0 +1,2 @@
+{"timestamp":"2026-04-12T15:09:00.688825+00:00","type":"initiative.kicked_off","initiative":"judge-rate-limit-retry","branch":"master","data":{"intent":"Add gavel-ai-level rate-limit retry for DeepEval judge evaluations"}}
+{"timestamp":"2026-04-12T15:09:07.631313+00:00","type":"specs.archived","initiative":"judge-rate-limit-retry","branch":"master","data":{"archive_name":"20260412-150907-judge-rate-limit-retry","type":"initiative"}}

@@ -145,7 +145,11 @@ class RecordDataSource(DataSource, Generic[T]):
             if isinstance(data, list):
                 yield from data
             else:
-                raise ValueError("JSON file must contain an array of records")
+                top_keys = list(data.keys())[:5] if isinstance(data, dict) else ""
+                hint = f" (got object with keys: {top_keys})" if top_keys else f" (got {type(data).__name__})"
+                raise ValueError(
+                    f"JSON file must contain a top-level array of records: {self._path}{hint}"
+                )
         elif self._ext == ".csv":
             import csv
             import io

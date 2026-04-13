@@ -232,7 +232,8 @@ Return ONLY a JSON array of scenarios. Each scenario should be a valid JSON obje
                 if self._validate_scenario(scenario):
                     validated_scenarios.append(scenario)
                 else:
-                    self.logger.warning(f"Skipping invalid scenario {i + 1}: {scenario}")
+                    keys = list(scenario.keys()) if isinstance(scenario, dict) else type(scenario).__name__
+                    self.logger.warning(f"Skipping invalid scenario {i + 1} (keys: {keys})")
 
             if not validated_scenarios:
                 raise ValueError("No valid scenarios found in LLM response")

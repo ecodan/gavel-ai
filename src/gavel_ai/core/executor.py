@@ -5,7 +5,7 @@ Per Architecture Decision 3: Processor orchestration with error handling modes.
 """
 
 import asyncio
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from tqdm import tqdm
 
@@ -46,12 +46,19 @@ class Executor:
         self.variant_id = variant_id or "unknown"
         self.tracer = get_tracer(__name__)
 
-    async def execute(self, inputs: List[Input]) -> List[ProcessorResult]:
+    async def execute(
+        self,
+        inputs: List[Input],
+        on_result: Optional[Callable[[Input, ProcessorResult], None]] = None,
+    ) -> List[ProcessorResult]:
         """
         Execute processor against all inputs with concurrency control.
 
         Args:
             inputs: List of Input instances
+            on_result: Optional callback invoked with (input, result) after each scenario
+                       completes. Called synchronously before moving to the next batch.
+                       Use this to stream results to disk as they arrive.
 
         Returns:
             List of ProcessorResult instances (one per input)
@@ -93,7 +100,10 @@ class Executor:
                 if self.error_handling == "fail_fast":
                     # Fail immediately on first error
                     batch_results = await asyncio.gather(*tasks)
-                    results.extend(batch_results)
+                    for input_item, result in zip(batch, batch_results):
+                        if on_result is not None:
+                            on_result(input_item, result)
+                        results.append(result)
                     completed_count += len(batch_results)
                 else:
                     # Collect all results, including errors
@@ -105,9 +115,13 @@ class Executor:
                             error_result = ProcessorResult(
                                 output="", metadata={}, error=str(result)
                             )
+                            if on_result is not None:
+                                on_result(input_item, error_result)
                             results.append(error_result)
                             failed_count += 1
                         else:
+                            if on_result is not None:
+                                on_result(input_item, result)
                             results.append(result)
                             completed_count += 1
 

@@ -1,0 +1,11 @@
+{
+  "name": "judge-rate-limit-retry",
+  "type": "initiative",
+  "registry_entry": {
+    "intent": "Add gavel-ai-level rate-limit retry for DeepEval judge evaluations",
+    "owner": "unknown",
+    "signals": [],
+    "created_at": "2026-04-12T15:09:00.682764+00:00"
+  },
+  "timestamp": "20260412-150907"
+}

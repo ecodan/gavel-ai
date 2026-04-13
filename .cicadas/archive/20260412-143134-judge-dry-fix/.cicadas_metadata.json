@@ -1,0 +1,24 @@
+{
+  "name": "judge-dry-fix",
+  "type": "initiative",
+  "registry_entry": {
+    "intent": "DRY refactor of the oneshot judge pipeline: unify on OutputRecord as in-pipeline type, loop all variants in ScenarioProcessorStep, group by variant_id in JudgeRunnerStep, reuse pipeline steps in judge CLI, and delete duplicate ReJudge class. Fixes silent multi-variant data loss and eliminates dual code paths.",
+    "owner": "unknown",
+    "signals": [],
+    "created_at": "2026-04-12T04:45:27.446159+00:00"
+  },
+  "timestamp": "20260412-143134",
+  "associated_branches": {
+    "feat/foundation": {
+      "intent": "Add typed step-result attrs to LocalRunContext and extract compute_config_hash to storage/utils.py",
+      "modules": [
+        "storage/utils.py",
+        "core/contexts.py"
+      ],
+      "owner": "unknown",
+      "created_at": "2026-04-12T14:06:15.377414+00:00",
+      "worktree_path": "/Users/dan/dev/code/projects/python/gavel-ai-feat-foundation",
+      "initiative": "judge-dry-fix"
+    }
+  }
+}

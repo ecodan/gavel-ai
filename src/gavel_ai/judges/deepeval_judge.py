@@ -8,8 +8,10 @@ Per Architecture Decision 5: DeepEval-native judges with sequential execution.
 """
 
 import asyncio
+import logging
 import os
-from typing import Any, Dict, Optional
+import tenacity
+from typing import Any, Callable, Dict, Optional
 
 from deepeval.metrics import (
     AnswerRelevancyMetric,
@@ -18,6 +20,9 @@ from deepeval.metrics import (
     GEval,
     HallucinationMetric,
 )
+
+from gavel_ai.core.retry import RetryConfig, retry_with_backoff
+from deepeval.errors import MissingTestCaseParamsError
 from deepeval.models import AnthropicModel, GeminiModel, GPTModel, OllamaModel
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from jinja2 import Template
@@ -26,6 +31,28 @@ from gavel_ai.core.exceptions import JudgeError
 from gavel_ai.judges.base import Judge
 from gavel_ai.models.runtime import JudgeConfig, JudgeResult, Scenario
 from gavel_ai.telemetry import get_current_run_id
+
+
+def _is_rate_limit_retry_error(e: Exception) -> bool:
+    """
+    Check if a tenacity.RetryError was caused by a rate limit error.
+
+    DeepEval uses Tenacity to retry on transient errors. When rate-limit retries
+    are exhausted, Tenacity raises RetryError. This predicate distinguishes
+    rate-limit errors (which should be retried at gavel-ai level) from auth errors
+    (which should fail immediately).
+
+    Args:
+        e: Exception to check (should be tenacity.RetryError)
+
+    Returns:
+        True if the underlying cause is a rate-limit error, False otherwise
+    """
+    if not isinstance(e, tenacity.RetryError):
+        return False
+    cause = e.last_attempt.exception() if e.last_attempt else None
+    s = str(cause or e).lower()
+    return any(k in s for k in ("rate limit", "ratelimit", "429", "too many requests"))
 
 
 class DeepEvalJudge(Judge):
@@ -271,34 +298,60 @@ class DeepEvalJudge(Judge):
             span.set_attribute("scenario.id", scenario.id)
 
             try:
-                # Create DeepEval test case
+                # Create DeepEval test case (fails fast — not retried)
                 test_case = self._create_test_case(scenario, subject_output)
+            except MissingTestCaseParamsError as e:
+                raise JudgeError(
+                    f"Judge '{judge_type}' requires fields not present in scenario '{scenario.id}': {e}. "
+                    f"Add the required field to your scenario data or use a different judge."
+                ) from e
 
-                # Run metric evaluation (synchronous in DeepEval, so run in executor)
+            # Run metric evaluation with rate-limit retry
+            # DeepEval's internal Tenacity retries up to 2x on rate limits, then raises
+            # tenacity.RetryError. We retry at the gavel-ai level for rate-limit errors.
+            async def _run_metric() -> None:
                 await asyncio.to_thread(self.metric.measure, test_case)
 
-                # Extract score and normalize to 1-10
-                raw_score = self.metric.score
-                normalized_score = self._normalize_score(raw_score)
-
-                # Extract reasoning from metric
-                reasoning = self._extract_reasoning()
-
-                span.set_attribute("judge.score", normalized_score)
-
-                return JudgeResult(
-                    score=normalized_score,
-                    reasoning=reasoning,
-                    evidence=f"DeepEval {judge_type} score: {raw_score:.3f}",
+            try:
+                await retry_with_backoff(
+                    func=_run_metric,
+                    retry_config=RetryConfig(
+                        max_retries=3,
+                        initial_delay=5.0,    # rate limits need longer initial wait
+                        max_delay=60.0,
+                        backoff_factor=2.0,
+                        jitter=True,          # important for future parallel eval runs
+                    ),
+                    transient_exceptions=(tenacity.RetryError,),
+                    transient_predicate=_is_rate_limit_retry_error,
+                    error_class=JudgeError,
+                    error_message_template=(
+                        f"DeepEval '{judge_type}' for scenario '{scenario.id}' "
+                        f"exhausted rate-limit retries ({{max_retries}}): {{error}}"
+                    ),
                 )
-
             except JudgeError:
                 raise
             except Exception as e:
                 raise JudgeError(
-                    f"DeepEval evaluation failed for scenario '{scenario.id}': {e} - "
-                    f"Check API credentials and judge configuration"
+                    f"DeepEval evaluation failed for scenario '{scenario.id}' "
+                    f"(judge: '{judge_type}', error: {type(e).__name__}): {e}"
                 ) from e
+
+            # Extract score and normalize to 1-10
+            raw_score = self.metric.score
+            normalized_score = self._normalize_score(raw_score)
+
+            # Extract reasoning from metric
+            reasoning = self._extract_reasoning()
+
+            span.set_attribute("judge.score", normalized_score)
+
+            return JudgeResult(
+                score=normalized_score,
+                reasoning=reasoning,
+                evidence=f"DeepEval {judge_type} score: {raw_score:.3f}",
+            )
 
     def _create_test_case(self, scenario: Scenario, subject_output: str) -> LLMTestCase:
         """

@@ -1,0 +1,20 @@
+[
+  {"query": "help me set up a new gavel evaluation", "should_trigger": true},
+  {"query": "gavel oneshot run is failing with a config error", "should_trigger": true},
+  {"query": "how do I create scenario data for gavel", "should_trigger": true},
+  {"query": "run my gavel eval and show me the results", "should_trigger": true},
+  {"query": "what does gavel oneshot judge do", "should_trigger": true},
+  {"query": "help me interpret these gavel report results", "should_trigger": true},
+  {"query": "gavel conv generate isn't producing good scenarios", "should_trigger": true},
+  {"query": "mark this gavel run as a milestone", "should_trigger": true},
+  {"query": "how do I add more scenarios to my gavel eval", "should_trigger": true},
+  {"query": "gavel-ai eval is throwing an authentication error", "should_trigger": true},
+  {"query": "help me evaluate the results of this API call", "should_trigger": false},
+  {"query": "evaluate why this bug was introduced in the code", "should_trigger": false},
+  {"query": "help me write my performance evaluation for this quarter", "should_trigger": false},
+  {"query": "run pytest and evaluate test coverage", "should_trigger": false},
+  {"query": "evaluate which model is better using my own benchmark script", "should_trigger": false},
+  {"query": "how do I evaluate a PR before merging", "should_trigger": false},
+  {"query": "what metrics should I use to evaluate this algorithm", "should_trigger": false},
+  {"query": "help me evaluate this architecture decision", "should_trigger": false}
+]

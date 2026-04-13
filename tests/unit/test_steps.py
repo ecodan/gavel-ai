@@ -7,7 +7,7 @@ Tests ValidatorStep, ScenarioProcessorStep, JudgeRunnerStep, and ReportRunnerSte
 """
 
 import logging
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
@@ -20,6 +20,7 @@ from gavel_ai.core.steps import (
     ValidatorStep,
 )
 from gavel_ai.core.steps.base import StepPhase
+from gavel_ai.models.runtime import OutputRecord, ProcessorResult
 
 
 def _create_mock_data_source(return_value):
@@ -155,6 +156,73 @@ class TestValidatorStep:
         assert mock_context.validation_result.is_valid is True
 
 
+def _make_executor_mock_that_calls_callback(proc_results_per_exec):
+    """Return an Executor mock whose execute() calls on_result for each ProcessorResult."""
+
+    async def _fake_execute(inputs, on_result=None):
+        for input_item, proc_result in zip(inputs, proc_results_per_exec):
+            if on_result is not None:
+                on_result(input_item, proc_result)
+
+    mock_executor = MagicMock()
+    mock_executor.execute = _fake_execute
+    return mock_executor
+
+
+def _base_eval_context(variants=None, num_scenarios=1):
+    """Build a reusable mock eval context."""
+    variants = variants or ["test_model"]
+
+    mock_async_config = MagicMock()
+    mock_async_config.num_workers = 1
+    mock_async_config.task_timeout_seconds = 30
+
+    mock_test_subject = MagicMock()
+    mock_test_subject.prompt_name = "default:v1"
+
+    mock_eval_config = MagicMock()
+    mock_eval_config.test_subject_type = "local"
+    mock_eval_config.test_subjects = [mock_test_subject]
+    mock_eval_config.variants = variants
+    mock_eval_config.async_config = mock_async_config
+
+    scenarios = []
+    for i in range(num_scenarios):
+        s = MagicMock()
+        s.id = f"s{i + 1}"
+        s.scenario_id = f"s{i + 1}"
+        s.input = f"input {i + 1}"
+        s.metadata = {}
+        scenarios.append(s)
+
+    agents_config = {
+        "_models": {
+            "test_model": {
+                "model_provider": "openai",
+                "model_family": "gpt",
+                "model_version": "gpt-4",
+                "model_parameters": {"temperature": 0.7},
+                "provider_auth": {"api_key": "test-key"},
+            },
+            "variant_b": {
+                "model_provider": "anthropic",
+                "model_family": "claude",
+                "model_version": "claude-3-5-sonnet",
+                "model_parameters": {"temperature": 0.7},
+                "provider_auth": {"api_key": "test-key"},
+            },
+        }
+    }
+
+    mock_eval_context = MagicMock()
+    mock_eval_context.eval_name = "test_eval"
+    mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
+    mock_eval_context.agents = _create_mock_data_source(agents_config)
+    mock_eval_context.scenarios = _create_mock_data_source(scenarios)
+
+    return mock_eval_context, scenarios
+
+
 class TestScenarioProcessorStep:
     """Tests for ScenarioProcessorStep."""
 
@@ -170,65 +238,68 @@ class TestScenarioProcessorStep:
     async def test_execute_processes_scenarios(
         self, mock_executor_class: MagicMock, mock_processor_class: MagicMock
     ) -> None:
-        """Test that execute processes scenarios."""
+        """Test that execute processes a single variant and sets processor_results."""
         logger = logging.getLogger("test")
         step = ScenarioProcessorStep(logger)
 
-        # Setup mocks
-        mock_processor = MagicMock()
-        mock_processor_class.return_value = mock_processor
+        mock_processor_class.return_value = MagicMock()
+        proc_result = ProcessorResult(output="output1", metadata={})
+        mock_executor_class.return_value = _make_executor_mock_that_calls_callback([proc_result])
 
-        mock_executor = MagicMock()
-        mock_executor.execute = AsyncMock(return_value=[MagicMock()])
-        mock_executor_class.return_value = mock_executor
-
-        # Create mock config data
-        mock_async_config = MagicMock()
-        mock_async_config.num_workers = 1
-        mock_async_config.task_timeout_seconds = 30
-
-        mock_test_subject = MagicMock()
-        mock_test_subject.prompt_name = "default:v1"
-
-        mock_eval_config = MagicMock()
-        mock_eval_config.test_subject_type = "local"
-        mock_eval_config.test_subjects = [mock_test_subject]
-        mock_eval_config.variants = ["test_model"]
-        mock_eval_config.async_config = mock_async_config
-
-        mock_scenario = MagicMock()
-        mock_scenario.scenario_id = "s1"
-        mock_scenario.input = "test input"
-        mock_scenario.metadata = {}
-
-        mock_agents_config = {
-            "_models": {
-                "test_model": {
-                    "model_provider": "openai",
-                    "model_family": "gpt",
-                    "model_version": "gpt-4",
-                    "model_parameters": {"temperature": 0.7},
-                    "provider_auth": {"api_key": "test-key"},
-                }
-            },
-        }
-
-        # Create mock eval context with data sources
-        mock_eval_context = MagicMock()
-        mock_eval_context.eval_name = "test_eval"
-        mock_eval_context.eval_config = _create_mock_data_source(mock_eval_config)
-        mock_eval_context.agents = _create_mock_data_source(mock_agents_config)
-        mock_eval_context.scenarios = _create_mock_data_source([mock_scenario])
+        mock_eval_context, scenarios = _base_eval_context(variants=["test_model"], num_scenarios=1)
 
         mock_context = MagicMock(spec=RunContext)
         mock_context.eval_context = mock_eval_context
-        mock_context.processor_results = None
+        mock_context.results_raw = MagicMock()
 
         await step.execute(mock_context)
 
-        # Verify processor results were set
+        # processor_results should be a list of OutputRecord objects
         assert mock_context.processor_results is not None
-        mock_executor.execute.assert_called_once()
+        assert len(mock_context.processor_results) == 1
+        assert isinstance(mock_context.processor_results[0], OutputRecord)
+        assert mock_context.processor_results[0].variant_id == "gpt-4"
+        mock_context.results_raw.append.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("gavel_ai.core.steps.scenario_processor.PromptInputProcessor")
+    @patch("gavel_ai.core.steps.scenario_processor.Executor")
+    async def test_execute_two_variants_produces_2n_records(
+        self, mock_executor_class: MagicMock, mock_processor_class: MagicMock
+    ) -> None:
+        """Two variants × N scenarios → 2N OutputRecord objects with correct variant_id."""
+        logger = logging.getLogger("test")
+        step = ScenarioProcessorStep(logger)
+        num_scenarios = 3
+
+        mock_processor_class.return_value = MagicMock()
+        proc_results = [ProcessorResult(output=f"out{i}", metadata={}) for i in range(num_scenarios)]
+        mock_executor_class.return_value = _make_executor_mock_that_calls_callback(proc_results)
+
+        mock_eval_context, scenarios = _base_eval_context(
+            variants=["test_model", "variant_b"], num_scenarios=num_scenarios
+        )
+
+        mock_context = MagicMock(spec=RunContext)
+        mock_context.eval_context = mock_eval_context
+        mock_context.results_raw = MagicMock()
+
+        await step.execute(mock_context)
+
+        # 2 variants × 3 scenarios = 6 OutputRecord objects
+        assert mock_context.processor_results is not None
+        assert len(mock_context.processor_results) == 2 * num_scenarios
+        assert all(isinstance(r, OutputRecord) for r in mock_context.processor_results)
+
+        # Each variant's records have distinct variant_id
+        variant_ids = {r.variant_id for r in mock_context.processor_results}
+        assert len(variant_ids) == 2
+
+        # results_raw.append called 2N times
+        assert mock_context.results_raw.append.call_count == 2 * num_scenarios
+
+        # context.model_variant is a comma-joined display string
+        assert mock_context.model_variant == "test_model, variant_b"
 
 
 class TestJudgeRunnerStep:

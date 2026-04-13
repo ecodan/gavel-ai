@@ -4,19 +4,21 @@ Judge runner step for OneShot workflow.
 Responsibilities:
 - Extract judges from eval_config.test_subjects[]
 - Resolve judge model IDs in agents_config
-- Execute JudgeExecutor.execute_batch()
+- Execute JudgeExecutor.execute_batch() per variant group
 - Store evaluation_results in context
 
 Per Tech Spec 3.9: Extracted from run() lines 247-318.
 """
 
 import logging
+from collections import defaultdict
 from typing import Any, Dict, List
 
 from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError
 from gavel_ai.core.steps.base import Step, StepPhase
 from gavel_ai.judges.judge_executor import JudgeExecutor
+from gavel_ai.models.runtime import OutputRecord
 
 
 def get_model_definition(agents_config: dict, model_id: str) -> dict:
@@ -68,7 +70,7 @@ class JudgeRunnerStep(Step):
 
     async def execute(self, context: RunContext) -> None:  # noqa: C901
         """
-        Execute judges on processor results.
+        Execute judges on processor results, grouped by variant_id.
 
         Args:
             context: RunContext with processor_results to evaluate
@@ -79,7 +81,7 @@ class JudgeRunnerStep(Step):
         eval_config = context.eval_context.eval_config.read()
         agents_config = context.eval_context.agents.read()
         scenarios = context.eval_context.scenarios.read()
-        processor_results = context.processor_results
+        processor_results: List[OutputRecord] = context.processor_results
 
         if processor_results is None:
             raise ConfigError(
@@ -118,7 +120,7 @@ class JudgeRunnerStep(Step):
                     if judge_config.config:
                         judge_config.config["model"] = resolved_model
                         judge_config.config["model_family"] = model_family
-                        
+
                         # Pass auth details if available
                         provider_auth = model_def.get("provider_auth", {})
                         if "api_key" in provider_auth:
@@ -136,31 +138,41 @@ class JudgeRunnerStep(Step):
                     )
                     raise
 
-        self.logger.info(f"Running {len(judges_list)} judges on {len(processor_results)} results")
+        # Build scenario lookup map
+        scenario_map = {s.id: s for s in scenarios}
+
+        # Group processor results by variant_id
+        groups: Dict[str, List[OutputRecord]] = defaultdict(list)
+        for record in processor_results:
+            groups[record.variant_id].append(record)
+
+        self.logger.info(
+            f"Running {len(judges_list)} judges on {len(processor_results)} records "
+            f"across {len(groups)} variant(s)"
+        )
 
         judge_executor = JudgeExecutor(
             judge_configs=judges_list,
             error_handling="fail_fast",
         )
 
-        # Prepare batch evaluations
-        evaluations_batch: List[tuple] = [
-            (scenario, str(proc_result.output), "subject_agent")
-            for scenario, proc_result in zip(scenarios, processor_results, strict=True)
-        ]
-
-        # Execute judges on all results
-        evaluation_results = await judge_executor.execute_batch(
-            evaluations=evaluations_batch,
-            subject_id="PUT",
-            test_subject=test_subject,
-        )
+        all_results = []
+        for variant_id, group in groups.items():
+            batch = [
+                (scenario_map[r.scenario_id], r.processor_output, r.variant_id) for r in group
+            ]
+            results = await judge_executor.execute_batch(
+                evaluations=batch,
+                subject_id=test_subject,
+                test_subject=test_subject,
+            )
+            all_results.extend(results)
 
         # Convert to dict format for storage
         evaluation_results_dicts: List[Dict[str, Any]] = [
-            r.model_dump() if hasattr(r, "model_dump") else r for r in evaluation_results
+            r.model_dump() if hasattr(r, "model_dump") else r for r in all_results
         ]
 
         context.evaluation_results = evaluation_results_dicts
 
-        self.logger.info(f"Judging complete: {len(evaluation_results)} evaluations")
+        self.logger.info(f"Judging complete: {len(evaluation_results_dicts)} evaluations")

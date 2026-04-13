@@ -15,10 +15,11 @@ from rich.table import Table
 from gavel_ai.cli.scaffolding import generate_all_templates
 from gavel_ai.core.contexts import LocalFileSystemEvalContext, LocalRunContext
 from gavel_ai.core.exceptions import ConfigError, ResourceNotFoundError, ValidationError
+from gavel_ai.core.steps.judge_runner import JudgeRunnerStep
+from gavel_ai.core.steps.report_runner import ReportRunnerStep
 from gavel_ai.core.workflows.oneshot import OneShotWorkflow
-from gavel_ai.judges.rejudge import ReJudge
 from gavel_ai.log_config import get_application_logger
-from gavel_ai.models.runtime import ReporterConfig
+from gavel_ai.models.runtime import OutputRecord, ReporterConfig
 from gavel_ai.reporters.oneshot_reporter import OneShotReporter
 from gavel_ai.telemetry import get_tracer
 
@@ -149,7 +150,7 @@ def run(
         typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from None
     except Exception as e:
-        typer.secho(f"Execution Error: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(f"Error ({type(e).__name__}): {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from None
 
 
@@ -157,56 +158,35 @@ def run(
 def judge(
     run_id: str = typer.Option(..., "--run", help="Run ID to judge"),
     eval_name: Optional[str] = typer.Option(None, "--eval", help="Evaluation name"),
-    judges: Optional[str] = typer.Option(None, "--judges", help="Comma-separated judge names"),
 ) -> None:
-    """Judge evaluation results."""
+    """Judge evaluation results using pipeline steps."""
     try:
         real_eval_name, eval_dir = _get_eval_dir(eval_name, run_id)
         eval_ctx = LocalFileSystemEvalContext(eval_name=real_eval_name, eval_root=DEFAULT_EVAL_ROOT)
         run_ctx = LocalRunContext(
-            eval_ctx=eval_ctx, 
+            eval_ctx=eval_ctx,
             base_dir=eval_dir / "runs",
             run_id=run_id,
-            snapshot=False
+            snapshot=False,
         )
-        
-        if not run_ctx.results_raw.exists():
-            raise ResourceNotFoundError(f"Error: No results found for run '{run_id}'. Did it finish processing?")
-            
+
         console.print(f"Loading processor outputs from run '{run_id}'")
-        
-        # Determine judges
-        eval_config = eval_ctx.eval_config.read()
-        judge_configs = []
-        if eval_config.test_subjects:
-            for subject in eval_config.test_subjects:
-                if subject.judges:
-                    for j in subject.judges:
-                        # Add filtering if --judges was used
-                        if not judges or j.id in [x.strip() for x in judges.split(",")]:
-                            if j not in judge_configs:
-                                judge_configs.append(j)
-                                
-        if not judge_configs:
-            console.print("[yellow]No judges defined for this evaluation or filter matched no judges.[/yellow]")
-            return
-            
-        results_file = run_ctx.run_dir / "results_raw.jsonl"
 
-        rejudge_engine = ReJudge(results_file, judge_configs)
+        records: List[OutputRecord] = list(run_ctx.results_raw.read())
+        if not records:
+            raise ResourceNotFoundError(
+                f"No results found for run '{run_id}'. Did it finish processing?"
+            )
 
-        # Async run
-        rejudged = asyncio.run(rejudge_engine.rejudge_all(
-            preserve_existing=True,
-            output_file=run_ctx.run_dir / "results_judged.jsonl"
-        ))
-        
-        console.print(f"[bold green]✓ Completed judging ({len(judge_configs)} judges applied to {len(rejudged)} outputs)[/bold green]")
-        
-        # Automatically generate report
-        console.print("Generating updated report...")
-        _generate_report(run_id, real_eval_name, None)
-        
+        run_ctx.processor_results = records
+
+        asyncio.run(JudgeRunnerStep(app_logger).execute(run_ctx))
+        asyncio.run(ReportRunnerStep(app_logger).execute(run_ctx))
+
+        console.print(
+            f"[bold green]✓ Completed judging ({len(records)} results processed)[/bold green]"
+        )
+
     except (ConfigError, ResourceNotFoundError) as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from None
