@@ -49,6 +49,13 @@
       "summary": "Completed: Added gavel-ai-level rate-limit retry for DeepEval judge evaluations. Generalized retry_with_backoff() for reuse across processors, judges, and future layers. 910 tests pass at 83% coverage.",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-04-13T03:04:26.588203+00:00",
+      "branch": "skill/gavel-skill",
+      "summary": "Added gavel-skill agent skill: eval assistant with CLI reference, config schema, scenario format guide, and judges reference",
+      "decisions": "",
+      "modules": []
     }
   ]
 }
