@@ -126,8 +126,10 @@ class TestValidatorStep:
             await step.execute(mock_context)
 
     @pytest.mark.asyncio
-    async def test_execute_passes_with_empty_scenarios(self) -> None:
-        """Test that execute passes even when scenarios is empty (not validated anymore)."""
+    async def test_execute_raises_with_empty_scenarios(self) -> None:
+        """Test that execute raises ValidationError when scenarios list is empty."""
+        from gavel_ai.core.exceptions import ValidationError
+
         logger = logging.getLogger("test")
         step = ValidatorStep(logger)
 
@@ -150,10 +152,8 @@ class TestValidatorStep:
         mock_context.eval_context = mock_eval_context
         mock_context.validation_result = None
 
-        await step.execute(mock_context)
-
-        assert mock_context.validation_result is not None
-        assert mock_context.validation_result.is_valid is True
+        with pytest.raises(ValidationError, match="No scenarios"):
+            await step.execute(mock_context)
 
 
 def _make_executor_mock_that_calls_callback(proc_results_per_exec):

@@ -107,6 +107,23 @@ class JudgeRunnerStep(Step):
             context.deterministic_metrics = {}
             return
 
+        # Resolve config_ref → TOML file contents (merge into judge_config.config)
+        for judge_config in judges_list:
+            if judge_config.config_ref:
+                try:
+                    toml_data = context.eval_context.get_judge_config(judge_config.config_ref)
+                    if judge_config.config is None:
+                        judge_config.config = {}
+                    judge_config.config.update(toml_data)
+                    self.logger.debug(
+                        f"Resolved config_ref '{judge_config.config_ref}' for judge '{judge_config.name}'"
+                    )
+                except ConfigError:
+                    raise ConfigError(
+                        f"Judge config file not found: config/judges/{judge_config.config_ref}.toml - "
+                        "Create the file or remove the config_ref field"
+                    )
+
         # Resolve custom model IDs in judge configurations
         for judge_config in judges_list:
             model_to_resolve = None

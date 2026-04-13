@@ -121,3 +121,55 @@ class TestGetJudgeConfig:
 
         with pytest.raises(ConfigError):
             eval_ctx.get_judge_config("nonexistent")
+
+
+class TestConfigRefResolution:
+    """config_ref field in judge configs is resolved via get_judge_config() in JudgeRunnerStep."""
+
+    def _write_eval(self, tmp_path: Path) -> Path:
+        """Write a minimal eval with a quality_judge.toml and return eval_root."""
+        eval_root = tmp_path / "evaluations"
+        eval_dir = eval_root / "test-eval"
+        judges_dir = eval_dir / "config" / "judges"
+        judges_dir.mkdir(parents=True)
+        (eval_dir / "config").mkdir(exist_ok=True)
+        (eval_dir / "data").mkdir(parents=True)
+
+        toml_data = {"criteria": "Answer quality", "threshold": 0.8}
+        (judges_dir / "quality_judge.toml").write_text(toml.dumps(toml_data))
+
+        return eval_root
+
+    @pytest.mark.asyncio
+    async def test_config_ref_merged_into_judge_config(self, tmp_path):
+        """config_ref is loaded from TOML and merged into judge_config.config."""
+        import asyncio
+        import json
+        from gavel_ai.core.contexts import LocalFileSystemEvalContext
+        from gavel_ai.models.config import JudgeConfig
+
+        eval_root = self._write_eval(tmp_path)
+        eval_ctx = LocalFileSystemEvalContext(eval_name="test-eval", eval_root=eval_root)
+
+        judge = JudgeConfig(name="quality", type="deepeval.geval", config_ref="quality_judge")
+
+        # Simulate the config_ref resolution block from JudgeRunnerStep
+        toml_data = eval_ctx.get_judge_config(judge.config_ref)
+        if judge.config is None:
+            judge.config = {}
+        judge.config.update(toml_data)
+
+        assert judge.config["criteria"] == "Answer quality"
+        assert judge.config["threshold"] == pytest.approx(0.8)
+
+    @pytest.mark.asyncio
+    async def test_config_ref_missing_raises_config_error(self, tmp_path):
+        """Referencing a nonexistent TOML via config_ref raises ConfigError."""
+        from gavel_ai.core.contexts import LocalFileSystemEvalContext
+        from gavel_ai.core.exceptions import ConfigError
+
+        eval_root = self._write_eval(tmp_path)
+        eval_ctx = LocalFileSystemEvalContext(eval_name="test-eval", eval_root=eval_root)
+
+        with pytest.raises(ConfigError):
+            eval_ctx.get_judge_config("nonexistent_judge")

@@ -223,6 +223,23 @@
             color: #667eea;
         }
 
+        .skip-note {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-left: 4px;
+        }
+
+        .det-metric-label {
+            font-size: 13px;
+            color: #495057;
+            margin: 8px 0 16px 0;
+        }
+
+        .na-note {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
         .judge-reasoning {
             font-size: 12px;
             color: #666;
@@ -292,7 +309,8 @@
                         <tr>
                             <td><strong>{{ variant }}</strong></td>
                             {% for metric, val in metrics.items() %}
-                            <td>{{ "%.2f"|format(val) }}</td>
+                            {% set skip = (skipped_counts.get(variant, {}) or {}).get(metric, 0) if skipped_counts is defined else 0 %}
+                            <td>{{ "%.2f"|format(val) }}{% if skip > 0 %}<span class="skip-note">({{ skip }} skipped)</span>{% endif %}</td>
                             {% endfor %}
                             <td><strong>{{ "%.2f"|format(metrics.values()|sum / metrics.values()|length) if
                                     metrics.values()|length > 0 else '0.00' }}</strong>
@@ -381,6 +399,74 @@
                 </div>
                 {% endfor %}
             </section>
+
+            {% if deterministic_results %}
+            <section id="deterministic-judges">
+                <h2>Deterministic Judges</h2>
+                {% for result in deterministic_results %}
+                <h3>{{ result.metric_name }}</h3>
+                {% if result.judge_type == "classifier" %}
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Scenario</th>
+                            <th>Prediction</th>
+                            <th>Actual</th>
+                            <th>Match</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sample in result.samples %}
+                        <tr>
+                            <td>{{ sample.scenario_id }}</td>
+                            {% if sample.skip_reason %}
+                            <td colspan="3"><em class="na-note">Skipped: {{ sample.skip_reason }}</em></td>
+                            {% else %}
+                            <td>{{ sample.prediction }}</td>
+                            <td>{{ sample.actual }}</td>
+                            <td>{{ "&#10003;" if sample.match else "&#10007;" }}</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% elif result.judge_type == "regression" %}
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Scenario</th>
+                            <th>Prediction</th>
+                            <th>Actual</th>
+                            <th>Signed Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sample in result.samples %}
+                        <tr>
+                            <td>{{ sample.scenario_id }}</td>
+                            {% if sample.skip_reason %}
+                            <td colspan="3"><em class="na-note">Skipped: {{ sample.skip_reason }}</em></td>
+                            {% else %}
+                            <td>{{ sample.prediction }}</td>
+                            <td>{{ sample.actual }}</td>
+                            <td>{{ "%.4f"|format(sample.raw_score) }}</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+                <p class="det-metric-label">
+                    <strong>{{ result.report_metric }}</strong>:
+                    {% if result.population_score is none %}
+                    <span class="na-note">N/A (0 samples)</span>
+                    {% else %}
+                    {{ "%.4f"|format(result.population_score) }}
+                    {% endif %}
+                </p>
+                {% endfor %}
+            </section>
+            {% endif %}
         </div>
 
         <footer>
