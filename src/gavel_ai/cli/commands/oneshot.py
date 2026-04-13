@@ -72,10 +72,18 @@ def _print_run_summary(run_ctx: LocalRunContext, eval_ctx: LocalFileSystemEvalCo
 
 
 
+VALID_TEMPLATES = ("default", "classification", "regression")
+
+
 @app.command()
 def create(
     eval: str = typer.Option(..., "--eval", help="Evaluation name"),
     type: str = typer.Option("local", "--type", help="Evaluation type: local or in-situ"),
+    template: str = typer.Option(
+        "default",
+        "--template",
+        help="Scaffold template: default, classification, regression",
+    ),
     eval_root: Optional[str] = typer.Option(
         None, "--eval-root", help="Custom evaluation root directory"
     ),
@@ -87,6 +95,12 @@ def create(
             raise ValidationError(
                 f"Invalid evaluation name '{eval}' - "
                 "Use only alphanumeric characters, hyphens, and underscores"
+            )
+
+        # Validate template
+        if template not in VALID_TEMPLATES:
+            raise ValidationError(
+                f"Unknown template '{template}' - Available: {', '.join(VALID_TEMPLATES)}"
             )
 
         # Determine eval root directory
@@ -101,7 +115,7 @@ def create(
             )
 
         # Generate all templates
-        generate_all_templates(eval_root_path, eval, type)
+        generate_all_templates(eval_root_path, eval, type, template)
 
         app_logger.info(f"Evaluation '{eval}' created at {eval_path}")
 
