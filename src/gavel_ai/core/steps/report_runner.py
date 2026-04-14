@@ -203,6 +203,27 @@ class ReportRunnerStep(Step):
         )
         reporter = OneShotReporter(reporter_config)
 
+        # Build input_source string from scenarios config
+        scenarios_cfg = getattr(eval_config, "scenarios", None)
+        if scenarios_cfg is not None:
+            input_source: str = f"{scenarios_cfg.source} ({scenarios_cfg.name})"
+        else:
+            input_source = ""
+
+        # Build subject_names from test_subjects prompt_name, falling back to processor results
+        subject_names: List[str] = [
+            ts.prompt_name
+            for ts in (eval_config.test_subjects or [])
+            if getattr(ts, "prompt_name", None)
+        ]
+        if not subject_names:
+            seen_subjects: set = set()
+            for pr in processor_results:
+                subj: str = getattr(pr, "test_subject", None) or "default"
+                if subj not in seen_subjects:
+                    seen_subjects.add(subj)
+                    subject_names.append(subj)
+
         run_data = RunData(
             metadata={
                 "eval_name": run_context.eval_context.eval_name,
@@ -211,6 +232,8 @@ class ReportRunnerStep(Step):
                 "scenario_count": len(processor_results) // max(len(eval_config.variants), 1),
                 "variant_count": len(eval_config.variants),
                 "eval_type": "oneshot",
+                "input_source": input_source,
+                "subject_names": subject_names,
             },
             results=evaluation_results,
             telemetry={

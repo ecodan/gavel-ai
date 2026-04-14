@@ -8,6 +8,9 @@ Treats OneShot as a conversation of length 1.
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+INPUT_COLLAPSE_THRESHOLD: int = 200
+RESPONSE_TRUNCATE_THRESHOLD: int = 500
+
 from gavel_ai.models.runtime import (
     DeterministicRunResult,
     ReportData,
@@ -209,4 +212,30 @@ class OneShotReporter(Jinja2Reporter):
         # Return as dict for Jinja2, with extra skipped_counts key
         ctx = report_data.model_dump()
         ctx["skipped_counts"] = skipped_counts
+
+        # New context keys for upgraded report template
+        telemetry = getattr(run, "telemetry", None)
+        ctx["total_execution_time_s"] = (
+            telemetry.get("total_duration_seconds") if isinstance(telemetry, dict) else None
+        )
+
+        run_metadata: Dict[str, Any] = getattr(run, "metadata", {}) or {}
+        ctx["input_source"] = run_metadata.get("input_source", "")
+        ctx["scenario_count"] = run_metadata.get("scenario_count", 0)
+
+        # subject_names: prefer metadata, fall back to unique subjects from scenario map
+        subject_names: List[str] = run_metadata.get("subject_names", [])
+        if not subject_names:
+            seen: set = set()
+            subject_names = []
+            for scenario in scenario_map.values():
+                subj: str = scenario.test_subject or "default"
+                if subj not in seen:
+                    seen.add(subj)
+                    subject_names.append(subj)
+        ctx["subject_names"] = subject_names
+
+        ctx["input_collapse_threshold"] = INPUT_COLLAPSE_THRESHOLD
+        ctx["response_truncate_threshold"] = RESPONSE_TRUNCATE_THRESHOLD
+
         return ctx
