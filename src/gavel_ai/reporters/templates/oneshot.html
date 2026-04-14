@@ -4,206 +4,229 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - Evaluation Report</title>
+    <title>OneShot Evaluation Report - {{ title }}</title>
     <style>
-        /* Unified Reporting Spec CSS */
-        :root {
-            --primary-bg: #f5f7fa;
-            --container-bg: #ffffff;
-            --header-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --user-bg: #e3f2fd;
-            --user-border: #1976d2;
-            --assistant-bg: #f3e5f5;
-            --assistant-border: #7b1fa2;
-            --text-secondary: #7f8c8d;
-            --border-light: #dee2e6;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             padding: 12px;
-            background: var(--primary-bg);
-            margin: 0;
+            background: #f5f7fa;
             color: #333;
+            font-size: 13px;
+            line-height: 1.4;
         }
 
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            background: var(--container-bg);
+            background: #ffffff;
             border-radius: 6px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
 
         header {
-            padding: 20px 24px;
-            background: var(--header-gradient);
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            border-radius: 6px 6px 0 0;
         }
 
         header h1 {
-            margin: 0;
-            font-size: 24px;
+            margin: 0 0 6px 0;
+            font-size: 1.5em;
         }
 
-        .metadata-badge {
-            margin-top: 8px;
-            font-size: 14px;
+        .header-meta {
             opacity: 0.9;
+            font-size: 0.85em;
+        }
+
+        .header-meta span {
+            margin-right: 12px;
+        }
+
+        .time-value {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
         }
 
         .content {
-            padding: 24px;
+            padding: 16px;
         }
 
         h2 {
-            margin: 32px 0 16px 0;
-            padding-bottom: 8px;
+            color: #2c3e50;
+            margin: 20px 0 10px 0;
+            padding-bottom: 6px;
             border-bottom: 2px solid #667eea;
-            font-size: 20px;
+            font-size: 1.2em;
         }
 
         h2:first-child {
             margin-top: 0;
         }
 
+        h3 {
+            color: #34495e;
+            margin: 12px 0 6px 0;
+            font-size: 1.05em;
+        }
+
+        h4 {
+            color: #555;
+            margin: 12px 0 6px 0;
+            font-size: 0.95em;
+        }
+
         /* Tables */
-        .summary-table {
+        table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 24px;
+            margin: 8px 0 16px 0;
             background: white;
+            border: 1px solid #ddd;
+            font-size: 12px;
+            table-layout: fixed;
         }
 
-        .summary-table th,
-        .summary-table td {
-            padding: 12px 16px;
+        table th {
+            background: #ecf0f1;
+            padding: 6px 8px;
             text-align: left;
-            border-bottom: 1px solid var(--border-light);
-        }
-
-        .summary-table th {
-            background: #f8f9fa;
             font-weight: 600;
-            color: #495057;
+            border-bottom: 2px solid #bdc3c7;
+            font-size: 12px;
         }
 
-        .summary-table tr:last-child td {
+        table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #ecf0f1;
+            vertical-align: top;
+        }
+
+        table tr:last-child td {
             border-bottom: none;
         }
 
-        /* Scenario Cards */
-        .scenario-card {
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            margin-bottom: 32px;
-            overflow: hidden;
+        .summary-score-table th:not(:first-child),
+        .summary-score-table td:not(:first-child),
+        .performance-summary-table th:not(:first-child),
+        .performance-summary-table td:not(:first-child) {
+            text-align: right;
         }
 
-        .scenario-header {
-            background: #f8f9fa;
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border-light);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .xut-subheader {
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 0.85em;
         }
 
-        .scenario-header h3 {
-            margin: 0;
-            font-size: 18px;
+        /* Scenario cards */
+        .input-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f0f7ff;
+            border-left: 3px solid #3498db;
+            border-radius: 3px;
         }
 
+        .input-section h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.05em;
+            color: #34495e;
+        }
+
+        /* Collapsible input */
         .system-prompt {
-            padding: 12px 16px;
-            background: #fff9db;
-            border-bottom: 1px solid #fee08b;
-            font-size: 13px;
-        }
-
-        /* Comparison Grid */
-        .comparison-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1px;
-            background: var(--border-light);
-        }
-
-        .variant-column {
+            margin: 2px 0 8px 0;
+            padding: 4px 6px;
             background: white;
-            padding: 16px;
+            border-radius: 2px;
+            border: 1px solid #dee2e6;
+            font-size: 12px;
         }
 
-        .variant-name {
-            font-weight: bold;
-            margin-bottom: 16px;
-            padding-bottom: 8px;
-            border-bottom: 1px dashed var(--border-light);
-            color: #667eea;
+        .system-prompt strong {
+            color: #2c3e50;
+            display: inline;
+            margin-right: 6px;
+            font-size: 11px;
+            font-weight: 600;
         }
 
-        /* Conversation View */
-        .conversation-turns {
-            margin: 8px 0;
+        .input-text-wrapper {
+            display: inline;
+            line-height: 1.2;
         }
 
-        .turn {
-            margin: 12px 0;
-            padding: 12px;
-            border-radius: 4px;
-            position: relative;
+        .input-text-collapsed {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+            max-width: 100%;
         }
 
-        .turn-role {
-            font-size: 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin-bottom: 4px;
+        .input-text-expanded {
+            white-space: pre-wrap;
+            word-break: break-word;
+            display: none;
+        }
+
+        .input-text-wrapper.expanded {
             display: block;
         }
 
-        .turn-user {
-            background: var(--user-bg);
-            border-left: 4px solid var(--user-border);
-            margin-left: 20px;
+        .input-text-wrapper.expanded .input-text-collapsed {
+            display: none !important;
         }
 
-        .turn-user .turn-role {
-            color: var(--user-border);
+        .input-text-wrapper.expanded .input-text-expanded {
+            display: block !important;
         }
 
-        .turn-assistant {
-            background: var(--assistant-bg);
-            border-left: 4px solid var(--assistant-border);
-            margin-right: 20px;
+        /* Truncated response */
+        .truncated-content {
+            position: relative;
         }
 
-        .turn-assistant .turn-role {
-            color: var(--assistant-border);
+        .truncated-preview {
+            display: block;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
         }
 
-        .turn-content {
-            font-size: 14px;
-            line-height: 1.5;
-            white-space: pre-wrap;
+        .truncated-full {
+            display: none;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
         }
 
-        .turn-footer {
-            margin-top: 8px;
-            display: flex;
-            justify-content: flex-end;
-            font-size: 11px;
-            color: var(--text-secondary);
+        .truncated-content.expanded .truncated-preview {
+            display: none;
         }
 
-        /* Judge Results */
-        .judge-results {
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid var(--border-light);
+        .truncated-content.expanded .truncated-full {
+            display: block;
         }
 
+        .model-response {
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        /* Judge results */
         .judge-badge {
             display: inline-block;
             padding: 4px 8px;
@@ -225,19 +248,8 @@
 
         .skip-note {
             font-size: 11px;
-            color: var(--text-secondary);
+            color: #7f8c8d;
             margin-left: 4px;
-        }
-
-        .det-metric-label {
-            font-size: 13px;
-            color: #495057;
-            margin: 8px 0 16px 0;
-        }
-
-        .na-note {
-            color: var(--text-secondary);
-            font-style: italic;
         }
 
         .judge-reasoning {
@@ -250,28 +262,69 @@
             display: none;
         }
 
-        /* Standard Utilities */
-        .expand-toggle {
-            color: var(--user-border);
-            cursor: pointer;
-            text-decoration: underline;
+        .no-data {
+            text-align: center;
+            padding: 12px;
+            color: #7f8c8d;
+            font-style: italic;
             font-size: 12px;
+        }
+
+        /* Deterministic judges section */
+        .det-metric-label {
+            font-size: 13px;
+            color: #495057;
+            margin: 8px 0 16px 0;
+        }
+
+        .na-note {
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        /* Expand button */
+        .expand-btn {
+            font-size: 11px;
+            cursor: pointer;
+            color: #3498db;
+            background: none;
+            border: none;
+            text-decoration: underline;
+            padding: 0 2px;
+            margin-left: 4px;
+            line-height: 1.2;
+        }
+
+        .expand-btn:hover {
+            color: #2980b9;
         }
 
         footer {
-            padding: 24px;
+            padding: 12px;
             text-align: center;
             font-size: 12px;
-            color: var(--text-secondary);
-        }
-
-        @media (max-width: 768px) {
-            .comparison-grid {
-                grid-template-columns: 1fr;
-            }
+            color: #7f8c8d;
+            border-top: 1px solid #dee2e6;
+            margin-top: 20px;
         }
     </style>
     <script>
+        function toggleInput(id) {
+            const wrapper = document.getElementById(id);
+            wrapper.classList.toggle('expanded');
+            const btn = wrapper.querySelector('button');
+            btn.textContent = wrapper.classList.contains('expanded') ? 'collapse' : 'expand';
+        }
+
+        function toggleTruncated(id) {
+            const el = document.getElementById(id);
+            el.classList.toggle('expanded');
+            document.querySelectorAll(`button[onclick="toggleTruncated('${id}')"]`)
+                .forEach(btn => {
+                    btn.textContent = el.classList.contains('expanded') ? 'collapse' : 'expand';
+                });
+        }
+
         function toggleReasoning(id) {
             const el = document.getElementById(id);
             el.style.display = el.style.display === 'block' ? 'none' : 'block';
@@ -282,62 +335,155 @@
 <body>
     <div class="container">
         <header>
-            <h1>{{ title }}</h1>
-            <div class="metadata-badge">
-                Run ID: <strong>{{ run_id }}</strong> &nbsp;|&nbsp;
-                Generated: <strong>{{ generated_at.strftime('%Y-%m-%d %H:%M:%S') }}</strong>
+            <h1>OneShot Evaluation Report</h1>
+            <div class="header-meta">
+                <span><strong>Evaluation:</strong> {{ title }}</span>
+                <span><strong>Run ID:</strong> {{ run_id }}</span>
+                {% if total_execution_time_s is not none and total_execution_time_s is not undefined %}
+                <span><strong>Overall Execution Time:</strong>
+                    <span class="time-value">{{ "%.2fs"|format(total_execution_time_s) }}</span>
+                </span>
+                {% endif %}
+                <span><strong>Generated:</strong> {{ generated_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
             </div>
         </header>
 
         <div class="content">
-            {% if summary_metrics %}
-            <section id="summary">
-                <h2>Evaluation Summary</h2>
-                <table class="summary-table">
-                    <thead>
-                        <tr>
-                            <th>Variant</th>
-                            {% set first_variant_id = summary_metrics.keys()|first %}
-                            {% for metric in summary_metrics[first_variant_id].keys() %}
-                            <th>{{ metric }}</th>
-                            {% endfor %}
-                            <th>Overall Avg</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for variant, metrics in summary_metrics.items() %}
-                        <tr>
-                            <td><strong>{{ variant }}</strong></td>
-                            {% for metric, val in metrics.items() %}
-                            {% set skip = (skipped_counts.get(variant, {}) or {}).get(metric, 0) if skipped_counts is defined else 0 %}
-                            <td>{{ "%.2f"|format(val) }}{% if skip > 0 %}<span class="skip-note">({{ skip }} skipped)</span>{% endif %}</td>
-                            {% endfor %}
-                            <td><strong>{{ "%.2f"|format(metrics.values()|sum / metrics.values()|length) if
-                                    metrics.values()|length > 0 else '0.00' }}</strong>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </section>
-            {% endif %}
 
-            <!-- Performance Metrics -->
+            <!-- Eval Summary -->
+            <section id="summary">
+                <h2>Eval Summary</h2>
+                {% if summary_metrics or deterministic_results %}
+                    {% for subject in subject_names %}
+                    <h3>{{ subject }}</h3>
+                    <div class="xut-subheader">
+                        {% if input_source %}<strong>Input Source:</strong> {{ input_source }} | {% endif %}
+                        <strong>Number of Scenarios:</strong> {{ scenario_count }}
+                    </div>
+                    {% if summary_metrics %}
+                    <h4>LLM Judges</h4>
+                    <table class="summary-score-table">
+                        <thead>
+                            <tr>
+                                <th>Variant</th>
+                                {% set first_variant_id = summary_metrics.keys()|first %}
+                                {% for metric in summary_metrics[first_variant_id].keys() %}
+                                <th>{{ metric }}</th>
+                                {% endfor %}
+                                <th>LLM Avg</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for variant, metrics in summary_metrics.items() %}
+                            <tr>
+                                <td><strong>{{ variant }}</strong></td>
+                                {% for metric, val in metrics.items() %}
+                                {% set skip = (skipped_counts.get(variant, {}) or {}).get(metric, 0) if skipped_counts is defined else 0 %}
+                                <td>{{ "%.2f"|format(val) }}{% if skip > 0 %}<span class="skip-note">({{ skip }} skipped)</span>{% endif %}</td>
+                                {% endfor %}
+                                <td><strong>{{ "%.2f"|format(metrics.values()|sum / metrics.values()|length) if metrics.values()|length > 0 else '0.00' }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                    {% if deterministic_results %}
+                    <h4>Deterministic Metrics</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Type</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for result in deterministic_results %}
+                            <tr>
+                                <td>{{ result.metric_name }}</td>
+                                <td>{{ result.judge_type }}</td>
+                                <td>{% if result.population_score is none %}<em class="na-note">N/A</em>
+                                    {% else %}{{ "%.4f"|format(result.population_score) }}{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                    {% else %}
+                    {# Fallback: no subject names — render flat tables as before #}
+                    {% if summary_metrics %}
+                    <h4>LLM Judges</h4>
+                    <table class="summary-score-table">
+                        <thead>
+                            <tr>
+                                <th>Variant</th>
+                                {% set first_variant_id = summary_metrics.keys()|first %}
+                                {% for metric in summary_metrics[first_variant_id].keys() %}
+                                <th>{{ metric }}</th>
+                                {% endfor %}
+                                <th>LLM Avg</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for variant, metrics in summary_metrics.items() %}
+                            <tr>
+                                <td><strong>{{ variant }}</strong></td>
+                                {% for metric, val in metrics.items() %}
+                                {% set skip = (skipped_counts.get(variant, {}) or {}).get(metric, 0) if skipped_counts is defined else 0 %}
+                                <td>{{ "%.2f"|format(val) }}{% if skip > 0 %}<span class="skip-note">({{ skip }} skipped)</span>{% endif %}</td>
+                                {% endfor %}
+                                <td><strong>{{ "%.2f"|format(metrics.values()|sum / metrics.values()|length) if metrics.values()|length > 0 else '0.00' }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                    {% if deterministic_results %}
+                    <h4>Deterministic Metrics</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Type</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for result in deterministic_results %}
+                            <tr>
+                                <td>{{ result.metric_name }}</td>
+                                <td>{{ result.judge_type }}</td>
+                                <td>{% if result.population_score is none %}<em class="na-note">N/A</em>
+                                    {% else %}{{ "%.4f"|format(result.population_score) }}{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </section>
+
+            <!-- Performance Summary -->
             {% if performance_metrics %}
             <section id="performance">
                 <h2>Performance Summary</h2>
-                <table class="summary-table">
+                {% for subject in subject_names %}
+                <h3>{{ subject }}</h3>
+                {% else %}
+                {% endfor %}
+                <table class="performance-summary-table">
                     <thead>
                         <tr>
                             <th>Variant</th>
-                            <th>Avg Turn Time</th>
+                            <th>Avg Response Time</th>
                             <th>Total Time</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for variant, perf in performance_metrics.items() %}
                         <tr>
-                            <td>{{ variant }}</td>
+                            <td><strong>{{ variant }}</strong></td>
                             <td>{{ "%.2fs"|format(perf.avg_turn_time) }}</td>
                             <td>{{ "%.2fs"|format(perf.total_time) }}</td>
                         </tr>
@@ -351,30 +497,60 @@
             <section id="scenarios">
                 <h2>Detailed Analysis</h2>
                 {% for subject, subject_scenarios in scenarios_by_subject.items() %}
-                <div class="subject-group">
-                    <h3 class="subject-title">Subject: {{ subject }}</h3>
-                    {% for scenario in subject_scenarios %}
-                    <div class="scenario-card">
-                        <div class="scenario-header">
-                            <h3>Scenario: {{ scenario.scenario_id }}</h3>
+                <h3>Prompt: {{ subject }}</h3>
+                {% for scenario in subject_scenarios %}
+                <div class="input-section">
+                    <h3>Scenario {{ scenario.scenario_id }}
+                        <span style="float:right; font-weight:normal; color:#666; font-size:0.85em;">
+                            {{ scenario.test_subject }}
+                        </span>
+                    </h3>
+
+                    <div class="system-prompt">
+                        <strong>Input:</strong>
+                        {% if scenario.system_input and scenario.system_input|length > input_collapse_threshold %}
+                        <div id="input-{{ scenario.scenario_id }}" class="input-text-wrapper">
+                            <span class="input-text-collapsed">{{ scenario.system_input[:input_collapse_threshold] }}...</span>
+                            <span class="input-text-expanded">{{ scenario.system_input }}</span>
+                            <button class="expand-btn" onclick="toggleInput('input-{{ scenario.scenario_id }}')">expand</button>
                         </div>
-                        {% if scenario.system_input %}
-                        <div class="prompt-box">
-                            <strong>Prompt:</strong>
-                            <div class="prompt-content">{{ scenario.system_input }}</div>
-                        </div>
+                        {% else %}
+                        <span>{{ scenario.system_input or "" }}</span>
                         {% endif %}
+                    </div>
 
-                        <div class="comparison-grid">
-                            {% for variant_id, variant in scenario.variants.items() %}
-                            <div class="variant-column">
-                                <div class="variant-name">{{ variant_id }}</div>
-
-                                <div class="response-content">
-                                    {{ variant.output }}
-                                </div>
-
-                                <div class="judge-results">
+                    <table>
+                        <thead>
+                            <tr>
+                                {% for variant_id in scenario.variants %}
+                                <th style="width: {{ (100 / scenario.variants|length)|round(1) }}%;">{{ variant_id }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {# Response row #}
+                            <tr>
+                                {% for variant_id, variant in scenario.variants.items() %}
+                                <td>
+                                    {% set resp = variant.output or "" %}
+                                    {% if resp|length > response_truncate_threshold %}
+                                    <div id="response-{{ scenario.scenario_id }}-{{ variant_id }}" class="truncated-content">
+                                        <span class="truncated-preview">{{ resp[:response_truncate_threshold] }}...</span>
+                                        <span class="truncated-full">{{ resp }}</span>
+                                        <button class="expand-btn"
+                                            onclick="toggleTruncated('response-{{ scenario.scenario_id }}-{{ variant_id }}')">expand</button>
+                                    </div>
+                                    {% else %}
+                                    <div class="model-response">{{ resp }}</div>
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {# Score row #}
+                            <tr>
+                                {% for variant_id, variant in scenario.variants.items() %}
+                                <td>
+                                    {% if variant.judgments %}
                                     {% for judge in variant.judgments %}
                                     <div class="judge-badge"
                                         onclick="toggleReasoning('reason-{{ scenario.scenario_id }}-{{ variant_id }}-{{ loop.index }}')">
@@ -385,28 +561,27 @@
                                         {{ judge.reasoning }}
                                     </div>
                                     {% endfor %}
-                                </div>
-                                <div class="variant-footer">
-                                    {% if variant.timing.total_time %}
-                                    Time: {{ "%.2fs"|format(variant.timing.total_time) }}
+                                    {% else %}
+                                    <div class="no-data">No scoring data</div>
                                     {% endif %}
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endfor %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
+                {% endfor %}
                 {% endfor %}
             </section>
 
             {% if deterministic_results %}
+            <!-- Deterministic Judges (full breakdown) -->
             <section id="deterministic-judges">
                 <h2>Deterministic Judges</h2>
                 {% for result in deterministic_results %}
                 <h3>{{ result.metric_name }}</h3>
                 {% if result.judge_type == "classifier" %}
-                <table class="summary-table">
+                <table>
                     <thead>
                         <tr>
                             <th>Scenario</th>
@@ -431,7 +606,7 @@
                     </tbody>
                 </table>
                 {% elif result.judge_type == "regression" %}
-                <table class="summary-table">
+                <table>
                     <thead>
                         <tr>
                             <th>Scenario</th>
@@ -467,6 +642,7 @@
                 {% endfor %}
             </section>
             {% endif %}
+
         </div>
 
         <footer>

@@ -90,15 +90,20 @@ async def test_oneshot_reporter_generates_unified_html(mock_oneshot_run, reporte
     reporter = OneShotReporter(reporter_config)
     output = await reporter.generate(mock_oneshot_run, "oneshot.html")
 
-    # Verify Unified Spec elements
+    # Header
+    assert "OneShot Evaluation Report" in output
+    assert "Evaluation:" in output
     assert "Claude vs GPT Comparison" in output
     assert "Run ID:" in output
-    assert "Evaluation Summary" in output
+    # Sections
+    assert "Eval Summary" in output
     assert "Performance Summary" in output
     assert "Detailed Analysis" in output
-    assert "comparison-grid" in output
-    assert "turn-user" in output
-    assert "turn-assistant" in output
+    # New table-based scenario layout (no comparison-grid)
+    assert "comparison-grid" not in output
+    # New column headers
+    assert "Avg Response Time" in output
+    assert "LLM Avg" in output
 
 
 @pytest.mark.asyncio
@@ -274,3 +279,106 @@ async def test_deterministic_section_absent_when_empty(reporter_config):
     html = await reporter.generate(run, "oneshot.html")
 
     assert "Deterministic Judges" not in html
+
+
+# ---------------------------------------------------------------------------
+# New context keys: execution time, input source, subject names, thresholds
+# ---------------------------------------------------------------------------
+
+class MockRunWithTelemetry(MockRun):
+    """MockRun extended with telemetry and richer metadata for new context key tests."""
+
+    def __init__(self, total_duration_seconds=None, input_source="", subject_names=None, scenario_count=2):
+        super().__init__()
+        self.telemetry = (
+            {"total_duration_seconds": total_duration_seconds}
+            if total_duration_seconds is not None
+            else {}
+        )
+        self.metadata["input_source"] = input_source
+        self.metadata["subject_names"] = subject_names if subject_names is not None else []
+        self.metadata["scenario_count"] = scenario_count
+        self.raw_results = []
+
+
+@pytest.mark.asyncio
+async def test_build_context_includes_execution_time(reporter_config):
+    """_build_context returns total_execution_time_s from telemetry."""
+    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
+
+    run = MockRunWithTelemetry(total_duration_seconds=42.5)
+    reporter = OneShotReporter(reporter_config)
+    ctx = reporter._build_context(run)
+
+    assert ctx["total_execution_time_s"] == 42.5
+
+
+@pytest.mark.asyncio
+async def test_build_context_graceful_missing_execution_time(reporter_config):
+    """_build_context returns None for total_execution_time_s when telemetry is empty."""
+    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
+
+    run = MockRunWithTelemetry(total_duration_seconds=None)
+    reporter = OneShotReporter(reporter_config)
+    ctx = reporter._build_context(run)
+
+    assert ctx["total_execution_time_s"] is None
+
+
+@pytest.mark.asyncio
+async def test_build_context_input_source(reporter_config):
+    """_build_context passes input_source from metadata."""
+    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
+
+    run = MockRunWithTelemetry(input_source="file.local (scenarios.json)")
+    reporter = OneShotReporter(reporter_config)
+    ctx = reporter._build_context(run)
+
+    assert ctx["input_source"] == "file.local (scenarios.json)"
+
+
+@pytest.mark.asyncio
+async def test_build_context_subject_names_from_metadata(reporter_config):
+    """_build_context returns subject_names from run.metadata when present."""
+    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
+
+    run = MockRunWithTelemetry(subject_names=["sample_prompt:v1", "sample_prompt:v2"])
+    reporter = OneShotReporter(reporter_config)
+    ctx = reporter._build_context(run)
+
+    assert ctx["subject_names"] == ["sample_prompt:v1", "sample_prompt:v2"]
+
+
+@pytest.mark.asyncio
+async def test_build_context_subject_names_fallback(reporter_config):
+    """_build_context falls back to unique test_subject values from results when metadata list is empty."""
+    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
+
+    run = MockRunWithTelemetry(subject_names=[])
+    # Results contain test_subject implicitly via the default MockRun results (subject_id/test_subject absent)
+    # The default MockRun results have no subject_id, so scenario.test_subject defaults to "default"
+    reporter = OneShotReporter(reporter_config)
+    ctx = reporter._build_context(run)
+
+    # Should fall back to unique subjects from the scenario map
+    assert isinstance(ctx["subject_names"], list)
+    assert len(ctx["subject_names"]) >= 1
+
+
+@pytest.mark.asyncio
+async def test_build_context_thresholds_present(reporter_config):
+    """_build_context includes collapse threshold constants."""
+    from gavel_ai.reporters.oneshot_reporter import (
+        INPUT_COLLAPSE_THRESHOLD,
+        OneShotReporter,
+        RESPONSE_TRUNCATE_THRESHOLD,
+    )
+
+    run = MockRunWithTelemetry()
+    reporter = OneShotReporter(reporter_config)
+    ctx = reporter._build_context(run)
+
+    assert ctx["input_collapse_threshold"] == INPUT_COLLAPSE_THRESHOLD
+    assert ctx["response_truncate_threshold"] == RESPONSE_TRUNCATE_THRESHOLD
+    assert ctx["input_collapse_threshold"] == 200
+    assert ctx["response_truncate_threshold"] == 500

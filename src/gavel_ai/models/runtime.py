@@ -147,10 +147,11 @@ class Scenario(BaseModel):
     expected_behavior: Optional[str] = Field(
         None, validation_alias=AliasChoices("expected_behavior", "expected")
     )
-    expected_output: Optional[str] = Field(
+    expected_output: Optional[Any] = Field(
         None,
         description=(
-            "Golden reference output. Used by field_mapping.expected_output='expected_output'. "
+            "Golden reference output. May be a string or a complex object (dict/list). "
+            "Used by field_mapping.expected_output='expected_output'. "
             "Also checked as a fallback by _get_expected_output when no field_mapping is set."
         ),
     )
