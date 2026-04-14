@@ -63,6 +63,27 @@
       "summary": "finish-oneshot initiative merged: DeterministicMetric hierarchy (ClassifierMetric + RegressionMetric via scikit-learn), config_ref TOML judge resolution, .workflow_status step tracking, snapshot_run_config prompt copy, expanded ValidatorStep (variant resolution, prompt existence, empty scenario check), OneShotReporter score-averaging exclusion on processor errors, deterministic judge HTML section, --template classification/regression scaffold, in-situ scaffold fix, Google Vertex AI ADC auth support.",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-04-14T17:32:38.264293+00:00",
+      "branch": "feat/report-upgrades/data-pipeline",
+      "summary": "Extended oneshot_reporter._build_context with total_execution_time_s, input_source, subject_names, scenario_count, and collapse threshold constants. ReportRunnerStep populates input_source and subject_names in RunData.metadata. 6 new unit tests added.",
+      "decisions": "",
+      "modules": []
+    },
+    {
+      "timestamp": "2026-04-14T17:38:02.825178+00:00",
+      "branch": "feat/report-upgrades/template",
+      "summary": "Rewrote oneshot.html: new header (execution time, eval name), Eval Summary (LLM/deterministic split), Performance Summary (subject heading, renamed column), Scenario Detail (table layout, collapsible inputs, truncated responses). Updated HTML assertions in test_oneshot_reporter.py.",
+      "decisions": "",
+      "modules": []
+    },
+    {
+      "timestamp": "2026-04-14T21:12:24.446956+00:00",
+      "branch": "initiative/report-upgrades",
+      "summary": "Upgraded OneShot HTML report: header now shows execution time and eval name; Eval Summary splits LLM vs deterministic judge sections with per-subject sub-headings; Performance Summary adds per-subject sub-headings and renames 'Avg Turn Time' to 'Avg Response Time'; Scenario Detail replaced with table layout, collapsible inputs (>200 chars), and truncatable responses (>500 chars). ReportRunnerStep populates input_source and subject_names in RunData.metadata. OneShotReporter._build_context injects total_execution_time_s, input_source, subject_names, scenario_count, and threshold constants.",
+      "decisions": "",
+      "modules": []
     }
   ]
 }

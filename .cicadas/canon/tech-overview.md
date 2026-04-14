@@ -58,6 +58,7 @@ Gavel-AI uses a **Layered Service Architecture** centered around the **RunContex
 | **Judge** | Evaluates LLM output against a scenario (LLM-based via DeepEval, or deterministic via `DeterministicMetric`). | `src/gavel_ai/judges/` |
 | **RunContext** | Manages the lifecycle of a single evaluation run and its artifacts. | `src/gavel_ai/storage/run_context.py` |
 | **ProviderFactory** | Creates Pydantic-AI agents based on model definitions. | `src/gavel_ai/providers/factory.py` |
+| **Reporter** | Renders Jinja2 HTML/Markdown reports. `OneShotReporter._build_context()` enriches the Jinja2 context with execution time, input source, subject names, scenario count, and collapse thresholds. The OneShot template renders split LLM/deterministic judge sections, per-subject sub-headings, table-layout scenario detail with collapsible inputs and truncatable responses. | `src/gavel_ai/reporters/`, `src/gavel_ai/reporters/templates/oneshot.html` |
 
 ### Data Flow
 

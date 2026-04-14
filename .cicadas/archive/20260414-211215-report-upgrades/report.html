@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneShot Evaluation Report - test_new_os</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            background: #f5f7fa;
+            padding: 12px;
+            font-size: 13px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px;
+            border-radius: 6px 6px 0 0;
+        }
+
+        header h1 {
+            font-size: 1.5em;
+            margin-bottom: 6px;
+        }
+
+        .header-meta {
+            opacity: 0.9;
+            font-size: 0.85em;
+        }
+
+        .header-meta span {
+            margin-right: 12px;
+        }
+
+        .content {
+            padding: 16px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin: 20px 0 10px 0;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #667eea;
+            font-size: 1.2em;
+        }
+
+        h3 {
+            color: #34495e;
+            margin: 12px 0 6px 0;
+            font-size: 1.05em;
+        }
+
+        .overall-time {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            border-left: 3px solid #667eea;
+            margin-bottom: 12px;
+            font-size: 0.95em;
+        }
+
+        .overall-time strong {
+            color: #2c3e50;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            background: white;
+            border: 1px solid #ddd;
+            font-size: 12px;
+            table-layout: fixed;
+        }
+
+        table th {
+            background: #ecf0f1;
+            padding: 6px 8px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #bdc3c7;
+            font-size: 12px;
+        }
+
+        table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #ecf0f1;
+            vertical-align: top;
+            text-align: left;
+        }
+
+        table tr:hover {
+            background: #f9f9f9;
+        }
+
+        /* Summary score and performance tables: right-align numeric columns (Variant stays left) */
+        .summary-score-table th:not(:first-child),
+        .summary-score-table td:not(:first-child),
+        .performance-summary-table th:not(:first-child),
+        .performance-summary-table td:not(:first-child) {
+            text-align: right;
+        }
+
+        .score-badge {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .variant-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .prompt-section {
+            margin-bottom: 30px;
+        }
+
+        .input-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f0f7ff;
+            border-left: 3px solid #3498db;
+            border-radius: 3px;
+        }
+
+        .input-section h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.05em;
+            color: #34495e;
+        }
+
+        .input-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 12px;
+            line-height: 1.4;
+            margin-top: 6px;
+            background: white;
+            padding: 8px;
+            border-radius: 3px;
+        }
+
+        .input-text-collapsed {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-height: 1.5em;
+            display: block;
+        }
+
+        .input-text-expanded {
+            white-space: pre-wrap;
+            word-break: break-word;
+            display: none;
+        }
+
+        .model-response {
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            margin-bottom: 8px;
+            font-size: 12px;
+            line-height: 1.4;
+            text-align: left !important;
+            vertical-align: top;
+            display: block;
+            max-width: 100%;
+        }
+
+        .judge-detail {
+            margin: 8px 0;
+            padding: 8px;
+            background: white;
+            border-left: 3px solid #3498db;
+            border-radius: 3px;
+        }
+
+        .judge-detail strong {
+            display: block;
+            color: #2c3e50;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+
+        .reasoning {
+            margin: 4px 0 0 0;
+            font-size: 11px;
+            color: #555;
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+        
+        .reasoning p {
+            margin: 0;
+        }
+
+        .expand-btn {
+            font-size: 11px;
+            cursor: pointer;
+            color: #3498db;
+            background: none;
+            border: none;
+            text-decoration: underline;
+            padding: 1px 4px;
+        }
+
+        .expand-btn:hover {
+            color: #2980b9;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+            font-style: italic;
+            font-size: 12px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 12px;
+            color: #7f8c8d;
+            font-size: 0.85em;
+            border-top: 1px solid #dee2e6;
+            margin-top: 20px;
+        }
+
+        .system-prompt {
+            margin: 2px 0;
+            padding: 2px 4px;
+            background: white;
+            border-radius: 2px;
+            border: 1px solid #dee2e6;
+            line-height: 1.2;
+            min-height: auto;
+        }
+
+        .system-prompt strong {
+            color: #2c3e50;
+            display: inline;
+            margin-right: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .system-prompt-content {
+            display: inline;
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .input-text-wrapper {
+            display: inline;
+            line-height: 1.2;
+            margin: 0;
+            padding: 0;
+        }
+
+        .input-text-collapsed {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .input-text-expanded {
+            white-space: pre-wrap;
+            word-break: break-word;
+            display: none;
+        }
+
+        .input-text-wrapper.expanded {
+            display: block;
+        }
+
+        .input-text-wrapper.expanded .input-text-collapsed {
+            display: none !important;
+        }
+
+        .input-text-wrapper.expanded .input-text-expanded {
+            display: block !important;
+        }
+
+        .input-text-wrapper .expand-btn {
+            margin-left: 4px;
+            display: inline;
+            vertical-align: baseline;
+            padding: 0 2px;
+            line-height: 1.2;
+        }
+
+        .scenario-container {
+            margin-top: 8px;
+        }
+
+        .variant-card {
+            margin-bottom: 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            background: white;
+        }
+
+        .variant-header {
+            padding: 6px 8px;
+            background: #f8f9fa;
+            cursor: pointer;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 12px;
+        }
+
+        .variant-header:hover {
+            background: #e9ecef;
+        }
+
+        .variant-header strong {
+            font-size: 12px;
+        }
+
+        .variant-content {
+            padding: 8px;
+            display: none;
+        }
+
+        .variant-content.expanded {
+            display: block;
+        }
+
+        .response-container {
+            margin-bottom: 8px;
+        }
+
+        .response-label {
+            font-size: 11px;
+            color: #2c3e50;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .response-box {
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .judge-section {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #ecf0f1;
+        }
+
+        .judge-evaluation {
+            margin: 6px 0;
+            padding: 6px;
+            background: #f8f9fa;
+            border-radius: 3px;
+        }
+
+        .judge-header {
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .score-value {
+            font-weight: 600;
+        }
+
+        .score-display {
+            font-size: 11px;
+            margin-left: 8px;
+            color: #666;
+        }
+
+        .judge-reasoning-box {
+            margin-top: 6px;
+            padding: 6px;
+            background: white;
+            border-left: 2px solid #3498db;
+            border-radius: 2px;
+            font-size: 11px;
+        }
+
+        .score-badge {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .time-value {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        .xut-subheader {
+            margin-bottom: 6px;
+            color: #666;
+            font-size: 0.85em;
+        }
+
+        .truncated-content {
+            position: relative;
+            margin: 0;
+            padding: 0;
+        }
+
+        .truncated-preview {
+            display: block !important;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+            white-space: normal;
+            margin: 0;
+            padding: 0;
+        }
+
+        .truncated-full {
+            display: none;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+            white-space: normal;
+            margin: 0;
+            padding: 0;
+        }
+
+        .truncated-content.expanded .truncated-preview {
+            display: none;
+        }
+
+        .truncated-content.expanded .truncated-full {
+            display: block;
+        }
+
+        .judge-score-hover {
+            position: relative;
+            cursor: help;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+        }
+
+        .judge-score-hover .tooltip {
+            visibility: hidden;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-width: 400px;
+            z-index: 1000;
+            margin-bottom: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .judge-score-hover:hover .tooltip {
+            visibility: visible;
+        }
+
+        .judge-score-hover .tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #333;
+        }
+
+        .judge-reasoning-box {
+            display: none;
+        }
+
+        .judge-reasoning-box.expanded {
+            display: block;
+        }
+
+        .error-box {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            padding: 8px;
+            margin: 8px 0;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .error-box strong {
+            color: #c62828;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .error-box p {
+            margin: 4px 0 0 0;
+            color: #555;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .error-box ul {
+            margin: 4px 0 0 0;
+            padding-left: 20px;
+        }
+
+        .error-box li {
+            margin: 2px 0;
+            color: #555;
+        }
+    </style>
+    <script>
+        function toggleExpand(id) {
+            const element = document.getElementById(id);
+            const isHidden = element.style.display === 'none' || !element.classList.contains('expanded');
+            element.style.display = isHidden ? 'block' : 'none';
+            element.classList.toggle('expanded', isHidden);
+            
+            // Update button text
+            const buttons = document.querySelectorAll(`button[onclick="toggleExpand('${id}')"]`);
+            buttons.forEach(btn => {
+                btn.textContent = isHidden ? 'collapse' : 'show reasoning';
+            });
+        }
+
+        function toggleTruncated(id) {
+            const element = document.getElementById(id);
+            element.classList.toggle('expanded');
+            
+            // Update button text
+            const buttons = document.querySelectorAll(`button[onclick="toggleTruncated('${id}')"]`);
+            buttons.forEach(btn => {
+                const isExpanded = element.classList.contains('expanded');
+                btn.textContent = isExpanded ? 'collapse' : 'expand';
+            });
+        }
+
+        function toggleInput(id) {
+            const wrapper = document.getElementById(id);
+            const button = wrapper.querySelector('button');
+            
+            // Toggle the expanded class on the wrapper
+            // CSS handles showing/hiding collapsed vs expanded spans
+            wrapper.classList.toggle('expanded');
+            
+            // Update button text based on current state
+            const isExpanded = wrapper.classList.contains('expanded');
+            button.textContent = isExpanded ? 'collapse' : 'expand';
+        }
+
+        // Helper function to truncate text at word boundary
+        function truncateAtWord(text, maxLength) {
+            if (text.length <= maxLength) return text;
+            const truncated = text.substring(0, maxLength);
+            const lastSpace = truncated.lastIndexOf(' ');
+            if (lastSpace > maxLength * 0.8) {
+                return truncated.substring(0, lastSpace) + '...';
+            }
+            return truncated + '...';
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>OneShot Evaluation Report</h1>
+            <div class="header-meta">
+                <span><strong>Evaluation:</strong> test_new_os</span>
+                <span><strong>Run ID:</strong> 20260213_163914</span>
+                <span><strong>Overall Execution Time:</strong> <span class="time-value">26.65s</span></span>
+                <span><strong>Generated:</strong> 2026-03-13 21:26:19</span>
+            </div>
+        </header>
+
+        <div class="content">
+
+            <!-- Eval Summary Section -->
+            <section>
+                <h2>Eval Summary</h2>
+                
+                    <h3>sample_prompt:v1</h3>
+                    <div class="xut-subheader">
+                        <strong>Input Source:</strong> file.local (scenarios.json) | 
+                        <strong>Number of Scenarios:</strong> 3
+                    </div>
+
+
+                    <h4 style="margin-top: 12px; margin-bottom: 6px; color: #555;">LLM Judges</h4>
+                    <table class="summary-score-table">
+                        <colgroup>
+                            <col style="width: 70%">
+                            <col style="width: 10%">
+                            <col style="width: 10%">
+                            <col style="width: 10%">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Variant</th>
+                                <th>Completeness File <span style="font-weight: normal; color: #666;">(mean)</span></th>
+                                <th>Quality Inline <span style="font-weight: normal; color: #666;">(mean)</span></th>
+                                <th>LLM Avg</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                <tr>
+                                    <td><strong>ai_gateway_claude</strong></td>
+                                            <td>0.9/10</td>
+                                            <td>0.9/10</td>
+                                        <td><strong>0.9/10</strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>ai_gateway_gemini</strong></td>
+                                            <td>0.8/10</td>
+                                            <td>0.9/10</td>
+                                        <td><strong>0.8/10</strong></td>
+                                </tr>
+                        </tbody>
+                    </table>
+
+                
+            </section>
+
+            <!-- Performance Summary Section -->
+            <section>
+                <h2>Performance Summary</h2>
+                
+                    <h3>sample_prompt:v1</h3>
+                        <table class="performance-summary-table">
+                            <colgroup>
+                                <col style="width: 80%">
+                                <col style="width: 10%">
+                                <col style="width: 10%">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>Variant</th>
+                                    <th>Avg Response Time</th>
+                                    <th>Total Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                    <tr>
+                                        <td><strong>ai_gateway_claude</strong></td>
+                                    <td>
+                                            5.01s
+                                        </td>
+                                    <td>
+                                            15.04s
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>ai_gateway_gemini</strong></td>
+                                    <td>
+                                            4.56s
+                                        </td>
+                                    <td>
+                                            13.69s
+                                        </td>
+                                    </tr>
+                            </tbody>
+                        </table>
+                
+            </section>
+
+            <!-- Detail Sections - One per XUT -->
+                <section class="prompt-section">
+                    <h2>Prompt: sample_prompt:v1</h2>
+                    
+                    
+                        <div class="input-section">
+                            <h3>Scenario example_1 <span style="float: right; font-weight: normal; color: #666; font-size: 0.85em;">sample_prompt:v1</span></h3>
+                            
+                            <div class="system-prompt">
+                                <strong>Input:</strong>
+                                
+                                <div class="system-prompt-content">
+                                        <div id="input-sample_prompt:v1-example_1" class="input-text-wrapper">
+                                            <span class="input-text-collapsed">What is the capital of France?</span>
+                                            <span class="input-text-expanded">What is the capital of France?</span>
+                                            <button class="expand-btn" onclick="toggleInput('input-sample_prompt:v1-example_1')">expand</button>
+                                        </div>
+                                </div>
+                            </div>
+                            
+                                <table>
+                                    <thead>
+                                        <tr>
+                                                <th style="width: 50.0%;">ai_gateway_claude</th>
+                                                <th style="width: 50.0%;">ai_gateway_gemini</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                                <td>
+                                                    
+                                                    <div class="model-response">
+                                                            The capital of France is **Paris**.
+                                                </div>
+                                                </td>
+                                                <td>
+                                                    
+                                                    <div class="model-response">
+                                                            Paris
+                                                </div>
+                                                </td>
+                                        </tr>
+                                            <tr>
+                                                    <td>
+                                                            <div class="no-data">No scoring data</div>
+                                                    </td>
+                                                    <td>
+                                                            <div class="no-data">No scoring data</div>
+                                                    </td>
+                                            </tr>
+                                    </tbody>
+                                </table>
+                        </div>
+                        <div class="input-section">
+                            <h3>Scenario example_2 <span style="float: right; font-weight: normal; color: #666; font-size: 0.85em;">sample_prompt:v1</span></h3>
+                            
+                            <div class="system-prompt">
+                                <strong>Input:</strong>
+                                
+                                <div class="system-prompt-content">
+                                        <div id="input-sample_prompt:v1-example_2" class="input-text-wrapper">
+                                            <span class="input-text-collapsed">Explain quantum computing in simple terms.</span>
+                                            <span class="input-text-expanded">Explain quantum computing in simple terms.</span>
+                                            <button class="expand-btn" onclick="toggleInput('input-sample_prompt:v1-example_2')">expand</button>
+                                        </div>
+                                </div>
+                            </div>
+                            
+                                <table>
+                                    <thead>
+                                        <tr>
+                                                <th style="width: 50.0%;">ai_gateway_claude</th>
+                                                <th style="width: 50.0%;">ai_gateway_gemini</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                                <td>
+                                                    
+                                                    <div class="model-response">
+                                                            <div id="response-sample_prompt:v1-example_2-ai_gateway_claude" class="truncated-content">
+                                                                <span class="truncated-preview" style="display: block;"># Quantum Computing Explained Simply
+
+## Regular Computers vs. Quantum Computers
+
+**Regular computers** use bits that are either 0 or 1 — like light switches that are on or off.
+
+**Quantum computers** use quantum bits (qubits) that can be 0, 1, or **both at the same time** — thanks to a quantum property called superposition.
+
+## Key Differences
+
+| Aspect | Regular Computer | Quantum Computer |
+|--------|-----------------|-----------------|
+| **Basic unit** | Bit (0 or 1) | Qubit (0, 1, or both)...</span>
+                                                                <span class="truncated-full"># Quantum Computing Explained Simply
+
+## Regular Computers vs. Quantum Computers
+
+**Regular computers** use bits that are either 0 or 1 — like light switches that are on or off.
+
+**Quantum computers** use quantum bits (qubits) that can be 0, 1, or **both at the same time** — thanks to a quantum property called superposition.
+
+## Key Differences
+
+| Aspect | Regular Computer | Quantum Computer |
+|--------|-----------------|-----------------|
+| **Basic unit** | Bit (0 or 1) | Qubit (0, 1, or both) |
+| **Processing** | Sequential | Parallel (many possibilities at once) |
+| **Power** | Good for everyday tasks | Exceptional for complex problems |
+
+## Why It Matters
+
+Because qubits can explore multiple solutions simultaneously, quantum computers can solve certain problems **exponentially faster** than regular computers. This includes:
+- Breaking encryption
+- Drug discovery
+- Optimization problems
+- Artificial intelligence
+
+## The Catch
+
+Quantum computers are:
+- Extremely difficult to build and maintain
+- Only useful for specific types of problems
+- Not replacements for everyday computers
+
+**In short:** Quantum computers harness quantum physics to process information in fundamentally different ways, making them powerful for specialized tasks.</span>
+                                                                <button class="expand-btn" onclick="toggleTruncated('response-sample_prompt:v1-example_2-ai_gateway_claude')">expand</button>
+                                                            </div>
+                                                </div>
+                                                </td>
+                                                <td>
+                                                    
+                                                    <div class="model-response">
+                                                            <div id="response-sample_prompt:v1-example_2-ai_gateway_gemini" class="truncated-content">
+                                                                <span class="truncated-preview" style="display: block;">Quantum computing is a new type of computing that uses principles from quantum mechanics, like superposition and entanglement, to process information.
+
+*   **Classical computers** use **bits** that are either a 0 or a 1.
+*   **Quantum computers** use **qubits** which can be 0, 1, or both at the same time (this is called **superposition**).
+*   **Entanglement** allows qubits to be linked so that the state of one instantly affects the others, even when separated.
+
+These quantum phenomena allow...</span>
+                                                                <span class="truncated-full">Quantum computing is a new type of computing that uses principles from quantum mechanics, like superposition and entanglement, to process information.
+
+*   **Classical computers** use **bits** that are either a 0 or a 1.
+*   **Quantum computers** use **qubits** which can be 0, 1, or both at the same time (this is called **superposition**).
+*   **Entanglement** allows qubits to be linked so that the state of one instantly affects the others, even when separated.
+
+These quantum phenomena allow quantum computers to perform complex calculations much faster for specific problems that are too difficult for traditional computers, such as drug discovery, materials science, and cryptography. It is an emerging technology.</span>
+                                                                <button class="expand-btn" onclick="toggleTruncated('response-sample_prompt:v1-example_2-ai_gateway_gemini')">expand</button>
+                                                            </div>
+                                                </div>
+                                                </td>
+                                        </tr>
+                                            <tr>
+                                                    <td>
+                                                            <div class="no-data">No scoring data</div>
+                                                    </td>
+                                                    <td>
+                                                            <div class="no-data">No scoring data</div>
+                                                    </td>
+                                            </tr>
+                                    </tbody>
+                                </table>
+                        </div>
+                        <div class="input-section">
+                            <h3>Scenario example_3 <span style="float: right; font-weight: normal; color: #666; font-size: 0.85em;">sample_prompt:v1</span></h3>
+                            
+                            <div class="system-prompt">
+                                <strong>Input:</strong>
+                                
+                                <div class="system-prompt-content">
+                                        <div id="input-sample_prompt:v1-example_3" class="input-text-wrapper">
+                                            <span class="input-text-collapsed">What are the main causes of climate change?</span>
+                                            <span class="input-text-expanded">What are the main causes of climate change?</span>
+                                            <button class="expand-btn" onclick="toggleInput('input-sample_prompt:v1-example_3')">expand</button>
+                                        </div>
+                                </div>
+                            </div>
+                            
+                                <table>
+                                    <thead>
+                                        <tr>
+                                                <th style="width: 50.0%;">ai_gateway_claude</th>
+                                                <th style="width: 50.0%;">ai_gateway_gemini</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                                <td>
+                                                    
+                                                    <div class="model-response">
+                                                            <div id="response-sample_prompt:v1-example_3-ai_gateway_claude" class="truncated-content">
+                                                                <span class="truncated-preview" style="display: block;"># Main Causes of Climate Change
+
+## Primary Causes
+
+**Greenhouse Gas Emissions**
+- **CO₂ from fossil fuels**: Burning coal, oil, and natural gas for energy is the largest contributor
+- **Methane**: Released from agriculture, livestock, and fossil fuel production
+- **Nitrous oxide**: Emitted from industrial processes and agriculture
+
+**Deforestation**
+- Reduces trees that absorb CO₂
+- Often replaced by activities that emit greenhouse gases
+
+## Secondary Contributors
+
+**Industrial Processes**
+-...</span>
+                                                                <span class="truncated-full"># Main Causes of Climate Change
+
+## Primary Causes
+
+**Greenhouse Gas Emissions**
+- **CO₂ from fossil fuels**: Burning coal, oil, and natural gas for energy is the largest contributor
+- **Methane**: Released from agriculture, livestock, and fossil fuel production
+- **Nitrous oxide**: Emitted from industrial processes and agriculture
+
+**Deforestation**
+- Reduces trees that absorb CO₂
+- Often replaced by activities that emit greenhouse gases
+
+## Secondary Contributors
+
+**Industrial Processes**
+- Manufacturing and cement production release significant emissions
+- Chemical processes release potent greenhouse gases
+
+**Agriculture**
+- Livestock farming produces methane
+- Fertilizers release nitrous oxide
+- Land use changes
+
+**Energy Production**
+- Coal-fired power plants
+- Oil and gas extraction
+
+## Natural Factors (Minor Role)
+- Volcanic activity
+- Solar radiation variations
+- These account for a small fraction of current warming
+
+## Key Point
+Scientific consensus (97%+) confirms that **human activities are the dominant cause** of observed warming since the mid-20th century, primarily through greenhouse gas emissions from burning fossil fuels.</span>
+                                                                <button class="expand-btn" onclick="toggleTruncated('response-sample_prompt:v1-example_3-ai_gateway_claude')">expand</button>
+                                                            </div>
+                                                </div>
+                                                </td>
+                                                <td>
+                                                    
+                                                    <div class="model-response">
+                                                            <div id="response-sample_prompt:v1-example_3-ai_gateway_gemini" class="truncated-content">
+                                                                <span class="truncated-preview" style="display: block;">The main causes of climate change are:
+
+1.  **Greenhouse Gas Emissions:** Primarily from the burning of fossil fuels (coal, oil, and natural gas) for energy, transportation, industry, and electricity generation. These gases (like carbon dioxide, methane, and nitrous oxide) trap heat in the atmosphere.
+2.  **Deforestation:** The clearing of forests reduces the number of trees that absorb carbon dioxide from the atmosphere, contributing to its buildup.
+3.  **Industrial Processes and...</span>
+                                                                <span class="truncated-full">The main causes of climate change are:
+
+1.  **Greenhouse Gas Emissions:** Primarily from the burning of fossil fuels (coal, oil, and natural gas) for energy, transportation, industry, and electricity generation. These gases (like carbon dioxide, methane, and nitrous oxide) trap heat in the atmosphere.
+2.  **Deforestation:** The clearing of forests reduces the number of trees that absorb carbon dioxide from the atmosphere, contributing to its buildup.
+3.  **Industrial Processes and Agriculture:** Certain industrial activities and agricultural practices (e.g., livestock farming, use of fertilizers) release significant amounts of methane and nitrous oxide.</span>
+                                                                <button class="expand-btn" onclick="toggleTruncated('response-sample_prompt:v1-example_3-ai_gateway_gemini')">expand</button>
+                                                            </div>
+                                                </div>
+                                                </td>
+                                        </tr>
+                                            <tr>
+                                                    <td>
+                                                            <div class="no-data">No scoring data</div>
+                                                    </td>
+                                                    <td>
+                                                            <div class="no-data">No scoring data</div>
+                                                    </td>
+                                            </tr>
+                                    </tbody>
+                                </table>
+                        </div>
+                </section>
+
+        </div>
+
+        <footer>
+            <p>Generated by LoomEval - 2026-03-13 21:26:19 UTC</p>
+        </footer>
+    </div>
+</body>
+</html>
