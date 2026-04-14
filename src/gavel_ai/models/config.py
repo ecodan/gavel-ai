@@ -29,6 +29,29 @@ class JudgeConfig(BaseModel):
     )
 
 
+class ScenarioFieldMapping(BaseModel):
+    """
+    Maps scenario file fields (dot notation) to GEval LLMTestCase params.
+
+    Each value is a dot-notation path resolved against the scenario object.
+    Examples: "input.query", "metadata.expected_schema", "expected_behavior".
+
+    - input / expected_output: resolved from the scenario file.
+    - actual_output: if set, taken from the scenario (useful for re-judging
+      pre-generated outputs); otherwise defaults to live processor output.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    input: Optional[str] = Field(None, description="Dot-notation path to input text")
+    expected_output: Optional[str] = Field(
+        None, description="Dot-notation path to expected output text"
+    )
+    actual_output: Optional[str] = Field(
+        None, description="Dot-notation path to actual output (overrides processor output)"
+    )
+
+
 class ScenariosConfig(BaseModel):
     """Scenarios configuration."""
 
@@ -36,6 +59,13 @@ class ScenariosConfig(BaseModel):
 
     source: str = Field(..., description="Scenario source (file.local, file.remote, generator)")
     name: str = Field(..., description="Scenario name or file")
+    field_mapping: Optional[ScenarioFieldMapping] = Field(
+        None,
+        description=(
+            "Maps scenario file fields to GEval test case params "
+            "(input, expected_output, actual_output) using dot notation"
+        ),
+    )
 
 
 class ExecutionConfig(BaseModel):
@@ -82,6 +112,10 @@ class GEvalConfig(BaseModel):
     evaluation_steps: List[str] = Field(..., description="Evaluation steps")
     model: str = Field(..., description="LLM model for evaluation")
     threshold: float = Field(0.7, ge=0.0, le=1.0, description="Pass/fail threshold")
+    strict_mode: bool = Field(
+        False,
+        description="Return binary 0/1 score instead of continuous. Score normalizes to 1 or 10.",
+    )
 
 
 class TurnGeneratorConfig(BaseModel):

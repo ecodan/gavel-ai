@@ -71,7 +71,11 @@ def generate_eval_config(eval_root: Path, eval_name: str, eval_type: str) -> Non
                 }
             ],
             "variants": ["claude_haiku"],
-            "scenarios": {"source": "file.local", "name": "scenarios.json"},
+            "scenarios": {
+                "source": "file.local",
+                "name": "scenarios.json",
+                "field_mapping": {"expected_output": "expected_behavior"},
+            },
             "execution": {"max_concurrent": 10},
             "async": {
                 "num_workers": 8,
@@ -110,7 +114,11 @@ def generate_eval_config(eval_root: Path, eval_name: str, eval_type: str) -> Non
                 }
             ],
             "variants": ["claude_haiku"],
-            "scenarios": {"source": "file.local", "name": "scenarios.json"},
+            "scenarios": {
+                "source": "file.local",
+                "name": "scenarios.json",
+                "field_mapping": {"expected_output": "expected_behavior"},
+            },
             "execution": {"max_concurrent": 10},
             "async": {
                 "num_workers": 8,

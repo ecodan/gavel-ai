@@ -68,8 +68,21 @@ Pydantic model: `gavel_ai.models.config.EvalConfig`
 | `threshold` | float | No | Pass/fail threshold (0.0–1.0 for deepeval, or 1–10 for score comparison). Defaults to `0.7`. |
 | `criteria` | string | No | Top-level shorthand for `config.criteria` (geval) |
 | `evaluation_steps` | string[] | No | Top-level shorthand for `config.evaluation_steps` (geval) |
-| `config` | object | No | Judge-specific config (see `references/judges-reference.md`) |
-| `config_ref` | string | No | Path to external judge config file in `judges/` |
+| `config` | object | No | Judge-specific config (see below and `references/judges-reference.md`) |
+| `config_ref` | string | No | Path to external judge config TOML in `config/judges/` |
+
+#### `judges[].config` for `deepeval.geval`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `model` | string | — | Model key from `agents.json` |
+| `criteria` | string | — | One sentence describing what "good" looks like |
+| `evaluation_steps` | string[] | — | 3–6 concrete checks evaluated in order |
+| `threshold` | float | `0.7` | Pass/fail cutoff (0.0–1.0 raw DeepEval scale) |
+| `strict_mode` | bool | `false` | Return binary 0/1 score instead of continuous. Normalizes to score 1 or 10. |
+| `expected_output_template` | string | — | Jinja2 template rendered with `scenario.input` fields + `scenario.metadata` |
+
+`evaluation_params` is always `[INPUT, ACTUAL_OUTPUT, EXPECTED_OUTPUT]`. Values are resolved from `scenarios.field_mapping` or `scenario.expected_behavior` — see `scenarios.field_mapping` above.
 
 ### `scenarios`
 
@@ -77,6 +90,45 @@ Pydantic model: `gavel_ai.models.config.EvalConfig`
 |---|---|---|---|
 | `source` | `"file.local" \| "file.remote" \| "generator"` | Yes | Where scenarios come from |
 | `name` | string | Yes | Filename (e.g., `"scenarios.json"`) |
+| `field_mapping` | object | No | Maps scenario file fields → GEval test-case params (see below) |
+
+#### `scenarios.field_mapping`
+
+Declares how to extract GEval test-case params from each scenario record using **dot-notation paths**.
+Configured once per eval; applies to every `deepeval.geval` judge in the run.
+
+| Sub-field | Type | Description |
+|---|---|---|
+| `input` | string | Dot-notation path to input text (e.g., `"input.query"`). Defaults to `input.text` → `input.query` → `str(input)`. |
+| `expected_output` | string | Dot-notation path to expected/golden output (e.g., `"expected_output"`, `"metadata.golden"`). Defaults to `scenario.expected_behavior`. |
+| `actual_output` | string | Dot-notation path to pre-generated output (overrides live processor output). Only needed for offline re-judging. |
+
+**Validation**: If any GEval judge is configured and a scenario cannot resolve `expected_output`
+(via `field_mapping.expected_output` or the `expected_behavior` fallback), gavel raises
+`ConfigError` before any API call.
+
+**Example** (scenario file uses `"expected_output"` field):
+```json
+"scenarios": {
+  "source": "file.local",
+  "name": "scenarios.json",
+  "field_mapping": {
+    "expected_output": "expected_output"
+  }
+}
+```
+
+**Example** (expected output nested in metadata):
+```json
+"scenarios": {
+  "source": "file.local",
+  "name": "scenarios.json",
+  "field_mapping": {
+    "input": "input.query",
+    "expected_output": "metadata.golden_schema"
+  }
+}
+```
 
 ### `execution` (simple concurrency)
 

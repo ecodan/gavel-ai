@@ -357,6 +357,127 @@ class TestGEvalExpectedOutputTemplate:
         assert expected == "Paris"
 
 
+class TestScenarioFieldMapping:
+    """Test field_mapping dot-notation resolution in _create_test_case."""
+
+    def test_field_mapping_resolves_input_from_dict(self, mock_deepeval_metrics, geval_config):
+        """field_mapping.input overrides default input extraction."""
+        geval_config.config["field_mapping"] = {"input": "input.query"}
+        scenario = Scenario(
+            id="s1",
+            input={"query": "What is 2+2?", "text": "Ignored"},
+            expected_behavior="4",
+        )
+        judge = DeepEvalJudge(geval_config)
+        test_case = judge._create_test_case(scenario, "4")
+
+        assert test_case.input == "What is 2+2?"
+
+    def test_field_mapping_resolves_expected_output_from_metadata(
+        self, mock_deepeval_metrics, geval_config
+    ):
+        """field_mapping.expected_output reads from nested metadata path."""
+        geval_config.config["field_mapping"] = {"expected_output": "metadata.schema"}
+        scenario = Scenario(
+            id="s1",
+            input="some input",
+            metadata={"schema": '{"type": "object"}'},
+        )
+        judge = DeepEvalJudge(geval_config)
+        test_case = judge._create_test_case(scenario, "output")
+
+        assert test_case.expected_output == '{"type": "object"}'
+
+    def test_field_mapping_resolves_actual_output_from_scenario(
+        self, mock_deepeval_metrics, geval_config
+    ):
+        """field_mapping.actual_output overrides processor output."""
+        geval_config.config["field_mapping"] = {"actual_output": "metadata.recorded_output"}
+        scenario = Scenario(
+            id="s1",
+            input="input",
+            expected_behavior="expected",
+            metadata={"recorded_output": "pre-generated output"},
+        )
+        judge = DeepEvalJudge(geval_config)
+        test_case = judge._create_test_case(scenario, "live output ignored")
+
+        assert test_case.actual_output == "pre-generated output"
+
+    def test_field_mapping_missing_path_falls_back(self, mock_deepeval_metrics, geval_config):
+        """When a mapped path resolves to None, fallback behavior applies."""
+        geval_config.config["field_mapping"] = {"actual_output": "metadata.nonexistent"}
+        scenario = Scenario(id="s1", input="input", expected_behavior="expected")
+        judge = DeepEvalJudge(geval_config)
+        test_case = judge._create_test_case(scenario, "fallback output")
+
+        # Falls back to processor output when resolution returns None
+        assert test_case.actual_output == "fallback output"
+
+    def test_resolve_field_traverses_nested_dict(self, mock_deepeval_metrics, geval_config):
+        """_resolve_field handles multi-level dot notation."""
+        scenario = Scenario(
+            id="s1",
+            input="x",
+            metadata={"level1": {"level2": "deep value"}},
+        )
+        judge = DeepEvalJudge(geval_config)
+        result = judge._resolve_field(scenario, "metadata.level1.level2")
+
+        assert result == "deep value"
+
+    def test_resolve_field_returns_none_for_missing_key(self, mock_deepeval_metrics, geval_config):
+        """_resolve_field returns None when any segment is missing."""
+        scenario = Scenario(id="s1", input="x")
+        judge = DeepEvalJudge(geval_config)
+
+        assert judge._resolve_field(scenario, "metadata.missing") is None
+        assert judge._resolve_field(scenario, "nonexistent_attr") is None
+
+
+class TestGEvalStrictMode:
+    """Test strict_mode flag on GEval judge."""
+
+    def test_strict_mode_passed_to_geval(self, mock_deepeval_metrics):
+        """strict_mode=True is forwarded to the GEval constructor."""
+        from unittest.mock import ANY
+
+        config = JudgeConfig(
+            name="strict-judge",
+            type="deepeval.geval",
+            config={
+                "criteria": "Is the output correct?",
+                "evaluation_steps": ["Check correctness"],
+                "model": "gpt-4",
+                "strict_mode": True,
+            },
+        )
+        DeepEvalJudge(config)
+
+        mock_deepeval_metrics["GEval"].assert_called_once_with(
+            name="strict-judge",
+            criteria="Is the output correct?",
+            evaluation_steps=["Check correctness"],
+            evaluation_params=[
+                LLMTestCaseParams.INPUT,
+                LLMTestCaseParams.ACTUAL_OUTPUT,
+                LLMTestCaseParams.EXPECTED_OUTPUT,
+            ],
+            model=ANY,
+            threshold=0.5,
+            strict_mode=True,
+        )
+
+    def test_strict_mode_omitted_when_not_set(self, mock_deepeval_metrics, geval_config):
+        """When strict_mode is absent from config, it is not forwarded to GEval."""
+        from unittest.mock import ANY, call
+
+        DeepEvalJudge(geval_config)
+
+        _, kwargs = mock_deepeval_metrics["GEval"].call_args
+        assert "strict_mode" not in kwargs
+
+
 class TestRateLimitRetry:
     """Test rate-limit retry logic for DeepEval judge evaluation."""
 

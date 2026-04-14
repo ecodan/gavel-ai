@@ -218,7 +218,10 @@ class DeepEvalJudge(Judge):
                         "Evaluate the clarity and accuracy",
                     ],
                 )
-                # evaluation_params must be LLMTestCaseParams enum values (not strings)
+                # evaluation_params is always all three — the scenarios section
+                # field_mapping (injected into config by JudgeRunnerStep) controls
+                # where each value comes from.  JudgeRunnerStep validates upfront that
+                # every scenario can resolve expected_output before any judge runs.
                 evaluation_params = [
                     LLMTestCaseParams.INPUT,
                     LLMTestCaseParams.ACTUAL_OUTPUT,
@@ -241,7 +244,7 @@ class DeepEvalJudge(Judge):
                 # Create family-specific model with cost tracking disabled
                 model = self._create_model_instance(model_name, model_family)
 
-                return metric_class(
+                geval_kwargs: Dict[str, Any] = dict(
                     name=metric_config.get("name", judge_id),
                     criteria=criteria,
                     evaluation_steps=evaluation_steps,
@@ -249,6 +252,12 @@ class DeepEvalJudge(Judge):
                     model=model,
                     threshold=threshold,
                 )
+                # strict_mode makes GEval return binary 0/1 (normalizes to score 1 or 10)
+                strict_mode = metric_config.get("strict_mode")
+                if strict_mode is not None:
+                    geval_kwargs["strict_mode"] = strict_mode
+
+                return metric_class(**geval_kwargs)
 
             # For other judges, pass threshold and model if provided
             kwargs = {}
@@ -360,6 +369,7 @@ class DeepEvalJudge(Judge):
         Supports:
         - Standard expected output from scenario
         - expected_output_template with Jinja2 rendering for custom scenarios
+        - field_mapping (injected by JudgeRunnerStep) for dot-notation field resolution
 
         Args:
             scenario: The test scenario
@@ -368,24 +378,38 @@ class DeepEvalJudge(Judge):
         Returns:
             LLMTestCase instance
         """
-        # Extract input text from scenario (support both dict and string formats)
-        if isinstance(scenario.input, dict):
+        field_mapping: Dict[str, str] = (self.config.config or {}).get("field_mapping") or {}
+
+        # --- input ---
+        if field_mapping.get("input"):
+            input_text = self._resolve_field(scenario, field_mapping["input"]) or ""
+        elif isinstance(scenario.input, dict):
             input_text = (
                 scenario.input.get("text") or scenario.input.get("query") or str(scenario.input)
             )
         else:
             input_text = str(scenario.input)
 
-        # Create test case with available data
+        # --- actual_output ---
+        if field_mapping.get("actual_output"):
+            actual_output = self._resolve_field(scenario, field_mapping["actual_output"]) or subject_output
+        else:
+            actual_output = subject_output
+
+        # --- expected_output ---
+        # field_mapping.expected_output takes precedence; _get_expected_output handles
+        # expected_output_template and scenario.expected_behavior as fallbacks.
+        if field_mapping.get("expected_output"):
+            expected_output = self._resolve_field(scenario, field_mapping["expected_output"]) or ""
+        else:
+            expected_output = self._get_expected_output(scenario)
+
+        # Build test case
         test_case_kwargs: Dict[str, Any] = {
             "input": input_text,
-            "actual_output": subject_output,
+            "actual_output": actual_output,
+            "expected_output": expected_output or None,
         }
-
-        # Determine expected output: template rendering takes precedence
-        expected_output = self._get_expected_output(scenario)
-        if expected_output:
-            test_case_kwargs["expected_output"] = expected_output
 
         # Add context if available in scenario input (for dict format)
         if isinstance(scenario.input, dict) and "context" in scenario.input:
@@ -396,6 +420,31 @@ class DeepEvalJudge(Judge):
             test_case_kwargs["retrieval_context"] = scenario.input["retrieval_context"]
 
         return LLMTestCase(**test_case_kwargs)
+
+    @staticmethod
+    def _resolve_field(scenario: Scenario, path: str) -> Optional[str]:
+        """Resolve a dot-notation path starting from a scenario object.
+
+        Traverses object attributes then dict keys along each segment.
+        Returns the resolved value coerced to str, or None if any segment
+        is missing or the resolved value is falsy.
+
+        Examples:
+            "input.query"          → scenario.input["query"]
+            "metadata.expected"    → scenario.metadata["expected"]
+            "expected_behavior"    → scenario.expected_behavior
+        """
+        node: Any = scenario
+        for key in path.split("."):
+            if isinstance(node, dict):
+                node = node.get(key)
+            elif hasattr(node, key):
+                node = getattr(node, key)
+            else:
+                return None
+            if node is None:
+                return None
+        return str(node) if node is not None else None
 
     def _get_expected_output(self, scenario: Scenario) -> str:
         """
@@ -452,8 +501,8 @@ class DeepEvalJudge(Judge):
                     f"falling back to scenario.expected"
                 )
 
-        # Fall back to scenario expected output
-        return scenario.expected or scenario.expected_behavior or ""
+        # Fall back to scenario expected output fields (in priority order)
+        return scenario.expected or scenario.expected_behavior or scenario.expected_output or ""
 
     def _normalize_score(self, raw_score: float) -> int:
         """

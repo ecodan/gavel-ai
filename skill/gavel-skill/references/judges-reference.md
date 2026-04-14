@@ -37,7 +37,9 @@ use case. The most flexible judge — works for almost any evaluation goal.
 `criteria` and `evaluation_steps`. The judge LLM scores the output against
 your criteria.
 
-**Required scenario fields**: `input` (required), `expected_behavior` (recommended)
+**Required scenario fields**: `input` (required). `expected_output` (or equivalent via
+`field_mapping`) is always passed to the judge LLM. Every scenario must have a resolvable
+value — gavel validates this upfront and raises `ConfigError` if any scenario is missing it.
 
 **Config in `eval_config.json`:**
 ```json
@@ -53,10 +55,21 @@ your criteria.
       "Assess whether the response is complete and not missing key information",
       "Check that the tone is appropriate for the context"
     ],
-    "threshold": 0.7
+    "threshold": 0.7,
+    "strict_mode": false
   }
 }
 ```
+
+**`strict_mode`** (bool, default `false`) — when `true`, GEval returns a binary 0 or 1
+score instead of a continuous float. After normalization this becomes score 1 or 10.
+Use for format/schema compliance checks where you want a hard pass/fail rather than a
+gradient score.
+
+**`expected_output` resolution** — in priority order:
+1. `field_mapping.expected_output` in the `scenarios` config section (dot-notation path)
+2. `expected_output_template` in the judge config (Jinja2, rendered with scenario fields)
+3. `scenario.expected_behavior` / `scenario.expected` / `scenario.expected_output` fields
 
 **Writing good criteria & evaluation steps:**
 - `criteria` should be a single sentence describing what "good" looks like.

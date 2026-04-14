@@ -13,7 +13,7 @@ Per Tech Spec 3.9: Extracted from run() lines 247-318.
 
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError
@@ -21,7 +21,63 @@ from gavel_ai.core.steps.base import Step, StepPhase
 from gavel_ai.judges.deterministic_metric import DeterministicMetric
 from gavel_ai.judges.judge_executor import JudgeExecutor
 from gavel_ai.judges.judge_registry import JudgeRegistry
-from gavel_ai.models.runtime import DeterministicRunResult, OutputRecord
+from gavel_ai.models.config import ScenarioFieldMapping
+from gavel_ai.models.runtime import DeterministicRunResult, OutputRecord, Scenario
+
+
+def _resolve_scenario_field(scenario: Scenario, path: str) -> Optional[str]:
+    """Resolve a dot-notation path starting from a scenario object.
+
+    Mirrors DeepEvalJudge._resolve_field — kept here so the runner can
+    validate field_mapping against scenario data without importing the judge.
+    """
+    node: Any = scenario
+    for key in path.split("."):
+        if isinstance(node, dict):
+            node = node.get(key)
+        elif hasattr(node, key):
+            node = getattr(node, key)
+        else:
+            return None
+        if node is None:
+            return None
+    return str(node) if node is not None else None
+
+
+def _validate_geval_expected_output(
+    judge_name: str,
+    scenarios: List[Scenario],
+    field_mapping: Optional[ScenarioFieldMapping],
+) -> None:
+    """Raise ConfigError if any scenario cannot resolve expected_output for a GEval judge.
+
+    Called once at judge startup — fails fast before any API calls are made.
+    """
+    path = field_mapping.expected_output if field_mapping else None
+    missing: List[str] = []
+
+    for scenario in scenarios:
+        value = (
+            _resolve_scenario_field(scenario, path)
+            if path
+            else (scenario.expected_behavior or "")
+        )
+        if not value:
+            missing.append(scenario.id)
+
+    if missing:
+        hint = (
+            f"field_mapping.expected_output='{path}'"
+            if path
+            else "scenario.expected_behavior (no field_mapping.expected_output configured)"
+        )
+        ids_preview = ", ".join(missing[:5]) + ("..." if len(missing) > 5 else "")
+        raise ConfigError(
+            f"GEval judge '{judge_name}' requires expected_output but "
+            f"{len(missing)} scenario(s) have none (checked {hint}): {ids_preview}. "
+            f"Add expected_behavior to each scenario or set field_mapping.expected_output "
+            f"in the scenarios section of eval_config.json."
+        )
 
 
 def get_model_definition(agents_config: dict, model_id: str) -> dict:
@@ -159,6 +215,20 @@ class JudgeRunnerStep(Step):
                         f"Failed to resolve model for judge '{judge_config.name}': {e}"
                     )
                     raise
+
+        # Inject scenarios field_mapping into each GEval judge's config dict, then
+        # validate that every scenario can resolve expected_output.  Both steps happen
+        # before any API call so failures are caught immediately with a clear message.
+        field_mapping: Optional[ScenarioFieldMapping] = eval_config.scenarios.field_mapping
+        for judge_config in judges_list:
+            if judge_config.type == "deepeval.geval":
+                if judge_config.config is None:
+                    judge_config.config = {}
+                if field_mapping:
+                    judge_config.config["field_mapping"] = field_mapping.model_dump(
+                        exclude_none=True
+                    )
+                _validate_geval_expected_output(judge_config.name, scenarios, field_mapping)
 
         # Partition judges into LLM and deterministic
         llm_configs: List[Any] = []

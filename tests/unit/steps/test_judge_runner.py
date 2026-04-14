@@ -13,10 +13,15 @@ import pytest
 
 from gavel_ai.core.exceptions import ConfigError
 from gavel_ai.core.steps.base import StepPhase
-from gavel_ai.core.steps.judge_runner import JudgeRunnerStep, get_model_definition
+from gavel_ai.core.steps.judge_runner import (
+    JudgeRunnerStep,
+    _resolve_scenario_field,
+    _validate_geval_expected_output,
+    get_model_definition,
+)
 from gavel_ai.models import EvalConfig, JudgeConfig
-from gavel_ai.models.config import TestSubject
-from gavel_ai.models.runtime import OutputRecord
+from gavel_ai.models.config import ScenarioFieldMapping, ScenariosConfig, TestSubject
+from gavel_ai.models.runtime import OutputRecord, Scenario
 
 
 class TestGetModelDefinition:
@@ -125,6 +130,7 @@ class TestJudgeRunnerStep:
 
         mock_eval_config = MagicMock(spec=EvalConfig)
         mock_eval_config.test_subjects = [mock_subject1, mock_subject2]
+        mock_eval_config.scenarios = MagicMock(field_mapping=None)
 
         mock_context = MagicMock()
         mock_context.eval_context.eval_config.read.return_value = mock_eval_config
@@ -154,6 +160,7 @@ class TestJudgeRunnerStep:
 
         mock_eval_config = MagicMock(spec=EvalConfig)
         mock_eval_config.test_subjects = [mock_subject]
+        mock_eval_config.scenarios = MagicMock(field_mapping=None)
 
         agents_config = {
             "_models": {
@@ -195,6 +202,7 @@ class TestJudgeRunnerStep:
 
         mock_eval_config = MagicMock(spec=EvalConfig)
         mock_eval_config.test_subjects = [mock_subject]
+        mock_eval_config.scenarios = MagicMock(field_mapping=None)
 
         agents_config = {
             "_models": {
@@ -263,6 +271,7 @@ class TestJudgeRunnerStep:
 
         mock_eval_config = MagicMock(spec=EvalConfig)
         mock_eval_config.test_subjects = [mock_subject]
+        mock_eval_config.scenarios = MagicMock(field_mapping=None)
 
         mock_scenario = MagicMock()
         mock_scenario.id = "s1"
@@ -320,6 +329,7 @@ class TestJudgeRunnerStep:
 
         mock_eval_config = MagicMock(spec=EvalConfig)
         mock_eval_config.test_subjects = [mock_subject]
+        mock_eval_config.scenarios = MagicMock(field_mapping=None)
 
         # 3 scenarios
         scenarios = [MagicMock() for _ in range(3)]
@@ -388,3 +398,167 @@ class TestJudgeRunnerStep:
         assert len(mock_context.evaluation_results) == 6
         result_keys = {(r["scenario_id"], r["variant_id"]) for r in mock_context.evaluation_results}
         assert len(result_keys) == 6
+
+
+class TestResolveScenarioField:
+    """Tests for _resolve_scenario_field module-level helper."""
+
+    def test_resolves_top_level_attribute(self):
+        scenario = Scenario(id="s1", input="hello", expected_behavior="world")
+        assert _resolve_scenario_field(scenario, "expected_behavior") == "world"
+
+    def test_resolves_nested_dict_in_metadata(self):
+        scenario = Scenario(id="s1", input="x", metadata={"key": "value"})
+        assert _resolve_scenario_field(scenario, "metadata.key") == "value"
+
+    def test_resolves_nested_key_in_dict_input(self):
+        scenario = Scenario(id="s1", input={"query": "the question"})
+        assert _resolve_scenario_field(scenario, "input.query") == "the question"
+
+    def test_returns_none_for_missing_segment(self):
+        scenario = Scenario(id="s1", input="x")
+        assert _resolve_scenario_field(scenario, "metadata.nonexistent") is None
+
+    def test_returns_none_for_nonexistent_attribute(self):
+        scenario = Scenario(id="s1", input="x")
+        assert _resolve_scenario_field(scenario, "no_such_attr") is None
+
+
+class TestValidateGevalExpectedOutput:
+    """Tests for _validate_geval_expected_output."""
+
+    def _make_scenario(self, sid: str, expected: str = "") -> Scenario:
+        return Scenario(id=sid, input="input", expected_behavior=expected or None)
+
+    def test_passes_when_all_scenarios_have_expected_behavior(self):
+        scenarios = [self._make_scenario(f"s{i}", f"expected {i}") for i in range(3)]
+        # Should not raise
+        _validate_geval_expected_output("my-judge", scenarios, field_mapping=None)
+
+    def test_raises_when_scenario_missing_expected_behavior(self):
+        scenarios = [
+            self._make_scenario("s1", "good"),
+            self._make_scenario("s2", ""),  # missing
+        ]
+        with pytest.raises(ConfigError, match="s2"):
+            _validate_geval_expected_output("my-judge", scenarios, field_mapping=None)
+
+    def test_passes_with_field_mapping_resolving_expected_output(self):
+        scenarios = [
+            Scenario(id="s1", input="x", metadata={"schema": "value1"}),
+            Scenario(id="s2", input="x", metadata={"schema": "value2"}),
+        ]
+        mapping = ScenarioFieldMapping(expected_output="metadata.schema")
+        # Should not raise
+        _validate_geval_expected_output("my-judge", scenarios, field_mapping=mapping)
+
+    def test_raises_when_field_mapping_path_resolves_to_none(self):
+        scenarios = [
+            Scenario(id="s1", input="x", metadata={"schema": "ok"}),
+            Scenario(id="s2", input="x", metadata={}),  # missing key
+        ]
+        mapping = ScenarioFieldMapping(expected_output="metadata.schema")
+        with pytest.raises(ConfigError, match="s2"):
+            _validate_geval_expected_output("my-judge", scenarios, field_mapping=mapping)
+
+    def test_error_message_names_judge_and_missing_ids(self):
+        scenarios = [self._make_scenario(f"bad-{i}") for i in range(6)]
+        with pytest.raises(ConfigError) as exc_info:
+            _validate_geval_expected_output("schema_compliance", scenarios, field_mapping=None)
+        msg = str(exc_info.value)
+        assert "schema_compliance" in msg
+        assert "6 scenario(s)" in msg
+        assert "..." in msg  # preview truncated after 5
+
+
+class TestGEvalFieldMappingInjection:
+    """Tests that JudgeRunnerStep injects field_mapping into GEval judge configs."""
+
+    @pytest.mark.asyncio
+    async def test_field_mapping_injected_into_geval_config(self, mock_logger):
+        """field_mapping from ScenariosConfig is injected into each GEval judge's config."""
+        step = JudgeRunnerStep(mock_logger)
+
+        geval_judge = MagicMock(spec=JudgeConfig)
+        geval_judge.name = "quality"
+        geval_judge.type = "deepeval.geval"
+        geval_judge.model = None
+        geval_judge.config = {"model": "gpt-4", "criteria": "x", "evaluation_steps": []}
+        geval_judge.config_ref = None
+
+        mock_subject = MagicMock(spec=TestSubject)
+        mock_subject.judges = [geval_judge]
+
+        scenarios_cfg = ScenariosConfig(
+            source="file.local",
+            name="scenarios.json",
+            field_mapping=ScenarioFieldMapping(expected_output="metadata.expected_schema"),
+        )
+
+        mock_eval_config = MagicMock(spec=EvalConfig)
+        mock_eval_config.test_subjects = [mock_subject]
+        mock_eval_config.scenarios = scenarios_cfg
+
+        scenario = Scenario(
+            id="s1", input="x", metadata={"expected_schema": '{"type": "object"}'}
+        )
+
+        mock_context = MagicMock()
+        mock_context.eval_context.eval_config.read.return_value = mock_eval_config
+        mock_context.eval_context.agents.read.return_value = {
+            "_models": {
+                "gpt-4": {"model_version": "gpt-4", "model_family": "gpt"},
+            }
+        }
+        mock_context.eval_context.scenarios.read.return_value = [scenario]
+        mock_context.processor_results = []
+        mock_context.test_subject = "test"
+
+        with patch("gavel_ai.core.steps.judge_runner.JudgeExecutor"):
+            await step.execute(mock_context)
+
+        assert geval_judge.config["field_mapping"] == {
+            "expected_output": "metadata.expected_schema"
+        }
+
+    @pytest.mark.asyncio
+    async def test_validation_raises_config_error_before_execution(self, mock_logger):
+        """ConfigError is raised when scenarios lack expected_output before any judge runs."""
+        step = JudgeRunnerStep(mock_logger)
+
+        geval_judge = MagicMock(spec=JudgeConfig)
+        geval_judge.name = "schema_compliance"
+        geval_judge.type = "deepeval.geval"
+        geval_judge.model = None
+        geval_judge.config = {"model": "gpt-4", "criteria": "x", "evaluation_steps": []}
+        geval_judge.config_ref = None
+
+        mock_subject = MagicMock(spec=TestSubject)
+        mock_subject.judges = [geval_judge]
+
+        scenarios_cfg = ScenariosConfig(
+            source="file.local",
+            name="scenarios.json",
+            # No field_mapping — expected_output must come from expected_behavior
+        )
+
+        mock_eval_config = MagicMock(spec=EvalConfig)
+        mock_eval_config.test_subjects = [mock_subject]
+        mock_eval_config.scenarios = scenarios_cfg
+
+        # Scenario has no expected_behavior
+        scenario = Scenario(id="bad-scenario", input="x")
+
+        mock_context = MagicMock()
+        mock_context.eval_context.eval_config.read.return_value = mock_eval_config
+        mock_context.eval_context.agents.read.return_value = {
+            "_models": {
+                "gpt-4": {"model_version": "gpt-4", "model_family": "gpt"},
+            }
+        }
+        mock_context.eval_context.scenarios.read.return_value = [scenario]
+        mock_context.processor_results = []
+        mock_context.test_subject = "test"
+
+        with pytest.raises(ConfigError, match="schema_compliance"):
+            await step.execute(mock_context)
