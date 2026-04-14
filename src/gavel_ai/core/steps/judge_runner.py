@@ -11,6 +11,7 @@ Responsibilities:
 Per Tech Spec 3.9: Extracted from run() lines 247-318.
 """
 
+import json
 import logging
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
@@ -41,7 +42,11 @@ def _resolve_scenario_field(scenario: Scenario, path: str) -> Optional[str]:
             return None
         if node is None:
             return None
-    return str(node) if node is not None else None
+    if node is None:
+        return None
+    if isinstance(node, (dict, list)):
+        return json.dumps(node)
+    return str(node)
 
 
 def _validate_geval_expected_output(

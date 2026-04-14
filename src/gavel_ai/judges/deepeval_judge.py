@@ -8,6 +8,7 @@ Per Architecture Decision 5: DeepEval-native judges with sequential execution.
 """
 
 import asyncio
+import json
 import logging
 import os
 import tenacity
@@ -444,7 +445,11 @@ class DeepEvalJudge(Judge):
                 return None
             if node is None:
                 return None
-        return str(node) if node is not None else None
+        if node is None:
+            return None
+        if isinstance(node, (dict, list)):
+            return json.dumps(node)
+        return str(node)
 
     def _get_expected_output(self, scenario: Scenario) -> str:
         """
@@ -502,7 +507,12 @@ class DeepEvalJudge(Judge):
                 )
 
         # Fall back to scenario expected output fields (in priority order)
-        return scenario.expected or scenario.expected_behavior or scenario.expected_output or ""
+        raw = scenario.expected or scenario.expected_behavior or scenario.expected_output
+        if raw is None:
+            return ""
+        if isinstance(raw, (dict, list)):
+            return json.dumps(raw)
+        return str(raw)
 
     def _normalize_score(self, raw_score: float) -> int:
         """
