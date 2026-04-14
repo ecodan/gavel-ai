@@ -16,7 +16,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError
@@ -38,6 +38,8 @@ class RunData:
     metadata: Dict[str, Any] = field(default_factory=dict)
     results: List[Dict[str, Any]] = field(default_factory=list)
     telemetry: Dict[str, Any] = field(default_factory=dict)
+    raw_results: List[Dict[str, Any]] = field(default_factory=list)
+    deterministic_metrics: Optional[Dict[str, Any]] = None
 
 
 class ReportRunnerStep(Step):
@@ -215,6 +217,8 @@ class ReportRunnerStep(Step):
                 "total_duration_seconds": run_metadata_stats.total_duration_seconds,
                 "llm_calls": run_metadata_stats.llm_calls.model_dump(),
             },
+            raw_results=[r.model_dump() for r in processor_results],
+            deterministic_metrics=getattr(run_context, "deterministic_metrics", None),
         )
 
         self.logger.debug(f"Generating report to {report_path}")

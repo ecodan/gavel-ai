@@ -4,8 +4,9 @@ Judge runner step for OneShot workflow.
 Responsibilities:
 - Extract judges from eval_config.test_subjects[]
 - Resolve judge model IDs in agents_config
-- Execute JudgeExecutor.execute_batch() per variant group
-- Store evaluation_results in context
+- Execute JudgeExecutor.execute_batch() per variant group (LLM judges)
+- Execute DeterministicMetric per record (deterministic judges)
+- Store evaluation_results and deterministic_metrics in context
 
 Per Tech Spec 3.9: Extracted from run() lines 247-318.
 """
@@ -17,8 +18,10 @@ from typing import Any, Dict, List
 from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError
 from gavel_ai.core.steps.base import Step, StepPhase
+from gavel_ai.judges.deterministic_metric import DeterministicMetric
 from gavel_ai.judges.judge_executor import JudgeExecutor
-from gavel_ai.models.runtime import OutputRecord
+from gavel_ai.judges.judge_registry import JudgeRegistry
+from gavel_ai.models.runtime import DeterministicRunResult, OutputRecord
 
 
 def get_model_definition(agents_config: dict, model_id: str) -> dict:
@@ -58,7 +61,8 @@ class JudgeRunnerStep(Step):
     """
     Executes judges on processor results.
 
-    Sets context.evaluation_results with judge evaluations.
+    Sets context.evaluation_results with LLM judge evaluations.
+    Sets context.deterministic_metrics with deterministic metric results.
     """
 
     def __init__(self, logger: logging.Logger):
@@ -100,7 +104,25 @@ class JudgeRunnerStep(Step):
         if not judges_list:
             self.logger.info("No judges configured - skipping judging")
             context.evaluation_results = []
+            context.deterministic_metrics = {}
             return
+
+        # Resolve config_ref → TOML file contents (merge into judge_config.config)
+        for judge_config in judges_list:
+            if judge_config.config_ref:
+                try:
+                    toml_data = context.eval_context.get_judge_config(judge_config.config_ref)
+                    if judge_config.config is None:
+                        judge_config.config = {}
+                    judge_config.config.update(toml_data)
+                    self.logger.debug(
+                        f"Resolved config_ref '{judge_config.config_ref}' for judge '{judge_config.name}'"
+                    )
+                except ConfigError:
+                    raise ConfigError(
+                        f"Judge config file not found: config/judges/{judge_config.config_ref}.toml - "
+                        "Create the file or remove the config_ref field"
+                    )
 
         # Resolve custom model IDs in judge configurations
         for judge_config in judges_list:
@@ -138,8 +160,46 @@ class JudgeRunnerStep(Step):
                     )
                     raise
 
+        # Partition judges into LLM and deterministic
+        llm_configs: List[Any] = []
+        det_configs: List[Any] = []
+        for cfg in judges_list:
+            judge_class = JudgeRegistry._registry.get(cfg.type)
+            if judge_class is not None and issubclass(judge_class, DeterministicMetric):
+                det_configs.append(cfg)
+            else:
+                llm_configs.append(cfg)
+
         # Build scenario lookup map
         scenario_map = {s.id: s for s in scenarios}
+
+        # --- Deterministic metrics ---
+        deterministic_metrics: Dict[str, DeterministicRunResult] = {}
+        if det_configs:
+            self.logger.info(f"Running {len(det_configs)} deterministic metric(s) on {len(processor_results)} records")
+            for det_cfg in det_configs:
+                metric: DeterministicMetric = JudgeRegistry.create(det_cfg)
+                for record in processor_results:
+                    scenario = scenario_map.get(record.scenario_id)
+                    if scenario is None:
+                        self.logger.warning(f"Scenario '{record.scenario_id}' not found for deterministic metric '{det_cfg.name}'")
+                        continue
+                    metric.evaluate_sample(record.scenario_id, record.processor_output, scenario)
+                run_result: DeterministicRunResult = metric.compute()
+                deterministic_metrics[det_cfg.name] = run_result
+                self.logger.info(
+                    f"Deterministic metric '{det_cfg.name}': "
+                    f"population_score={run_result.population_score}, "
+                    f"samples={len(run_result.samples)}"
+                )
+
+        context.deterministic_metrics = deterministic_metrics
+
+        # --- LLM judges ---
+        if not llm_configs:
+            self.logger.info("No LLM judges configured")
+            context.evaluation_results = []
+            return
 
         # Group processor results by variant_id
         groups: Dict[str, List[OutputRecord]] = defaultdict(list)
@@ -147,12 +207,12 @@ class JudgeRunnerStep(Step):
             groups[record.variant_id].append(record)
 
         self.logger.info(
-            f"Running {len(judges_list)} judges on {len(processor_results)} records "
+            f"Running {len(llm_configs)} LLM judges on {len(processor_results)} records "
             f"across {len(groups)} variant(s)"
         )
 
         judge_executor = JudgeExecutor(
-            judge_configs=judges_list,
+            judge_configs=llm_configs,
             error_handling="fail_fast",
         )
 

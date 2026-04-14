@@ -151,3 +151,126 @@ async def test_oneshot_reporter_performance_metrics(mock_oneshot_run, reporter_c
     assert perf["claude"]["total_time"] == 1.5
     assert perf["gpt"]["avg_turn_time"] == 1.2
     assert perf["gpt"]["total_time"] == 1.2
+
+
+def _make_run_with_errors():
+    """Run with 3 scenarios for variant 'v1', 1 of which has a processor error."""
+    run = MockRun(
+        results=[
+            {
+                "scenario_id": "s1",
+                "variant_id": "v1",
+                "processor_output": "answer-1",
+                "scenario_input": "q1",
+                "judges": [{"judge_id": "quality", "score": 8, "reasoning": "good", "evidence": ""}],
+                "timing_ms": 100,
+                "timestamp": "2025-01-01T00:00:00Z",
+            },
+            {
+                "scenario_id": "s2",
+                "variant_id": "v1",
+                "processor_output": "answer-2",
+                "scenario_input": "q2",
+                "judges": [{"judge_id": "quality", "score": 6, "reasoning": "ok", "evidence": ""}],
+                "timing_ms": 100,
+                "timestamp": "2025-01-01T00:00:01Z",
+            },
+            {
+                "scenario_id": "s3",
+                "variant_id": "v1",
+                "processor_output": "failed",
+                "scenario_input": "q3",
+                "judges": [{"judge_id": "quality", "score": 0, "reasoning": "", "evidence": ""}],
+                "timing_ms": 100,
+                "timestamp": "2025-01-01T00:00:02Z",
+            },
+        ]
+    )
+    # Mark s3/v1 as having a processor error via raw_results
+    run.raw_results = [
+        {"scenario_id": "s3", "variant_id": "v1", "error": "timeout"},
+    ]
+    return run
+
+
+@pytest.mark.asyncio
+async def test_error_excluded_from_average(reporter_config):
+    """Errored (scenario, variant) pairs are excluded from judge score averages."""
+    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
+
+    run = _make_run_with_errors()
+    reporter = OneShotReporter(reporter_config)
+    ctx = reporter._build_context(run)
+
+    # s1=8, s2=6 → avg 7.0; s3 is errored so excluded
+    assert ctx["summary_metrics"]["v1"]["quality"] == pytest.approx(7.0)
+
+
+@pytest.mark.asyncio
+async def test_skipped_count_in_context(reporter_config):
+    """skipped_counts tracks how many errored entries were excluded per (variant, judge)."""
+    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
+
+    run = _make_run_with_errors()
+    reporter = OneShotReporter(reporter_config)
+    ctx = reporter._build_context(run)
+
+    assert ctx["skipped_counts"]["v1"]["quality"] == 1
+
+
+@pytest.mark.asyncio
+async def test_skipped_annotation_in_html(reporter_config):
+    """HTML contains (1 skipped) annotation when a judge has skipped records."""
+    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
+
+    run = _make_run_with_errors()
+    reporter = OneShotReporter(reporter_config)
+    html = await reporter.generate(run, "oneshot.html")
+
+    assert "skipped" in html.lower()
+
+
+@pytest.mark.asyncio
+async def test_deterministic_section_rendered(reporter_config):
+    """HTML renders Deterministic Judges section with classifier and regression tables."""
+    from gavel_ai.models.runtime import DeterministicRunResult, PerSampleDeterministicResult
+    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
+
+    run = MockRun()
+    run.raw_results = []
+    run.deterministic_metrics = {
+        "label_accuracy": DeterministicRunResult(
+            metric_name="label_accuracy",
+            judge_type="classifier",
+            report_metric="accuracy",
+            population_score=0.667,
+            samples=[
+                PerSampleDeterministicResult(
+                    scenario_id="s1", prediction="pos", actual="pos", match=True
+                ),
+                PerSampleDeterministicResult(
+                    scenario_id="s2", prediction="neg", actual="pos", match=False
+                ),
+            ],
+        )
+    }
+    reporter = OneShotReporter(reporter_config)
+    html = await reporter.generate(run, "oneshot.html")
+
+    assert "Deterministic Judges" in html
+    assert "label_accuracy" in html
+    assert "0.6670" in html  # population score formatted to 4 decimal places
+
+
+@pytest.mark.asyncio
+async def test_deterministic_section_absent_when_empty(reporter_config):
+    """HTML does not include Deterministic Judges section when deterministic_results is empty."""
+    from gavel_ai.reporters.oneshot_reporter import OneShotReporter
+
+    run = MockRun()
+    run.raw_results = []
+    run.deterministic_metrics = {}
+    reporter = OneShotReporter(reporter_config)
+    html = await reporter.generate(run, "oneshot.html")
+
+    assert "Deterministic Judges" not in html

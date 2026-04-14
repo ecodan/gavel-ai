@@ -25,6 +25,7 @@ DEFAULT_EVAL_ROOT: str = ".gavel/evaluations"
 class StepPhase(Enum):
     """Workflow step phases in execution order."""
 
+    PREPARE = "prepare"
     VALIDATION = "validation"
     SCENARIO_PROCESSING = "scenario_processing"
     JUDGING = "judging"
@@ -90,6 +91,7 @@ class Step(ABC):
         """
         try:
             await self.execute(context)
+            context.mark_step_complete(self.phase)
             return True
         except (ValidationError, ConfigError) as e:
             self.logger.error(f"{self.phase.value} failed: {e}", exc_info=True)

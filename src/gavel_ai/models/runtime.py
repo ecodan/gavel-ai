@@ -378,6 +378,31 @@ class ScenarioResult(BaseModel):
     variants: Dict[str, VariantResult] = Field(default_factory=dict)
 
 
+class PerSampleDeterministicResult(BaseModel):
+    """Per-sample result from a deterministic metric evaluation."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    scenario_id: str = Field(..., description="Scenario identifier")
+    prediction: Optional[str] = Field(None, description="Extracted prediction value (str representation)")
+    actual: Optional[str] = Field(None, description="Actual value from scenario (str representation)")
+    match: Optional[bool] = Field(None, description="Whether prediction matched actual (classifier only)")
+    raw_score: Optional[float] = Field(None, description="Signed error value (regression only)")
+    skip_reason: Optional[str] = Field(None, description="Reason sample was skipped, or None if included")
+
+
+class DeterministicRunResult(BaseModel):
+    """Aggregated result from running a deterministic metric over all samples."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    metric_name: str = Field(..., description="Judge config name (e.g. 'label_accuracy')")
+    judge_type: str = Field(..., description="Judge type: 'classifier' or 'regression'")
+    report_metric: str = Field(..., description="scikit-learn metric name (e.g. 'accuracy', 'mean_absolute_error')")
+    population_score: Optional[float] = Field(None, description="Aggregate metric score; None when all samples skipped")
+    samples: List[PerSampleDeterministicResult] = Field(default_factory=list)
+
+
 class ReportData(BaseModel):
     """
     Unified evaluation report data structure.
@@ -392,3 +417,4 @@ class ReportData(BaseModel):
     performance_metrics: Dict[str, Dict[str, float]] = Field(default_factory=dict)
     scenarios: List[ScenarioResult] = Field(default_factory=list)
     scenarios_by_subject: Dict[str, List[ScenarioResult]] = Field(default_factory=dict)
+    deterministic_results: List[DeterministicRunResult] = Field(default_factory=list)

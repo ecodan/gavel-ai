@@ -147,6 +147,7 @@ class TestJudgeRunnerStep:
         mock_judge.name = "test-judge"
         mock_judge.model = "custom-model"
         mock_judge.config = {"model": "custom-model"}
+        mock_judge.config_ref = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [mock_judge]
@@ -187,6 +188,7 @@ class TestJudgeRunnerStep:
         mock_judge.name = "test-judge"
         mock_judge.model = None
         mock_judge.config = {"model": "config-model"}
+        mock_judge.config_ref = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [mock_judge]
@@ -227,6 +229,7 @@ class TestJudgeRunnerStep:
         mock_judge.name = "test-judge"
         mock_judge.model = "nonexistent-model"
         mock_judge.config = None
+        mock_judge.config_ref = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [mock_judge]
@@ -250,8 +253,10 @@ class TestJudgeRunnerStep:
 
         mock_judge = MagicMock(spec=JudgeConfig)
         mock_judge.name = "test-judge"
+        mock_judge.type = "deepeval.answer_relevancy"
         mock_judge.model = None
         mock_judge.config = None
+        mock_judge.config_ref = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [mock_judge]
@@ -305,8 +310,10 @@ class TestJudgeRunnerStep:
 
         mock_judge = MagicMock(spec=JudgeConfig)
         mock_judge.name = "test-judge"
+        mock_judge.type = "deepeval.answer_relevancy"
         mock_judge.model = None
         mock_judge.config = None
+        mock_judge.config_ref = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [mock_judge]

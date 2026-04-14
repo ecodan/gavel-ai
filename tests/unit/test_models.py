@@ -12,22 +12,21 @@ from pydantic import ValidationError
 
 
 class TestInputModel:
-    """Test Input Pydantic model."""
+    """Test Input Pydantic model (base class with id + metadata fields only)."""
 
     def test_input_model_basic_creation(self):
-        """Input model can be created with required fields."""
+        """Input model can be created with required id field."""
         from gavel_ai.core.models import Input
 
-        input_data = Input(id="test-1", text="Hello, world!")
+        input_data = Input(id="test-1")
         assert input_data.id == "test-1"
-        assert input_data.text == "Hello, world!"
         assert input_data.metadata == {}
 
     def test_input_model_with_metadata(self):
         """Input model accepts metadata dict."""
         from gavel_ai.core.models import Input
 
-        input_data = Input(id="test-2", text="Test input", metadata={"key": "value", "count": 42})
+        input_data = Input(id="test-2", metadata={"key": "value", "count": 42})
         assert input_data.metadata["key"] == "value"
         assert input_data.metadata["count"] == 42
 
@@ -36,27 +35,17 @@ class TestInputModel:
         from gavel_ai.core.models import Input
 
         with pytest.raises(ValidationError) as exc_info:
-            Input(text="No ID provided")
+            Input()
 
         assert "id" in str(exc_info.value)
-
-    def test_input_model_requires_text(self):
-        """Input model requires text field."""
-        from gavel_ai.core.models import Input
-
-        with pytest.raises(ValidationError) as exc_info:
-            Input(id="test-3")
-
-        assert "text" in str(exc_info.value)
 
     def test_input_model_uses_snake_case_fields(self):
         """Input model uses snake_case field names."""
         from gavel_ai.core.models import Input
 
-        input_data = Input(id="test", text="data")
+        input_data = Input(id="test")
         # Verify snake_case field access works
         assert hasattr(input_data, "id")
-        assert hasattr(input_data, "text")
         assert hasattr(input_data, "metadata")
 
 
