@@ -90,15 +90,20 @@ async def test_oneshot_reporter_generates_unified_html(mock_oneshot_run, reporte
     reporter = OneShotReporter(reporter_config)
     output = await reporter.generate(mock_oneshot_run, "oneshot.html")
 
-    # Verify Unified Spec elements
+    # Header
+    assert "OneShot Evaluation Report" in output
+    assert "Evaluation:" in output
     assert "Claude vs GPT Comparison" in output
     assert "Run ID:" in output
-    assert "Evaluation Summary" in output
+    # Sections
+    assert "Eval Summary" in output
     assert "Performance Summary" in output
     assert "Detailed Analysis" in output
-    assert "comparison-grid" in output
-    assert "turn-user" in output
-    assert "turn-assistant" in output
+    # New table-based scenario layout (no comparison-grid)
+    assert "comparison-grid" not in output
+    # New column headers
+    assert "Avg Response Time" in output
+    assert "LLM Avg" in output
 
 
 @pytest.mark.asyncio
