@@ -56,6 +56,13 @@
       "summary": "Added gavel-skill agent skill: eval assistant with CLI reference, config schema, scenario format guide, and judges reference",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-04-14T00:14:26.218561+00:00",
+      "branch": "initiative/finish-oneshot",
+      "summary": "finish-oneshot initiative merged: DeterministicMetric hierarchy (ClassifierMetric + RegressionMetric via scikit-learn), config_ref TOML judge resolution, .workflow_status step tracking, snapshot_run_config prompt copy, expanded ValidatorStep (variant resolution, prompt existence, empty scenario check), OneShotReporter score-averaging exclusion on processor errors, deterministic judge HTML section, --template classification/regression scaffold, in-situ scaffold fix, Google Vertex AI ADC auth support.",
+      "decisions": "",
+      "modules": []
     }
   ]
 }
