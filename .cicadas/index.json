@@ -84,6 +84,34 @@
       "summary": "Upgraded OneShot HTML report: header now shows execution time and eval name; Eval Summary splits LLM vs deterministic judge sections with per-subject sub-headings; Performance Summary adds per-subject sub-headings and renames 'Avg Turn Time' to 'Avg Response Time'; Scenario Detail replaced with table layout, collapsible inputs (>200 chars), and truncatable responses (>500 chars). ReportRunnerStep populates input_source and subject_names in RunData.metadata. OneShotReporter._build_context injects total_execution_time_s, input_source, subject_names, scenario_count, and threshold constants.",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-04-19T03:43:53.471298+00:00",
+      "branch": "feat/judge-types",
+      "summary": "Added ToxicityMetric, ConversationCompletenessMetric, ConversationalGEval, TurnRelevancyMetric to JUDGE_TYPE_MAP; added conversational scaffold template with new judge types; updated CLI threshold help text; 14 new unit tests",
+      "decisions": "",
+      "modules": []
+    },
+    {
+      "timestamp": "2026-04-19T03:43:53.554710+00:00",
+      "branch": "feat/judge-config",
+      "summary": "Added markdown_path field to JudgeConfig; implemented _render_judge_template, _build_render_context, _load_markdown_judge_config helpers; wired markdown loading and criteria templating into JudgeRunnerStep.execute; 19 new unit tests; fixed test mocks for new fields",
+      "decisions": "",
+      "modules": []
+    },
+    {
+      "timestamp": "2026-04-19T03:43:53.641118+00:00",
+      "branch": "feat/schema-docs",
+      "summary": "Authored docs/specs/schema-configs.md and docs/specs/schema-outputs.md covering all config and output schemas; added Schema Reference section to CLAUDE.md",
+      "decisions": "",
+      "modules": []
+    },
+    {
+      "timestamp": "2026-04-19T15:27:15.979491+00:00",
+      "branch": "initiative/gavel-uplevel",
+      "summary": "Completed gavel-uplevel initiative: added 4 DeepEval judge types (toxicity, conversation_completeness, conversational_geval, turn_relevancy), markdown_path judge config loading, {{key}} criteria templating, schema reference docs (docs/specs/). Post-merge: fixed prompt template syntax (string.Template $var not {{var}}), field_mapping defaults, token extraction (input_tokens/output_tokens), timing field (total_latency_ms), and CLI rich error panel with run.log path.",
+      "decisions": "",
+      "modules": []
     }
   ]
 }

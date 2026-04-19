@@ -47,7 +47,7 @@ Measuring the quality of LLM outputs is notoriously difficult due to non-determi
 | OneShot Workflow | Batch processing of single-turn prompts against scenarios. | Shipped |
 | Conversational v2 | Multi-turn interaction evaluation support. | Shipped |
 | Provider Agnostic | Support for Claude, GPT, Gemini, and Ollama via Pydantic-AI. | Shipped |
-| DeepEval Judges | Built-in integration for similarity, faithfulness, and custom GEval scores. | Shipped |
+| DeepEval Judges | 11 judge types including toxicity, conversational completeness, and turn relevancy. Markdown-based judge config loading and `{{key}}` criteria templating. | Shipped |
 | Local-First Storage | Filesystem-based artifact storage for human-readable run history. | Shipped |
 | OpenTelemetry | Native instrumentation for distributed tracing and performance metrics. | Shipped |
 | Autotune v3 | Automated optimization of prompts and model parameters. | Beta |

@@ -15,7 +15,7 @@ Gavel-AI is a Python-based CLI evaluation engine that follows a clean architectu
 | **Language/Runtime** | Python 3.10+ | Supported versions up to 3.13. |
 | **CLI Framework** | Typer | Hierarchical command structure built on Click. |
 | **LLM Abstraction** | Pydantic-AI | Swappable providers (Claude, GPT, Gemini, Ollama). |
-| **Evaluation/Judges** | DeepEval + scikit-learn | LLM-as-judge (GEval) and deterministic GT-comparison metrics (accuracy, F1, MAE, etc.). |
+| **Evaluation/Judges** | DeepEval + scikit-learn | LLM-as-judge (11 DeepEval types including conversational) and deterministic GT-comparison metrics (accuracy, F1, MAE, etc.). |
 | **Reporting** | Jinja2 | Template-based HTML and Markdown report generation. |
 | **Observability** | OpenTelemetry | Native instrumentation for distributed tracing. |
 | **Configuration** | Pydantic | Type-safe config schemas and field validation. |
@@ -175,6 +175,11 @@ gavel diagnose
 - **Step Tracking:** `Step.safe_execute()` calls `context.mark_step_complete(self.phase)` on success. `LocalRunContext` appends entries to `{run_dir}/.workflow_status` (JSONL, append-only). On init, `StepPhase.PREPARE` is written after `snapshot_run_config()`. Call `context.get_completed_steps()` to read the log.
 - **Snapshot:** `LocalRunContext.snapshot_run_config()` copies `config/`, `prompts/`, and scenarios to `{run_dir}/.config/` and writes `snapshot_metadata.json`. Prompt copies land in `.config/prompts/`.
 - **Judge config TOML:** Set `config_ref: "name"` on a `JudgeConfig` to load `config/judges/{name}.toml` at run time. `JudgeRunnerStep` resolves and merges TOML into `judge_config.config` before passing to `JudgeExecutor`. Use `LocalFileSystemEvalContext.get_judge_config(name)` to load directly (result is cached).
+- **Judge config Markdown:** Set `markdown_path: "relative/path.md"` on a `JudgeConfig` to load judge config from a Markdown file. `JudgeRunnerStep._load_markdown_judge_config()` parses `## Criteria`, `## Evaluation Steps`, `## Threshold`, and `## Guidelines` sections. Path must remain within the eval dir (path traversal rejected with `ConfigError`). Merged after `config_ref` resolution; markdown fields take precedence.
+- **Judge criteria templating:** `criteria` (str) and each item in `evaluation_steps` (list) support `{{key}}` substitution. `JudgeRunnerStep._render_judge_template()` applies replacements using scenario fields (`_build_render_context()`: dict inputs unpacked, string inputs become `{"input": value}`, metadata keys merged). Unknown `{{key}}` placeholders are left unchanged.
+- **Prompt templates:** Use `$var` or `${var}` syntax (Python `string.Template`) in `.toml` prompt files — not `{{var}}` (Jinja). `ScenarioProcessorStep` validates placeholder→scenario field mapping at run-start for `local` evals and raises `ConfigError` early rather than sending literal placeholder text to the LLM.
+- **Token extraction:** `ProviderFactory` reads `response.usage.input_tokens` / `response.usage.output_tokens` (pydantic-ai `RunUsage` fields). `timing_ms` on `OutputRecord` is sourced from `metadata["total_latency_ms"]` (aggregated by `PromptInputProcessor`).
+- **CLI error display:** Failed runs print a Rich panel to stderr with the human-readable cause and the exact path to `run.log`. Full stack traces are logged via `exc_info=True` in `Step.safe_execute()` and `OneShotWorkflow.execute()`. `OneShotWorkflow.run_ctx` is set before execution begins so the log path is always available on failure.
 - **DeterministicMetric routing:** `JudgeRunnerStep` partitions judges by checking the class registered in `JudgeRegistry`. Types `"classifier"` and `"regression"` route to the deterministic inline loop (synchronous, no `JudgeExecutor`). All other types route to `JudgeExecutor` (LLM path). Results stored in `context.deterministic_metrics: Dict[str, DeterministicRunResult]`.
 - **Score averaging exclusion:** `OneShotReporter` skips judge scores for `(scenario_id, variant_id)` pairs where `OutputRecord.error` is not None. HTML template shows `(N skipped)` annotation per variant/judge when exclusions occurred.
 
