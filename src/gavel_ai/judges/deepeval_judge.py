@@ -16,10 +16,14 @@ from typing import Any, Callable, Dict, Optional
 
 from deepeval.metrics import (
     AnswerRelevancyMetric,
+    ConversationCompletenessMetric,
     ContextualRelevancyMetric,
+    ConversationalGEval,
     FaithfulnessMetric,
     GEval,
     HallucinationMetric,
+    ToxicityMetric,
+    TurnRelevancyMetric,
 )
 
 from gavel_ai.core.retry import RetryConfig, retry_with_backoff
@@ -70,9 +74,13 @@ class DeepEvalJudge(Judge):
     JUDGE_TYPE_MAP = {
         "deepeval.answer_relevancy": AnswerRelevancyMetric,
         "deepeval.contextual_relevancy": ContextualRelevancyMetric,
+        "deepeval.conversation_completeness": ConversationCompletenessMetric,
+        "deepeval.conversational_geval": ConversationalGEval,
         "deepeval.faithfulness": FaithfulnessMetric,
-        "deepeval.hallucination": HallucinationMetric,
         "deepeval.geval": GEval,
+        "deepeval.hallucination": HallucinationMetric,
+        "deepeval.toxicity": ToxicityMetric,
+        "deepeval.turn_relevancy": TurnRelevancyMetric,
     }
 
     def _create_model_instance(self, model_name: str, model_family: Optional[str] = None) -> Any:
@@ -206,6 +214,37 @@ class DeepEvalJudge(Judge):
 
             # Extract metric-specific config from nested config dict
             metric_config = self.config.config.copy() if self.config.config else {}
+
+            # Handle conversational GEval (same constructor shape as GEval)
+            if judge_type == "deepeval.conversational_geval":
+                criteria = metric_config.get("criteria", "Evaluate the quality of the conversation")
+                evaluation_steps = metric_config.get(
+                    "evaluation_steps",
+                    [
+                        "Check if the conversation achieves the user's goal",
+                        "Evaluate the clarity and coherence of responses",
+                    ],
+                )
+                threshold = metric_config.get("threshold") or self.config.threshold or 0.5
+                model_name = metric_config.get("model") or self.config.model
+                if not model_name:
+                    raise JudgeError(
+                        f"ConversationalGEval judge '{judge_id}' requires 'model' in config - "
+                        f"Specify model in judge configuration"
+                    )
+                model_family = metric_config.get("model_family")
+                model = self._create_model_instance(model_name, model_family)
+                cgeval_kwargs: Dict[str, Any] = dict(
+                    name=metric_config.get("name", judge_id),
+                    criteria=criteria,
+                    evaluation_steps=evaluation_steps,
+                    model=model,
+                    threshold=threshold,
+                )
+                strict_mode = metric_config.get("strict_mode")
+                if strict_mode is not None:
+                    cgeval_kwargs["strict_mode"] = strict_mode
+                return metric_class(**cgeval_kwargs)
 
             # Handle GEval separately (different constructor)
             if judge_type == "deepeval.geval":

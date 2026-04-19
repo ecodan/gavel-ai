@@ -28,6 +28,15 @@ class JudgeConfig(BaseModel):
         None, description="Evaluation steps (for GEval judges)"
     )
 
+    # Markdown-based config loading
+    markdown_path: Optional[str] = Field(
+        None,
+        description=(
+            "Path to a Markdown file (relative to eval_dir) containing judge config sections: "
+            "## Criteria, ## Evaluation Steps, ## Threshold, ## Guidelines"
+        ),
+    )
+
 
 class ScenarioFieldMapping(BaseModel):
     """

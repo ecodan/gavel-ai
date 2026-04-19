@@ -72,7 +72,7 @@ def _print_run_summary(run_ctx: LocalRunContext, eval_ctx: LocalFileSystemEvalCo
 
 
 
-VALID_TEMPLATES = ("default", "classification", "regression")
+VALID_TEMPLATES = ("default", "classification", "regression", "conversational")
 
 
 @app.command()
@@ -82,7 +82,13 @@ def create(
     template: str = typer.Option(
         "default",
         "--template",
-        help="Scaffold template: default, classification, regression",
+        help=(
+            "Scaffold template: default, classification, regression, conversational. "
+            "Recommended judge thresholds — "
+            "toxicity/hallucination: 0.85-0.95; "
+            "answer_relevancy/faithfulness: 0.65-0.80; "
+            "conversation_completeness: 0.70-0.85."
+        ),
     ),
     eval_root: Optional[str] = typer.Option(
         None, "--eval-root", help="Custom evaluation root directory"
@@ -97,7 +103,6 @@ def create(
                 "Use only alphanumeric characters, hyphens, and underscores"
             )
 
-        # Validate template
         if template not in VALID_TEMPLATES:
             raise ValidationError(
                 f"Unknown template '{template}' - Available: {', '.join(VALID_TEMPLATES)}"

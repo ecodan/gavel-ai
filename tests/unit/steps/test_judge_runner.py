@@ -116,11 +116,17 @@ class TestJudgeRunnerStep:
         mock_judge1.name = "judge1"
         mock_judge1.model = None
         mock_judge1.config = None
+        mock_judge1.markdown_path = None
+        mock_judge1.criteria = None
+        mock_judge1.evaluation_steps = None
 
         mock_judge2 = MagicMock(spec=JudgeConfig)
         mock_judge2.name = "judge2"
         mock_judge2.model = None
         mock_judge2.config = None
+        mock_judge2.markdown_path = None
+        mock_judge2.criteria = None
+        mock_judge2.evaluation_steps = None
 
         mock_subject1 = MagicMock(spec=TestSubject)
         mock_subject1.judges = [mock_judge1]
@@ -154,6 +160,9 @@ class TestJudgeRunnerStep:
         mock_judge.model = "custom-model"
         mock_judge.config = {"model": "custom-model"}
         mock_judge.config_ref = None
+        mock_judge.markdown_path = None
+        mock_judge.criteria = None
+        mock_judge.evaluation_steps = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [mock_judge]
@@ -196,6 +205,9 @@ class TestJudgeRunnerStep:
         mock_judge.model = None
         mock_judge.config = {"model": "config-model"}
         mock_judge.config_ref = None
+        mock_judge.markdown_path = None
+        mock_judge.criteria = None
+        mock_judge.evaluation_steps = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [mock_judge]
@@ -238,6 +250,7 @@ class TestJudgeRunnerStep:
         mock_judge.model = "nonexistent-model"
         mock_judge.config = None
         mock_judge.config_ref = None
+        mock_judge.markdown_path = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [mock_judge]
@@ -265,6 +278,9 @@ class TestJudgeRunnerStep:
         mock_judge.model = None
         mock_judge.config = None
         mock_judge.config_ref = None
+        mock_judge.markdown_path = None
+        mock_judge.criteria = None
+        mock_judge.evaluation_steps = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [mock_judge]
@@ -323,6 +339,9 @@ class TestJudgeRunnerStep:
         mock_judge.model = None
         mock_judge.config = None
         mock_judge.config_ref = None
+        mock_judge.markdown_path = None
+        mock_judge.criteria = None
+        mock_judge.evaluation_steps = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [mock_judge]
@@ -485,6 +504,9 @@ class TestGEvalFieldMappingInjection:
         geval_judge.model = None
         geval_judge.config = {"model": "gpt-4", "criteria": "x", "evaluation_steps": []}
         geval_judge.config_ref = None
+        geval_judge.markdown_path = None
+        geval_judge.criteria = None
+        geval_judge.evaluation_steps = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [geval_judge]
@@ -532,6 +554,9 @@ class TestGEvalFieldMappingInjection:
         geval_judge.model = None
         geval_judge.config = {"model": "gpt-4", "criteria": "x", "evaluation_steps": []}
         geval_judge.config_ref = None
+        geval_judge.markdown_path = None
+        geval_judge.criteria = None
+        geval_judge.evaluation_steps = None
 
         mock_subject = MagicMock(spec=TestSubject)
         mock_subject.judges = [geval_judge]

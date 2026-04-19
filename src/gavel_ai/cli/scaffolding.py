@@ -385,6 +385,88 @@ def _generate_default_templates(eval_root: Path, eval_name: str, eval_type: str)
         generate_scenarios_json(eval_root, eval_name)
 
 
+def _generate_conversational_templates(eval_root: Path, eval_name: str, eval_type: str) -> None:
+    """Generate conversational evaluation templates with conv_completeness and conv_geval judges."""
+    eval_config: Dict[str, Any] = {
+        "eval_type": "oneshot",
+        "workflow_type": "conversational",
+        "test_subject_type": "local",
+        "eval_name": eval_name,
+        "description": "Conversational evaluation scaffolded by gavel oneshot create",
+        "test_subjects": [
+            {
+                "prompt_name": "assistant",
+                "judges": [
+                    {
+                        "name": "conversation_completeness",
+                        "type": "deepeval.conversation_completeness",
+                        "threshold": 0.75,
+                        "config": {"model": "gpt-5-mini"},
+                    },
+                    {
+                        "name": "conversational_quality",
+                        "type": "deepeval.conversational_geval",
+                        "threshold": 0.7,
+                        "config": {
+                            "model": "gpt-5-mini",
+                            "criteria": "Evaluate the quality and coherence of the conversation",
+                            "evaluation_steps": [
+                                "Check if the assistant addresses the user's goals",
+                                "Evaluate response relevance across turns",
+                                "Assess overall conversation coherence",
+                            ],
+                        },
+                    },
+                ],
+            }
+        ],
+        "variants": ["claude_haiku"],
+        "scenarios": {
+            "source": "file.local",
+            "name": "scenarios.json",
+        },
+        "conversational": {
+            "max_turns": 10,
+            "max_turn_length": 2000,
+            "turn_generator": {"model_id": "claude_haiku", "temperature": 0.0, "max_tokens": 500},
+        },
+        "execution": {"max_concurrent": 5},
+    }
+
+    output_file = eval_root / eval_name / "config" / "eval_config.json"
+    with open(output_file, "w") as f:
+        json.dump(eval_config, f, indent=2)
+
+    scenarios_data = [
+        {
+            "scenario_id": "conv-1",
+            "input": "Help me plan a trip to Japan for two weeks.",
+            "metadata": {"category": "travel_planning", "difficulty": "medium"},
+        },
+        {
+            "scenario_id": "conv-2",
+            "input": "I need help debugging a Python script that reads CSV files.",
+            "metadata": {"category": "technical_support", "difficulty": "medium"},
+        },
+    ]
+
+    scenarios_file = eval_root / eval_name / "data" / "scenarios.json"
+    with open(scenarios_file, "w") as f:
+        json.dump(scenarios_data, f, indent=2)
+
+    prompt_template = """v1 = '''
+You are a helpful AI assistant. Engage in a natural, helpful conversation with the user.
+Provide clear, accurate, and actionable responses.
+
+User message: {{input}}
+'''
+"""
+
+    prompt_file = eval_root / eval_name / "config" / "prompts" / "assistant.toml"
+    with open(prompt_file, "w") as f:
+        f.write(prompt_template)
+
+
 def generate_all_templates(
     eval_root: Path, eval_name: str, eval_type: str, template: str = "default"
 ) -> None:
@@ -395,10 +477,11 @@ def generate_all_templates(
         eval_root: Root directory for evaluations.
         eval_name: Name of the evaluation.
         eval_type: Evaluation type: "local" or "in-situ".
-        template: Scaffold template: "default", "classification", or "regression".
+        template: Scaffold template: "default", "classification", "regression", or "conversational".
             - ``default``: General-purpose LLM judge scaffold.
             - ``classification``: Classifier metrics with sentiment example scenarios.
             - ``regression``: Regression metric with arithmetic example scenarios.
+            - ``conversational``: Multi-turn eval with conversation_completeness and conversational_geval.
             Note: ``--type in-situ`` skips prompt generation and uses remote endpoint structure.
 
     Raises:
@@ -411,11 +494,13 @@ def generate_all_templates(
         _generate_classification_templates(eval_root, eval_name, eval_type)
     elif template == "regression":
         _generate_regression_templates(eval_root, eval_name, eval_type)
+    elif template == "conversational":
+        _generate_conversational_templates(eval_root, eval_name, eval_type)
     elif template == "default":
         _generate_default_templates(eval_root, eval_name, eval_type)
     else:
         raise ConfigError(
-            f"Unknown template '{template}' - Available: default, classification, regression"
+            f"Unknown template '{template}' - Available: default, classification, regression, conversational"
         )
 
     _generate_quality_judge_toml(eval_root, eval_name)
