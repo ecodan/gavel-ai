@@ -171,3 +171,8 @@ Each phase produces artifacts that feed into subsequent phases, ensuring alignme
 - BMAD Documentation: `_bmad/bmm/docs/`
 - Project Knowledge: `docs/`
 - BMAD Configuration: `_bmad/bmm/config.yaml`, `_bmad/core/config.yaml`
+
+## Schema Reference
+
+- [Config Schemas](docs/specs/schema-configs.md) — `eval_config.json`, `agents.json`, `scenarios.json`, judge config fields
+- [Output Schemas](docs/specs/schema-outputs.md) — `results_raw.jsonl`, `results_judged.jsonl`, `run_metadata.json`, telemetry, `.config/` snapshot
