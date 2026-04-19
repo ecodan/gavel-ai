@@ -104,6 +104,8 @@ class RunContext(ABC):
     Storage-agnostic: Does not assume filesystem, database, or any specific backend.
     """
 
+    last_step_error: Optional[Exception] = None
+
     @property
     @abstractmethod
     def eval_context(self) -> EvalContext:

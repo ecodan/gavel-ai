@@ -10,7 +10,9 @@ from typing import Any, Dict, List, Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from gavel_ai.cli.scaffolding import generate_all_templates
 from gavel_ai.core.contexts import LocalFileSystemEvalContext, LocalRunContext
@@ -34,6 +36,23 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+err_console = Console(stderr=True)
+
+
+def _print_run_error(e: Exception, log_path: Optional[Path] = None) -> None:
+    """Print a human-readable error panel to stderr; full trace goes to the log."""
+    cause = e.__cause__ or e
+    msg = Text(str(cause), style="red")
+    hint = f"\n\nSee [bold]{log_path}[/bold] for the full stack trace." if log_path else ""
+    err_console.print(
+        Panel(
+            msg.__str__() + hint,
+            title="[bold red]Run failed[/bold red]",
+            border_style="red",
+            expand=False,
+        )
+    )
+
 
 def _get_eval_dir(eval_name: Optional[str], run_id: Optional[str] = None) -> tuple[str, Path]:
     """Discover evaluation directory given eval name or run_id."""
@@ -150,9 +169,9 @@ def run(
     # Create evaluation context
     eval_ctx = LocalFileSystemEvalContext(eval_name=eval_name, eval_root=DEFAULT_EVAL_ROOT)
 
+    workflow = OneShotWorkflow(eval_ctx, app_logger)
     try:
         # Call business logic (core tier) - run async workflow
-        workflow = OneShotWorkflow(eval_ctx, app_logger)
         run_ctx = asyncio.run(workflow.execute())
 
         # Format output for CLI (presentation tier)
@@ -165,11 +184,9 @@ def run(
         # Print summary
         _print_run_summary(run_ctx, eval_ctx)
 
-    except (ConfigError, ValidationError) as e:
-        typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=1) from None
     except Exception as e:
-        typer.secho(f"Error ({type(e).__name__}): {e}", fg=typer.colors.RED, err=True)
+        log_path = (workflow.run_ctx.run_dir / "run.log") if workflow.run_ctx else None
+        _print_run_error(e, log_path)
         raise typer.Exit(code=1) from None
 
 

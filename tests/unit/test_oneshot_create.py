@@ -183,7 +183,7 @@ class TestOneshotCreateCommand:
 
         # Verify structure
         assert "v1" in prompts
-        assert "{{input}}" in prompts["v1"]  # Contains placeholder
+        assert "$input" in prompts["v1"]  # Contains placeholder
 
     def test_create_fails_if_directory_exists(self, tmp_path: Path) -> None:
         """Test that create command fails if evaluation directory already exists."""

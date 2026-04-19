@@ -14,7 +14,7 @@ Responsibilities:
 
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from gavel_ai.core.contexts import LocalFileSystemEvalContext, LocalRunContext
 from gavel_ai.core.steps.base import Step
@@ -54,6 +54,7 @@ class OneShotWorkflow:
         """
         self.eval_ctx = eval_ctx
         self.logger = logger
+        self.run_ctx: Optional[LocalRunContext] = None
 
     async def execute(self) -> LocalRunContext:
         """
@@ -71,6 +72,7 @@ class OneShotWorkflow:
         run_ctx = LocalRunContext(
             eval_ctx=self.eval_ctx, base_dir=self.eval_ctx.eval_dir / "runs"
         )
+        self.run_ctx = run_ctx
         run_id = run_ctx.run_id
 
         # Run context automatically:
@@ -132,5 +134,7 @@ class OneShotWorkflow:
             self.logger.info(f"Running {step.phase.value}...")
             success: bool = await step.safe_execute(run_ctx)
             if not success:
-                raise ProcessorError(f"Step {step.phase.value} failed")
+                err = ProcessorError(f"Step {step.phase.value} failed")
+                cause = run_ctx.last_step_error if isinstance(run_ctx.last_step_error, BaseException) else None
+                raise err from cause
             self.logger.info(f"Completed {step.phase.value}")

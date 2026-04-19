@@ -74,7 +74,7 @@ def generate_eval_config(eval_root: Path, eval_name: str, eval_type: str) -> Non
             "scenarios": {
                 "source": "file.local",
                 "name": "scenarios.json",
-                "field_mapping": {"expected_output": "expected_behavior"},
+                "field_mapping": {"expected_output": "expected"},
             },
             "execution": {"max_concurrent": 10},
             "async": {
@@ -117,7 +117,7 @@ def generate_eval_config(eval_root: Path, eval_name: str, eval_type: str) -> Non
             "scenarios": {
                 "source": "file.local",
                 "name": "scenarios.json",
-                "field_mapping": {"expected_output": "expected_behavior"},
+                "field_mapping": {"expected_output": "expected"},
             },
             "execution": {"max_concurrent": 10},
             "async": {
@@ -150,7 +150,7 @@ def generate_scenarios_json(eval_root: Path, eval_name: str) -> None:
         {
             "scenario_id": "2",
             "input": "Explain quantum computing in simple terms",
-            "expected": "",
+            "expected": "A clear, accessible explanation of quantum computing covering qubits, superposition, and how it differs from classical computing.",
             "metadata": {"category": "technology", "difficulty": "medium"},
         },
     ]
@@ -167,7 +167,7 @@ def generate_prompts_toml(eval_root: Path, eval_name: str) -> None:
     prompt_template = """v1 = '''
 You are a helpful AI assistant.
 
-User question: {{input}}
+User question: $input
 
 Provide a short, clear, accurate answer.
 '''
@@ -290,7 +290,7 @@ def _generate_classification_templates(eval_root: Path, eval_name: str, eval_typ
 You are a sentiment classifier. Classify the following text as positive, neutral, or negative.
 Respond with ONLY a JSON object in this exact format: {"label": "<sentiment>"}
 
-Text: {{input.text}}
+Text: ${input.text}
 '''
 """
 
@@ -366,7 +366,7 @@ def _generate_regression_templates(eval_root: Path, eval_name: str, eval_type: s
 You are a precise calculator. Answer the following arithmetic question.
 Respond with ONLY a JSON object in this exact format: {"value": <number>}
 
-Question: {{input.question}}
+Question: ${input.question}
 '''
 """
 
@@ -458,7 +458,7 @@ def _generate_conversational_templates(eval_root: Path, eval_name: str, eval_typ
 You are a helpful AI assistant. Engage in a natural, helpful conversation with the user.
 Provide clear, accurate, and actionable responses.
 
-User message: {{input}}
+User message: $input
 '''
 """
 

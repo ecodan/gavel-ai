@@ -146,9 +146,8 @@ class TestProviderExecution:
 
         mock_response = MagicMock()
         mock_response.output = "Test response"
-        mock_response.usage.prompt_tokens = 10
-        mock_response.usage.completion_tokens = 20
-        mock_response.usage.total_tokens = 30
+        mock_response.usage.input_tokens = 10
+        mock_response.usage.output_tokens = 20
 
         mock_agent.run = AsyncMock(return_value=mock_response)
 
@@ -169,9 +168,8 @@ class TestProviderExecution:
 
         mock_response = MagicMock()
         mock_response.output = "Response"
-        mock_response.usage.prompt_tokens = 50
-        mock_response.usage.completion_tokens = 100
-        mock_response.usage.total_tokens = 150
+        mock_response.usage.input_tokens = 50
+        mock_response.usage.output_tokens = 100
 
         mock_agent.run = AsyncMock(return_value=mock_response)
 

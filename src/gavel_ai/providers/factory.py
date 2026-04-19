@@ -256,12 +256,13 @@ class ProviderFactory:
                 prompt_tokens = 0
                 completion_tokens = 0
                 if hasattr(response, "usage") and response.usage:
-                    prompt_tokens = getattr(response.usage, "prompt_tokens", 0)
-                    completion_tokens = getattr(response.usage, "completion_tokens", 0)
+                    prompt_tokens = getattr(response.usage, "input_tokens", None) or getattr(response.usage, "prompt_tokens", 0)
+                    completion_tokens = getattr(response.usage, "output_tokens", None) or getattr(response.usage, "completion_tokens", 0)
+                    total_tokens = prompt_tokens + completion_tokens
                     metadata["tokens"] = {
                         "prompt": prompt_tokens,
                         "completion": completion_tokens,
-                        "total": getattr(response.usage, "total_tokens", 0),
+                        "total": total_tokens,
                     }
                 else:
                     metadata["tokens"] = {"prompt": 0, "completion": 0, "total": 0}

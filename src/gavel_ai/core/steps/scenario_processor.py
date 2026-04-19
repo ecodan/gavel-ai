@@ -13,9 +13,10 @@ Phase 2: Template rendering added to fix prompt loading bug.
 """
 
 import logging
+import re
 from datetime import datetime, timezone
 from string import Template
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 
 from gavel_ai.core.contexts import RunContext
 from gavel_ai.core.exceptions import ConfigError, ProcessorError
@@ -57,7 +58,7 @@ def _make_output_record(
         variant_id=variant_id,
         scenario_id=input_item.id,
         processor_output=str(proc_result.output),
-        timing_ms=int(metadata.get("latency_ms", 0)),
+        timing_ms=int(metadata.get("total_latency_ms", metadata.get("latency_ms", 0))),
         tokens_prompt=int(tokens_info.get("prompt", 0) if isinstance(tokens_info, dict) else 0),
         tokens_completion=int(
             tokens_info.get("completion", 0) if isinstance(tokens_info, dict) else 0
@@ -85,6 +86,40 @@ class ScenarioProcessorStep(Step):
     @property
     def phase(self) -> StepPhase:
         return StepPhase.SCENARIO_PROCESSING
+
+    def _validate_prompt_placeholders(
+        self, template_text: str, scenarios: List[Any], prompt_ref: str
+    ) -> None:
+        """Validate that every $var placeholder in the template resolves from scenario fields.
+
+        Raises:
+            ConfigError: If any placeholder has no corresponding field in any scenario.
+        """
+        # Extract all $var and ${var} placeholder names from the template
+        placeholders: Set[str] = set(re.findall(r"\$\{?([A-Za-z_][A-Za-z0-9_.]*)\}?", template_text))
+        if not placeholders:
+            raise ConfigError(
+                f"Prompt template '{prompt_ref}' contains no $variable placeholders. "
+                "Use $input (string scenarios) or ${field} (dict scenarios) to inject scenario data."
+            )
+
+        # Build available keys from the first scenario as representative
+        sample = scenarios[0] if scenarios else None
+        if sample is None:
+            return
+        if isinstance(sample.input, dict):
+            available: Set[str] = set(sample.input.keys())
+        else:
+            available = {"input"}
+        if sample.metadata:
+            available.update(sample.metadata.keys())
+
+        missing = placeholders - available
+        if missing:
+            raise ConfigError(
+                f"Prompt template '{prompt_ref}' references placeholder(s) {sorted(missing)} "
+                f"that are not present in scenarios. Available fields: {sorted(available)}"
+            )
 
     def _render_template(self, template_text: str, variables: Dict[str, Any]) -> str:
         """
@@ -133,49 +168,49 @@ class ScenarioProcessorStep(Step):
         if not test_subject_config:
             raise ConfigError("No test_subjects configured in eval_config")
 
-        # Load prompt template (once per test_subject, not per scenario)
-        prompt_name = test_subject_config.prompt_name or "unknown"
-        # Ensure prompt reference includes version (e.g., "default:v1" or "default:latest")
-        if ":" not in prompt_name:
-            prompt_ref = f"{prompt_name}:latest"
-        else:
-            prompt_ref = prompt_name
-        self.logger.info(f"Loading prompt template: {prompt_ref}")
-        try:
-            template_text = context.eval_context.get_prompt(prompt_ref)
-        except Exception as e:
-            raise ConfigError(
-                f"Failed to load prompt template '{prompt_ref}': {str(e)}. "
-                f"Ensure the template exists in config/prompts/"
-            ) from e
-
-        # Convert scenarios to PromptInput with rendered prompts (shared across all variants)
+        # Load and validate prompt template for local (prompt-based) evals only
+        template_text: str = ""
+        prompt_ref: str = ""
         inputs: List[PromptInput] = []
-        for scenario in scenarios:
-            # Extract variables from scenario input
-            if isinstance(scenario.input, dict):
-                variables = scenario.input
+
+        if eval_config.test_subject_type == "local":
+            prompt_name = test_subject_config.prompt_name or "unknown"
+            if ":" not in prompt_name:
+                prompt_ref = f"{prompt_name}:latest"
             else:
-                # String input: expose as $input in the template
-                variables = {"input": str(scenario.input)}
+                prompt_ref = prompt_name
+            self.logger.info(f"Loading prompt template: {prompt_ref}")
+            try:
+                template_text = context.eval_context.get_prompt(prompt_ref)
+            except Exception as e:
+                raise ConfigError(
+                    f"Failed to load prompt template '{prompt_ref}': {str(e)}. "
+                    f"Ensure the template exists in config/prompts/"
+                ) from e
 
-            # Render template with scenario variables
-            rendered_prompt = self._render_template(template_text, variables)
+            self._validate_prompt_placeholders(template_text, scenarios, prompt_ref)
 
-            # Create PromptInput with rendered prompt
-            prompt_input = PromptInput(
-                id=scenario.scenario_id,
-                user=rendered_prompt,
-                system=None,  # Can be added in future if needed
-                metadata={
-                    "scenario_input": scenario.input,  # Preserve original for debugging
-                    "template": prompt_ref,
-                    **(scenario.metadata or {}),
-                },
-            )
-            inputs.append(prompt_input)
+            # Convert scenarios to PromptInput with rendered prompts (shared across all variants)
+            for scenario in scenarios:
+                if isinstance(scenario.input, dict):
+                    variables = scenario.input
+                else:
+                    variables = {"input": str(scenario.input)}
 
-        self.logger.info(f"Created {len(inputs)} PromptInput objects with rendered templates")
+                rendered_prompt = self._render_template(template_text, variables)
+                prompt_input = PromptInput(
+                    id=scenario.scenario_id,
+                    user=rendered_prompt,
+                    system=None,
+                    metadata={
+                        "scenario_input": scenario.input,
+                        "template": prompt_ref,
+                        **(scenario.metadata or {}),
+                    },
+                )
+                inputs.append(prompt_input)
+
+            self.logger.info(f"Created {len(inputs)} PromptInput objects with rendered templates")
 
         models = agents_config.get("_models", {})
         all_records: List[OutputRecord] = []
