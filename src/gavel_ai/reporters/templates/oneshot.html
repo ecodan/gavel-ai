@@ -32,7 +32,7 @@
 
         header {
             padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%);
             color: white;
             border-radius: 6px 6px 0 0;
         }
@@ -61,10 +61,10 @@
         }
 
         h2 {
-            color: #2c3e50;
+            color: #1b4332;
             margin: 20px 0 10px 0;
             padding-bottom: 6px;
-            border-bottom: 2px solid #667eea;
+            border-bottom: 2px solid #2d6a4f;
             font-size: 1.2em;
         }
 
@@ -73,13 +73,13 @@
         }
 
         h3 {
-            color: #34495e;
+            color: #2d6a4f;
             margin: 12px 0 6px 0;
             font-size: 1.05em;
         }
 
         h4 {
-            color: #555;
+            color: #40916c;
             margin: 12px 0 6px 0;
             font-size: 0.95em;
         }
@@ -96,12 +96,13 @@
         }
 
         table th {
-            background: #ecf0f1;
+            background: #d8f3dc;
             padding: 6px 8px;
             text-align: left;
             font-weight: 600;
-            border-bottom: 2px solid #bdc3c7;
+            border-bottom: 2px solid #95d5b2;
             font-size: 12px;
+            color: #1b4332;
         }
 
         table td {
@@ -131,15 +132,15 @@
         .input-section {
             margin-bottom: 15px;
             padding: 10px;
-            background: #f0f7ff;
-            border-left: 3px solid #3498db;
+            background: #f0faf4;
+            border-left: 3px solid #52b788;
             border-radius: 3px;
         }
 
         .input-section h3 {
             margin: 0 0 8px 0;
             font-size: 1.05em;
-            color: #34495e;
+            color: #1b4332;
         }
 
         /* Collapsible input */
@@ -148,12 +149,12 @@
             padding: 4px 6px;
             background: white;
             border-radius: 2px;
-            border: 1px solid #dee2e6;
+            border: 1px solid #b7e4c7;
             font-size: 12px;
         }
 
         .system-prompt strong {
-            color: #2c3e50;
+            color: #1b4332;
             display: inline;
             margin-right: 6px;
             font-size: 11px;
@@ -161,8 +162,9 @@
         }
 
         .input-text-wrapper {
-            display: inline;
-            line-height: 1.2;
+            display: block;
+            line-height: 1.4;
+            margin-top: 2px;
         }
 
         .input-text-collapsed {
@@ -171,24 +173,22 @@
             text-overflow: ellipsis;
             display: block;
             max-width: 100%;
+            color: #555;
         }
 
         .input-text-expanded {
             white-space: pre-wrap;
             word-break: break-word;
             display: none;
-        }
-
-        .input-text-wrapper.expanded {
-            display: block;
+            color: #333;
         }
 
         .input-text-wrapper.expanded .input-text-collapsed {
-            display: none !important;
+            display: none;
         }
 
         .input-text-wrapper.expanded .input-text-expanded {
-            display: block !important;
+            display: block;
         }
 
         /* Truncated response */
@@ -243,7 +243,7 @@
 
         .score-val {
             font-weight: bold;
-            color: #667eea;
+            color: #2d6a4f;
         }
 
         .skip-note {
@@ -254,11 +254,11 @@
 
         .judge-reasoning {
             font-size: 12px;
-            color: #666;
+            color: #444;
             margin-top: 8px;
             padding: 8px;
-            background: #f8f9fa;
-            border-left: 2px solid #667eea;
+            background: #f0faf4;
+            border-left: 2px solid #52b788;
             display: none;
         }
 
@@ -286,7 +286,7 @@
         .expand-btn {
             font-size: 11px;
             cursor: pointer;
-            color: #3498db;
+            color: #40916c;
             background: none;
             border: none;
             text-decoration: underline;
@@ -296,7 +296,7 @@
         }
 
         .expand-btn:hover {
-            color: #2980b9;
+            color: #2d6a4f;
         }
 
         footer {

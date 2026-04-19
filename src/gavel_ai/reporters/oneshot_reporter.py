@@ -63,6 +63,16 @@ class OneShotReporter(Jinja2Reporter):
         # Build scenarios mapping
         scenario_map: Dict[str, ScenarioResult] = {}
 
+        # Build scenario_input lookup: prefer RunData.scenario_inputs (authoritative),
+        # then fall back to raw_results.metadata.scenario_input (legacy/defensive)
+        scenario_inputs_lookup: Dict[str, str] = dict(getattr(run, "scenario_inputs", None) or {})
+        if not scenario_inputs_lookup:
+            for raw in raw_results:
+                sid = raw.get("scenario_id") if isinstance(raw, dict) else getattr(raw, "scenario_id", None)
+                meta = raw.get("metadata", {}) if isinstance(raw, dict) else getattr(raw, "metadata", {})
+                if sid and isinstance(meta, dict) and "scenario_input" in meta:
+                    scenario_inputs_lookup[sid] = str(meta["scenario_input"])
+
         # Extract results from run
         results = get_val(run, "results", [])
 
@@ -84,10 +94,15 @@ class OneShotReporter(Jinja2Reporter):
             subject_id = get_val(result, "subject_id") or get_val(result, "test_subject", "default")
 
             if scenario_id not in scenario_map:
+                # Prefer scenario_inputs lookup (authoritative from scenarios config),
+                # then scenario_input from evaluation result, as last resort leave empty
+                scenario_input_val: str = scenario_inputs_lookup.get(scenario_id, "")
+                if not scenario_input_val:
+                    scenario_input_val = str(get_val(result, "scenario_input", "") or "")
                 scenario_map[scenario_id] = ScenarioResult(
                     scenario_id=scenario_id,
                     test_subject=subject_id,
-                    system_input=str(get_val(result, "scenario_input", ""))
+                    system_input=scenario_input_val,
                 )
 
             # Create VariantResult for this scenario
@@ -134,7 +149,9 @@ class OneShotReporter(Jinja2Reporter):
 
             # Build turns: OneShot is a 1-turn conversation
             turns = []
-            scenario_input_str = str(get_val(result, "scenario_input", "") or "")
+            scenario_input_str = scenario_inputs_lookup.get(scenario_id, "")
+            if not scenario_input_str:
+                scenario_input_str = str(get_val(result, "scenario_input", "") or "")
             if scenario_input_str:
                 turns.append(Turn(role="user", content=scenario_input_str))
             if processor_output:

@@ -40,6 +40,7 @@ class RunData:
     telemetry: Dict[str, Any] = field(default_factory=dict)
     raw_results: List[Dict[str, Any]] = field(default_factory=list)
     deterministic_metrics: Optional[Dict[str, Any]] = None
+    scenario_inputs: Dict[str, str] = field(default_factory=dict)
 
 
 class ReportRunnerStep(Step):
@@ -224,6 +225,13 @@ class ReportRunnerStep(Step):
                     seen_subjects.add(subj)
                     subject_names.append(subj)
 
+        # Build scenario_inputs lookup: scenario_id → raw input string
+        # Used by reporter as authoritative fallback when evaluation_results lack scenario_input
+        scenarios_list = run_context.eval_context.scenarios.read()
+        scenario_inputs: Dict[str, str] = {
+            s.scenario_id: str(s.input) for s in scenarios_list
+        }
+
         run_data = RunData(
             metadata={
                 "eval_name": run_context.eval_context.eval_name,
@@ -242,6 +250,7 @@ class ReportRunnerStep(Step):
             },
             raw_results=[r.model_dump() for r in processor_results],
             deterministic_metrics=getattr(run_context, "deterministic_metrics", None),
+            scenario_inputs=scenario_inputs,
         )
 
         self.logger.debug(f"Generating report to {report_path}")
