@@ -14,6 +14,7 @@ Per Tech Spec 3.9: Extracted from run() lines 247-318.
 import json
 import logging
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from gavel_ai.core.contexts import RunContext
@@ -24,6 +25,78 @@ from gavel_ai.judges.judge_executor import JudgeExecutor
 from gavel_ai.judges.judge_registry import JudgeRegistry
 from gavel_ai.models.config import ScenarioFieldMapping
 from gavel_ai.models.runtime import DeterministicRunResult, OutputRecord, Scenario
+
+
+def _render_judge_template(template: str, context: dict) -> str:
+    """Replace {{key}} placeholders with values from context; unknown keys pass through."""
+    result: str = template
+    for key, value in context.items():
+        result = result.replace(f"{{{{{key}}}}}", str(value))
+    return result
+
+
+def _build_render_context(scenario: Scenario) -> dict:
+    """Build template render context from scenario input and metadata."""
+    context: dict = {}
+    if isinstance(scenario.input, dict):
+        context.update(scenario.input)
+    elif isinstance(scenario.input, str):
+        context["input"] = scenario.input
+    if scenario.metadata:
+        context.update(scenario.metadata)
+    return context
+
+
+def _load_markdown_judge_config(markdown_path_str: str, eval_dir: Path) -> dict:
+    """
+    Load judge config from a Markdown file within eval_dir.
+
+    Parses ## Criteria, ## Evaluation Steps, ## Threshold, ## Guidelines sections.
+    Missing sections are silently absent from the returned dict.
+
+    Raises:
+        ConfigError: If the resolved path is outside eval_dir (path traversal).
+        ConfigError: If the file does not exist.
+    """
+    resolved: Path = (eval_dir / markdown_path_str).resolve()
+    eval_dir_resolved: Path = eval_dir.resolve()
+    if not str(resolved).startswith(str(eval_dir_resolved)):
+        raise ConfigError(
+            f"markdown_path '{markdown_path_str}' resolves outside eval_dir '{eval_dir}' - "
+            "Path traversal not allowed"
+        )
+    if not resolved.exists():
+        raise ConfigError(
+            f"markdown_path file not found: '{resolved}' - "
+            "Verify the path is relative to the eval directory"
+        )
+
+    text: str = resolved.read_text(encoding="utf-8")
+    result: dict = {}
+
+    import re
+    sections = re.split(r"^##\s+", text, flags=re.MULTILINE)
+    for section in sections:
+        if not section.strip():
+            continue
+        lines = section.splitlines()
+        heading = lines[0].strip()
+        body = "\n".join(lines[1:]).strip()
+
+        if heading == "Criteria":
+            result["criteria"] = body
+        elif heading == "Evaluation Steps":
+            steps = [line.strip().lstrip("-* ").strip() for line in body.splitlines() if line.strip()]
+            result["evaluation_steps"] = steps
+        elif heading == "Threshold":
+            try:
+                result["threshold"] = float(body.strip())
+            except ValueError:
+                pass
+        elif heading == "Guidelines":
+            result["guidelines"] = body
+
+    return result
 
 
 def _resolve_scenario_field(scenario: Scenario, path: str) -> Optional[str]:
@@ -185,6 +258,26 @@ class JudgeRunnerStep(Step):
                         "Create the file or remove the config_ref field"
                     )
 
+        # Resolve markdown_path → parsed Markdown sections (merge into judge_config.config)
+        eval_dir: Path = context.eval_context.eval_dir
+        for judge_config in judges_list:
+            if judge_config.markdown_path:
+                md_data = _load_markdown_judge_config(judge_config.markdown_path, eval_dir)
+                if judge_config.config is None:
+                    judge_config.config = {}
+                for key, value in md_data.items():
+                    if key not in judge_config.config:
+                        judge_config.config[key] = value
+                if "criteria" in md_data and judge_config.criteria is None:
+                    judge_config.criteria = md_data["criteria"]
+                if "evaluation_steps" in md_data and judge_config.evaluation_steps is None:
+                    judge_config.evaluation_steps = md_data["evaluation_steps"]
+                if "threshold" in md_data and judge_config.threshold is None:
+                    judge_config.threshold = md_data["threshold"]
+                self.logger.debug(
+                    f"Loaded markdown_path '{judge_config.markdown_path}' for judge '{judge_config.name}'"
+                )
+
         # Resolve custom model IDs in judge configurations
         for judge_config in judges_list:
             model_to_resolve = None
@@ -234,6 +327,30 @@ class JudgeRunnerStep(Step):
                         exclude_none=True
                     )
                 _validate_geval_expected_output(judge_config.name, scenarios, field_mapping)
+
+        # Apply criteria templating per record (deferred — applied in execution loop below).
+        # Store a per-scenario render context builder so each record gets its scenario vars.
+        # For now, apply top-level template rendering once using empty context
+        # (scenario-level rendering happens per-record in the deterministic path;
+        #  LLM judge criteria templating is applied here using the first scenario as preview
+        #  since LLM judges receive criteria once at construction, not per-sample).
+        # Per ADR-1: render criteria/evaluation_steps here before judge construction.
+        for judge_config in judges_list:
+            if scenarios:
+                render_ctx = _build_render_context(scenarios[0])
+                if judge_config.criteria:
+                    judge_config.criteria = _render_judge_template(judge_config.criteria, render_ctx)
+                    if judge_config.config is None:
+                        judge_config.config = {}
+                    judge_config.config["criteria"] = judge_config.criteria
+                if judge_config.evaluation_steps:
+                    judge_config.evaluation_steps = [
+                        _render_judge_template(step, render_ctx)
+                        for step in judge_config.evaluation_steps
+                    ]
+                    if judge_config.config is None:
+                        judge_config.config = {}
+                    judge_config.config["evaluation_steps"] = judge_config.evaluation_steps
 
         # Partition judges into LLM and deterministic
         llm_configs: List[Any] = []
