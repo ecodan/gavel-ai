@@ -6,7 +6,7 @@ Open-source, provider-agnostic AI evaluation framework for testing LLM applicati
 
 - **Provider Agnostic:** Works with Claude, GPT, Gemini, Ollama via Pydantic-AI
 - **Multiple Workflows:** OneShot, Conversational (v2+), Autotune (v3+)
-- **Built-in Judges:** DeepEval integration + custom GEval support
+- **Built-in Judges:** 11 DeepEval judge types (GEval, toxicity, conversational, faithfulness, and more) + deterministic GT-comparison metrics
 - **Local First:** All data stays on your machine
 - **OpenTelemetry:** Native observability instrumentation
 - **Git-Friendly:** Human-readable JSON/JSONL artifacts
@@ -79,17 +79,17 @@ gavel-ai/
 ### Running Tests
 
 ```bash
-pytest                    # Run all tests
-pytest tests/unit         # Unit tests only
-pytest tests/integration  # Integration tests only
+uv run pytest             # Run all tests
+uv run pytest -m unit     # Unit tests only
+uv run pytest -m integration  # Integration tests only
 ```
 
 ### Code Quality
 
 ```bash
-black src/                # Format code
-ruff check src/           # Lint code
-mypy src/                 # Type check
+uv run black src/         # Format code
+uv run ruff check src/    # Lint code
+uv run mypy src/          # Type check
 ```
 
 ### Pre-commit Hooks

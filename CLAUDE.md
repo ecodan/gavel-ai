@@ -24,29 +24,29 @@ The project uses Python 3.13+ with a minimal dependency footprint at the outset.
 
 ### Environment Setup
 ```bash
-# Activate virtual environment
-source .venv/bin/activate
+# Install dependencies
+uv sync
 
-# Install dependencies (add as needed to pyproject.toml)
+# Install in dev mode
 pip install -e .
 ```
 
 ### Python Development
 ```bash
 # Format code
-python -m black src/
+uv run black src/
 
 # Lint
-python -m ruff check src/
+uv run ruff check src/
 
 # Type checking
-python -m mypy src/
+uv run mypy src/
 
 # Run tests
-python -m pytest
+uv run pytest
 
 # Run a single test
-python -m pytest path/to/test.py::test_function
+uv run pytest path/to/test.py::test_function
 ```
 
 ### BMAD Workflows (via Claude Code)
@@ -128,8 +128,8 @@ BMAD includes comprehensive test architecture workflows:
 
 Run with:
 ```bash
-pytest -m unit          # unit tests only
-pytest -m integration   # integration tests only
+uv run pytest -m unit          # unit tests only
+uv run pytest -m integration   # integration tests only
 ```
 
 ## Agent Customizations
@@ -171,6 +171,13 @@ Each phase produces artifacts that feed into subsequent phases, ensuring alignme
 - BMAD Documentation: `_bmad/bmm/docs/`
 - Project Knowledge: `docs/`
 - BMAD Configuration: `_bmad/bmm/config.yaml`, `_bmad/core/config.yaml`
+
+## Runtime Conventions
+
+- **Prompt templates**: Use `$var` or `${var}` syntax (Python `string.Template`) in `.toml` prompt files — **not** `{{var}}`. Placeholders are validated against scenario fields at run-start for `local` evals.
+- **Judge criteria templating**: `criteria` strings and `evaluation_steps` items support `{{key}}` substitution using scenario fields, resolved by `JudgeRunnerStep` at run time.
+- **Error display**: Failed runs print a Rich panel to stderr with the human-readable cause and path to `run.log`. Never print stack traces to the terminal.
+- **Token fields**: `ProviderFactory` reads `input_tokens`/`output_tokens` from pydantic-ai `RunUsage`. `OutputRecord.timing_ms` maps to `metadata["total_latency_ms"]`.
 
 ## Schema Reference
 

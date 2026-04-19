@@ -71,9 +71,12 @@ gavel oneshot report --eval my_eval    # Generate reports
 - **Type hints**: Mandatory in all function signatures
 - **Logging**: Format `"%(asctime)s [%(levelname)s] <%(filename)s:%(lineno)s> %(message)s"`
 - **Snake case**: Code, config, telemetry attributes
-- **Test markers**: `@pytest.mark.unit` or `@pytest.mark.integration` (run with `-m`)
+- **Test markers**: `@pytest.mark.unit` or `@pytest.mark.integration` (run with `uv run pytest -m`)
 - **Immutability**: `results_raw.jsonl` never modified after processor exit
 - **OTel instrumentation**: All LLM calls and judge steps emit spans
+- **Prompt templates**: Use `$var` / `${var}` (Python `string.Template`) in `.toml` prompts — not `{{var}}`
+- **Judge criteria**: `{{key}}` substitution is supported in `criteria` and `evaluation_steps` fields using scenario variables
+- **CLI errors**: Failed runs show a Rich panel (human-readable cause + `run.log` path) to stderr; stack traces stay in the log
 
 ## For Workflow Guidance
 
