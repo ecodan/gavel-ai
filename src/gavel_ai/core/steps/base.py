@@ -94,13 +94,13 @@ class Step(ABC):
             context.mark_step_complete(self.phase)
             return True
         except (ValidationError, ConfigError) as e:
-            self.logger.error(f"{self.phase.value} failed: {e}", exc_info=True)
+            self.logger.error(f"{self.phase.value} failed: {e}")
             context.run_logger.error(f"{self.phase.value} failed: {e}", exc_info=True)
             context.last_step_error = e
             return False
         except Exception as e:
             self.logger.error(
-                f"{self.phase.value} failed with unexpected error: {e}", exc_info=True
+                f"{self.phase.value} failed with unexpected error: {e}"
             )
             context.run_logger.error(
                 f"{self.phase.value} failed with unexpected error: {e}", exc_info=True

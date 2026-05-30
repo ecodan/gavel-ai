@@ -103,7 +103,7 @@ class OneShotWorkflow:
 
         except Exception as e:
             run_ctx.run_logger.error(f"Execution error: {e}", exc_info=True)
-            self.logger.error(f"Execution error: {e}", exc_info=True)
+            self.logger.error(f"Execution error: {e}")
             raise
 
         finally:

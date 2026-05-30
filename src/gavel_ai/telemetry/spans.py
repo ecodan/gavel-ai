@@ -319,16 +319,17 @@ def _initialize_tracer_provider() -> TracerProvider:
         provider = TracerProvider(resource=resource)
         provider.add_span_processor(_dynamic_processor)
 
-        # Try to set as global provider
+        # Only set global provider if the current one is still the default proxy.
+        # Calling set_tracer_provider when a real provider exists emits a noisy
+        # "Overriding of current TracerProvider is not allowed" warning from OTel.
         if not _initialized:
-            try:
+            current_global = trace.get_tracer_provider()
+            if isinstance(current_global, trace.ProxyTracerProvider):
                 trace.set_tracer_provider(provider)
                 _initialized = True
                 logger.debug("OpenTelemetry tracer provider initialized")
-            except Exception:
-                # Provider was already set by another library
-                # Our processor won't work but app continues
-                logger.debug("TracerProvider already set - using existing")
+            else:
+                logger.debug("TracerProvider already set by another library - skipping")
                 _initialized = True
 
         return provider

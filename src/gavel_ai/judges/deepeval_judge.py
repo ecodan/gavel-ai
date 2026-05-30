@@ -146,20 +146,15 @@ class DeepEvalJudge(Judge):
                 kwargs["api_key"] = api_key
             return AnthropicModel(**kwargs)
         elif family == "gemini":
-            kwargs = {
-                "model": model_name,
-                "cost_per_input_token": 0,
-                "cost_per_output_token": 0,
-            }
+            # GeminiModel passes **kwargs to the underlying Google Client,
+            # which does not accept cost_per_input/output_token — omit them.
+            kwargs: Dict[str, Any] = {"model": model_name}
             if api_key:
                 kwargs["api_key"] = api_key
             return GeminiModel(**kwargs)
         elif family in ("qwen", "ollama"):
-            kwargs = {
-                "model": model_name,
-                "cost_per_input_token": 0,
-                "cost_per_output_token": 0,
-            }
+            # OllamaModel also does not support cost tracking kwargs.
+            kwargs = {"model": model_name}
             if base_url:
                 kwargs["base_url"] = base_url
             return OllamaModel(**kwargs)
