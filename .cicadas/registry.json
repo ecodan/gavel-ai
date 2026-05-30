@@ -1,37 +1,5 @@
 {
   "schema_version": "2.0",
-  "initiatives": {
-    "installable-library": {
-      "intent": "Make gavel-ai usable as a library dependency: gavel init command, --eval-root routing with 4-tier resolution, and packaging fix",
-      "owner": "unknown",
-      "signals": [],
-      "created_at": "2026-05-30T15:04:04.410670+00:00"
-    }
-  },
-  "branches": {
-    "feat/eval-root-routing": {
-      "intent": "gavel init command, read_project_config + resolve_eval_root helpers, uninit warning, --eval-root propagation through all CLI commands",
-      "modules": [
-        "cli/commands/conv.py",
-        "cli/common.py",
-        "cli/commands/oneshot.py",
-        "cli/commands/autotune.py",
-        "cli/main.py"
-      ],
-      "owner": "unknown",
-      "created_at": "2026-05-30T15:04:12.786063+00:00",
-      "worktree_path": "/Users/dan/dev/code/projects/python/gavel-ai-feat-eval-root-routing",
-      "initiative": "installable-library"
-    },
-    "feat/packaging-fix": {
-      "intent": "pyproject.toml packages.find + package-data for src layout and Jinja2 templates, install verification",
-      "modules": [
-        "pyproject.toml"
-      ],
-      "owner": "unknown",
-      "created_at": "2026-05-30T15:04:20.781198+00:00",
-      "worktree_path": "/Users/dan/dev/code/projects/python/gavel-ai-feat-packaging-fix",
-      "initiative": "installable-library"
-    }
-  }
+  "initiatives": {},
+  "branches": {}
 }

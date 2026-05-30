@@ -112,6 +112,13 @@
       "summary": "Completed gavel-uplevel initiative: added 4 DeepEval judge types (toxicity, conversation_completeness, conversational_geval, turn_relevancy), markdown_path judge config loading, {{key}} criteria templating, schema reference docs (docs/specs/). Post-merge: fixed prompt template syntax (string.Template $var not {{var}}), field_mapping defaults, token extraction (input_tokens/output_tokens), timing field (total_latency_ms), and CLI rich error panel with run.log path.",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-05-30T15:43:40.078201+00:00",
+      "branch": "initiative/installable-library",
+      "summary": "Added gavel init command, 4-tier eval root resolution (--eval-root flag / GAVEL_EVAL_ROOT env / .gavel/config.json / default), setuptools src layout + package-data, suppress duplicate exc_info in logging, fix Gemini/Ollama model kwargs, fix OTel init warning",
+      "decisions": "",
+      "modules": []
     }
   ]
 }

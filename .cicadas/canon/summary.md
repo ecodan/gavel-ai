@@ -18,7 +18,7 @@ Supports two evaluation modes: **OneShot** (single-turn prompt→response) and *
 
 ## Modules
 
-- `cli`: Presentation and command orchestration. `oneshot` subcommand has `create/run/judge/report/list/milestone`. Run errors displayed as Rich panel (human-readable + log path) — full stack trace stays in `run.log`.
+- `cli`: Presentation and command orchestration. Root `gavel init` command writes `.gavel/config.json`; all eval commands emit a soft warning if config absent. `oneshot` subcommand has `create/run/judge/report/list/milestone`. `cli/common.py` provides `resolve_eval_root(str|None) → Path` (4-tier: CLI flag → `GAVEL_EVAL_ROOT` env → `.gavel/config.json` → `.gavel/evaluations`) and `run_async()`. Run errors displayed as Rich panel (human-readable + log path) — full stack trace stays in `run.log`.
 - `core`: Shared abstractions, models, step base classes, retry logic, exceptions.
   - `core/execution/retry_logic.py`: Async exponential-backoff retry helper.
   - `core/steps/conversational_processor.py`: Multi-turn, multi-variant conversation execution with `max_turns` and `max_duration_ms` enforcement.
@@ -48,3 +48,5 @@ Supports two evaluation modes: **OneShot** (single-turn prompt→response) and *
 - **Duration fields**: `max_duration_ms` (ms, 30000–3600000) in `ConversationalConfig`; `timing_ms` on results.
 - **Schema docs**: `docs/specs/schema-configs.md` and `docs/specs/schema-outputs.md` document all config and output schemas.
 - **Test markers**: All tests tagged `@pytest.mark.unit` or `@pytest.mark.integration`. Run with `pytest -m unit` / `pytest -m integration`.
+- **Eval root (Annotated pattern)**: All CLI command functions use `eval_root: Annotated[Optional[str], typer.Option("--eval-root", envvar="GAVEL_EVAL_ROOT", ...)] = None`. The `= None` default is required so direct Python calls (unit tests) receive `None`, not Typer's `OptionInfo` object.
+- **Packaging**: `pyproject.toml` uses `[tool.setuptools.packages.find] where = ["src"]` and `[tool.setuptools.package-data] gavel_ai = ["reporters/templates/*"]` for correct `pip install` / `uv add` behavior from external projects.

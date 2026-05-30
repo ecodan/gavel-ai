@@ -134,12 +134,13 @@ Key invariant: deterministic results flow through `context.deterministic_metrics
 ### CLI Command Groups
 
 ```
-gavel oneshot <create|run|judge|report>
-gavel conv <create|run|judge|report>
+gavel init [--eval-root DIR] [--force]
+gavel oneshot <create|run|judge|report|list|milestone>
+gavel conv <create|generate>
 gavel autotune <run|report>
-gavel list
-gavel diagnose
 ```
+
+`gavel init` initializes the project by writing `.gavel/config.json` with the chosen eval root. Idempotent; `--force` overwrites. All eval-touching commands emit a soft yellow warning to stderr if `.gavel/config.json` is absent (suppress-able by running `gavel init` first).
 
 `gavel oneshot create` accepts:
 - `--type local|in-situ` — eval type; in-situ skips prompt generation
@@ -180,6 +181,8 @@ gavel diagnose
 - **Prompt templates:** Use `$var` or `${var}` syntax (Python `string.Template`) in `.toml` prompt files — not `{{var}}` (Jinja). `ScenarioProcessorStep` validates placeholder→scenario field mapping at run-start for `local` evals and raises `ConfigError` early rather than sending literal placeholder text to the LLM.
 - **Token extraction:** `ProviderFactory` reads `response.usage.input_tokens` / `response.usage.output_tokens` (pydantic-ai `RunUsage` fields). `timing_ms` on `OutputRecord` is sourced from `metadata["total_latency_ms"]` (aggregated by `PromptInputProcessor`).
 - **CLI error display:** Failed runs print a Rich panel to stderr with the human-readable cause and the exact path to `run.log`. Full stack traces are logged via `exc_info=True` in `Step.safe_execute()` and `OneShotWorkflow.execute()`. `OneShotWorkflow.run_ctx` is set before execution begins so the log path is always available on failure.
+- **Eval root resolution:** `cli/common.py::resolve_eval_root(eval_root_str)` applies 4-tier resolution: explicit `--eval-root` CLI flag → `GAVEL_EVAL_ROOT` env var (handled by Typer `envvar=` param) → `.gavel/config.json["eval_root"]` → `.gavel/evaluations` default. All eval-touching commands accept `--eval-root` via `Annotated[Optional[str], typer.Option("--eval-root", envvar="GAVEL_EVAL_ROOT", ...)] = None` — the `None` default is critical so direct Python calls in tests receive `None`, not Typer's `OptionInfo` object.
+- **Packaging (library use):** `pyproject.toml` declares `[tool.setuptools.packages.find] where = ["src"]` and `[tool.setuptools.package-data] gavel_ai = ["reporters/templates/*"]` so `pip install gavel-ai` or `uv add gavel-ai` from an external project picks up all modules and Jinja2 templates.
 - **DeterministicMetric routing:** `JudgeRunnerStep` partitions judges by checking the class registered in `JudgeRegistry`. Types `"classifier"` and `"regression"` route to the deterministic inline loop (synchronous, no `JudgeExecutor`). All other types route to `JudgeExecutor` (LLM path). Results stored in `context.deterministic_metrics: Dict[str, DeterministicRunResult]`.
 - **Score averaging exclusion:** `OneShotReporter` skips judge scores for `(scenario_id, variant_id)` pairs where `OutputRecord.error` is not None. HTML template shows `(N skipped)` annotation per variant/judge when exclusions occurred.
 
