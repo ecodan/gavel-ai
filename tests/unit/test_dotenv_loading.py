@@ -30,12 +30,14 @@ class TestDotenvLoading:
             assert gavel_ai.cli.main.app is not None
 
     def test_cli_main_callback_doesnt_duplicate_setup(self) -> None:
-        """Verify CLI callback doesn't re-run setup (moved to module level)."""
-        from gavel_ai.cli.main import main
+        """Verify CLI callback doesn't raise when invoked with no subcommand."""
+        from typer.testing import CliRunner
 
-        # Main callback should just pass through now
-        # No exceptions should be raised
-        main(version=None)
+        from gavel_ai.cli.main import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, [])
+        assert result.exit_code == 0
 
     def test_main_module_loads_dotenv(self) -> None:
         """Verify the main module imports and uses load_dotenv."""

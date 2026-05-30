@@ -6,6 +6,7 @@ from typing import Annotated, Optional
 
 import typer
 
+from gavel_ai.cli.common import resolve_eval_root
 from gavel_ai.core.contexts import LocalFileSystemEvalContext, LocalRunContext
 from gavel_ai.core.exceptions import ConfigError, ValidationError
 from gavel_ai.core.steps.generate_step import GenerateStep
@@ -15,22 +16,24 @@ from gavel_ai.telemetry import get_tracer
 tracer = get_tracer(__name__)
 app_logger = get_application_logger()
 
-DEFAULT_EVAL_ROOT = Path(".gavel/evaluations")
-
 app = typer.Typer(
     name="conv",
     help="Conversational evaluation workflow commands (v2+)",
     add_completion=False,
 )
 
+_EVAL_ROOT_HELP = "Root directory containing evaluations (default: .gavel/evaluations)"
+
 
 @app.command()
 def create(
     eval_name: Annotated[str, typer.Option("--eval", help="Evaluation name")],
+    eval_root: Annotated[
+        Optional[str], typer.Option("--eval-root", envvar="GAVEL_EVAL_ROOT", help=_EVAL_ROOT_HELP)
+    ] = None,
 ) -> None:
     """Create conversational evaluation scaffold."""
     typer.echo(f"Creating conversational evaluation scaffold for '{eval_name}'...")
-    # Scaffolding implementation will be fully implemented in Task 2
     typer.echo("Scaffolding implementation pending")
 
 
@@ -43,35 +46,32 @@ def generate(
             "--prompt-file", help="Custom prompt file (default: prompts/generate_scenarios.toml)"
         ),
     ] = None,
+    eval_root: Annotated[
+        Optional[str], typer.Option("--eval-root", envvar="GAVEL_EVAL_ROOT", help=_EVAL_ROOT_HELP)
+    ] = None,
 ) -> None:
     """Generate scenarios using LLM."""
     app_logger.info(f"Conversational Scenario Generation for '{eval_name}' started")
 
     try:
-        # Create evaluation context
-        eval_ctx = LocalFileSystemEvalContext(eval_name=eval_name, eval_root=DEFAULT_EVAL_ROOT)
-
-        # Create run context for the generation process
+        resolved_root: Path = resolve_eval_root(eval_root)
+        eval_ctx = LocalFileSystemEvalContext(eval_name=eval_name, eval_root=resolved_root)
         run_ctx = LocalRunContext(eval_ctx)
 
-        # If custom prompt file provided, override in eval_config temporarily
         if prompt_file:
             config = eval_ctx.eval_config.read()
             if not hasattr(config, "scenario_generation"):
-                # Handle dictionary if it's not a model
                 if isinstance(config, dict):
                     if "scenario_generation" not in config:
                         config["scenario_generation"] = {}
                     config["scenario_generation"]["prompt_file"] = str(prompt_file.absolute())
                 else:
-                    # It's an EvalConfig model
                     config.scenario_generation = {"prompt_file": str(prompt_file.absolute())}
             else:
                 config.scenario_generation["prompt_file"] = str(prompt_file.absolute())
 
             eval_ctx.eval_config.write(config)
 
-        # Execute the generation step
         step = GenerateStep(app_logger)
         asyncio.run(step.execute(run_ctx))
 

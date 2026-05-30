@@ -1,12 +1,11 @@
 """OneShot evaluation workflow CLI commands."""
 
-import asyncio
 import json
 import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 import typer
 from rich.console import Console
@@ -14,6 +13,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from gavel_ai.cli.common import resolve_eval_root, run_async
 from gavel_ai.cli.scaffolding import generate_all_templates
 from gavel_ai.core.contexts import LocalFileSystemEvalContext, LocalRunContext
 from gavel_ai.core.exceptions import ConfigError, ResourceNotFoundError, ValidationError
@@ -28,8 +28,6 @@ from gavel_ai.telemetry import get_tracer
 tracer = get_tracer(__name__)
 app_logger = get_application_logger()
 
-DEFAULT_EVAL_ROOT = Path(".gavel/evaluations")
-
 app = typer.Typer(
     name="oneshot",
     help="OneShot evaluation workflow commands",
@@ -37,6 +35,11 @@ app = typer.Typer(
 )
 console = Console()
 err_console = Console(stderr=True)
+
+_EVAL_ROOT_HELP = "Root directory containing evaluations (default: .gavel/evaluations)"
+_EvalRootArg = Annotated[
+    Optional[str], typer.Option("--eval-root", envvar="GAVEL_EVAL_ROOT", help=_EVAL_ROOT_HELP)
+]
 
 
 def _print_run_error(e: Exception, log_path: Optional[Path] = None) -> None:
@@ -54,10 +57,16 @@ def _print_run_error(e: Exception, log_path: Optional[Path] = None) -> None:
     )
 
 
-def _get_eval_dir(eval_name: Optional[str], run_id: Optional[str] = None) -> tuple[str, Path]:
+def _get_eval_dir(
+    eval_name: Optional[str],
+    run_id: Optional[str] = None,
+    eval_root: Optional[Path] = None,
+) -> tuple[str, Path]:
     """Discover evaluation directory given eval name or run_id."""
+    root: Path = eval_root if eval_root is not None else resolve_eval_root(None)
+
     if eval_name:
-        eval_path = DEFAULT_EVAL_ROOT / eval_name
+        eval_path = root / eval_name
         if not eval_path.exists():
             raise ResourceNotFoundError(f"Evaluation '{eval_name}' not found")
         return eval_name, eval_path
@@ -65,19 +74,20 @@ def _get_eval_dir(eval_name: Optional[str], run_id: Optional[str] = None) -> tup
     if not run_id:
         raise ConfigError("Must provide either --eval or --run")
 
-    if not DEFAULT_EVAL_ROOT.exists():
+    if not root.exists():
         raise ConfigError("No evaluations found. Use 'gavel oneshot create' first.")
-    
-    for eval_dir in DEFAULT_EVAL_ROOT.iterdir():
+
+    for eval_dir in root.iterdir():
         if eval_dir.is_dir() and (eval_dir / "runs" / run_id).exists():
             return eval_dir.name, eval_dir
-    
+
     raise ResourceNotFoundError(f"Run ID '{run_id}' not found in any evaluation")
+
 
 def _print_run_summary(run_ctx: LocalRunContext, eval_ctx: LocalFileSystemEvalContext) -> None:
     eval_config = eval_ctx.eval_config.read()
     scenarios = eval_ctx.scenarios.read()
-    
+
     judge_count = sum(
         len(subject.judges) for subject in (eval_config.test_subjects or []) if subject.judges
     )
@@ -88,7 +98,6 @@ def _print_run_summary(run_ctx: LocalRunContext, eval_ctx: LocalFileSystemEvalCo
     if judge_count > 0:
         console.print(f"   Judges: [cyan]{judge_count}[/cyan]")
     console.print(f"   Report: {run_ctx.run_dir / 'report.html'}")
-
 
 
 VALID_TEMPLATES = ("default", "classification", "regression", "conversational")
@@ -109,13 +118,10 @@ def create(
             "conversation_completeness: 0.70-0.85."
         ),
     ),
-    eval_root: Optional[str] = typer.Option(
-        None, "--eval-root", help="Custom evaluation root directory"
-    ),
+    eval_root: _EvalRootArg = None,
 ) -> None:
     """Create a new evaluation scaffold."""
     try:
-        # Validate evaluation name
         if not eval.replace("-", "").replace("_", "").isalnum():
             raise ValidationError(
                 f"Invalid evaluation name '{eval}' - "
@@ -127,18 +133,15 @@ def create(
                 f"Unknown template '{template}' - Available: {', '.join(VALID_TEMPLATES)}"
             )
 
-        # Determine eval root directory
-        eval_root_path: Path = Path(eval_root) if eval_root else Path(DEFAULT_EVAL_ROOT)
+        eval_root_path: Path = resolve_eval_root(eval_root)
         eval_path = eval_root_path / eval
 
-        # Check if evaluation already exists
         if eval_path.exists():
             raise ConfigError(
                 f"Evaluation '{eval}' already exists - "
                 "Use different name or delete existing evaluation"
             )
 
-        # Generate all templates
         generate_all_templates(eval_root_path, eval, type, template)
 
         app_logger.info(f"Evaluation '{eval}' created at {eval_path}")
@@ -162,26 +165,24 @@ def run(
     scenarios: Optional[str] = typer.Option(
         None, "--scenarios", help="Scenario filter (e.g., 1-10)"
     ),
+    eval_root: _EvalRootArg = None,
 ) -> None:
     """CLI entry point for OneShot evaluation workflow."""
     app_logger.info(f"OneShot Evaluation '{eval_name}' started")
 
-    # Create evaluation context
-    eval_ctx = LocalFileSystemEvalContext(eval_name=eval_name, eval_root=DEFAULT_EVAL_ROOT)
+    resolved_root: Path = resolve_eval_root(eval_root)
+    eval_ctx = LocalFileSystemEvalContext(eval_name=eval_name, eval_root=resolved_root)
 
     workflow = OneShotWorkflow(eval_ctx, app_logger)
     try:
-        # Call business logic (core tier) - run async workflow
-        run_ctx = asyncio.run(workflow.execute())
+        run_ctx = run_async(workflow.execute())
 
-        # Format output for CLI (presentation tier)
         typer.echo(f"✓ Created run: {run_ctx.run_id}")
         typer.echo("✓ Completed validation")
         typer.echo("✓ Completed scenario_processing")
         typer.echo("✓ Completed judging")
         typer.echo("✓ Completed reporting")
 
-        # Print summary
         _print_run_summary(run_ctx, eval_ctx)
 
     except Exception as e:
@@ -194,11 +195,13 @@ def run(
 def judge(
     run_id: str = typer.Option(..., "--run", help="Run ID to judge"),
     eval_name: Optional[str] = typer.Option(None, "--eval", help="Evaluation name"),
+    eval_root: _EvalRootArg = None,
 ) -> None:
     """Judge evaluation results using pipeline steps."""
     try:
-        real_eval_name, eval_dir = _get_eval_dir(eval_name, run_id)
-        eval_ctx = LocalFileSystemEvalContext(eval_name=real_eval_name, eval_root=DEFAULT_EVAL_ROOT)
+        resolved_root: Path = resolve_eval_root(eval_root)
+        real_eval_name, eval_dir = _get_eval_dir(eval_name, run_id, resolved_root)
+        eval_ctx = LocalFileSystemEvalContext(eval_name=real_eval_name, eval_root=resolved_root)
         run_ctx = LocalRunContext(
             eval_ctx=eval_ctx,
             base_dir=eval_dir / "runs",
@@ -216,8 +219,8 @@ def judge(
 
         run_ctx.processor_results = records
 
-        asyncio.run(JudgeRunnerStep(app_logger).execute(run_ctx))
-        asyncio.run(ReportRunnerStep(app_logger).execute(run_ctx))
+        run_async(JudgeRunnerStep(app_logger).execute(run_ctx))
+        run_async(ReportRunnerStep(app_logger).execute(run_ctx))
 
         console.print(
             f"[bold green]✓ Completed judging ({len(records)} results processed)[/bold green]"
@@ -231,25 +234,28 @@ def judge(
         raise typer.Exit(code=1) from None
 
 
-def _generate_report(run_id: str, eval_name: Optional[str], template: Optional[str]) -> None:
-    # 1. Discover evaluation if not provided
-    real_eval_name, eval_dir = _get_eval_dir(eval_name, run_id)
+def _generate_report(
+    run_id: str,
+    eval_name: Optional[str],
+    template: Optional[str],
+    eval_root: Optional[Path] = None,
+) -> None:
+    resolved_root: Path = eval_root if eval_root is not None else resolve_eval_root(None)
+    real_eval_name, eval_dir = _get_eval_dir(eval_name, run_id, resolved_root)
 
-    # 2. Create contexts
-    eval_ctx = LocalFileSystemEvalContext(eval_name=real_eval_name, eval_root=DEFAULT_EVAL_ROOT)
+    eval_ctx = LocalFileSystemEvalContext(eval_name=real_eval_name, eval_root=resolved_root)
     run_ctx = LocalRunContext(
-        eval_ctx=eval_ctx, 
+        eval_ctx=eval_ctx,
         base_dir=eval_dir / "runs",
         run_id=run_id,
-        snapshot=False
+        snapshot=False,
     )
 
-    if not (run_ctx.run_dir).exists():
+    if not run_ctx.run_dir.exists():
         raise ResourceNotFoundError(f"Run directory not found: {run_ctx.run_dir}")
 
     typer.echo(f"Generating report for run '{run_id}' in evaluation '{real_eval_name}'...")
 
-    # 3. Load results
     results = []
     if run_ctx.results_judged.exists():
         results = list(run_ctx.results_judged.read())
@@ -258,8 +264,7 @@ def _generate_report(run_id: str, eval_name: Optional[str], template: Optional[s
     else:
         raise ConfigError(f"No results found for run {run_id}")
 
-    # 4. Load metadata
-    metadata = {}
+    metadata: Dict[str, Any] = {}
     if run_ctx.run_metadata.exists():
         metadata_obj = run_ctx.run_metadata.read()
         if hasattr(metadata_obj, "model_dump"):
@@ -271,10 +276,9 @@ def _generate_report(run_id: str, eval_name: Optional[str], template: Optional[s
             "eval_name": real_eval_name,
             "run_id": run_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "status": "unknown"
+            "status": "unknown",
         }
 
-    # 5. Generate report
     templates_dir = Path(__file__).parent.parent.parent / "reporters" / "templates"
     reporter_config = ReporterConfig(
         template_path=str(templates_dir),
@@ -283,31 +287,33 @@ def _generate_report(run_id: str, eval_name: Optional[str], template: Optional[s
     reporter = OneShotReporter(reporter_config)
 
     class ReportData:
-        def __init__(self, metadata, results, run_id):
+        def __init__(self, metadata: dict, results: list, run_id: str) -> None:
             self.metadata = metadata
             self.results = results
             self.run_id = run_id
 
     report_data = ReportData(metadata, results, run_id)
     template_name = template if template else "oneshot.html"
-    
-    report_content = asyncio.run(reporter.generate(report_data, template_name))
-    
+
+    report_content = run_async(reporter.generate(report_data, template_name))
+
     report_path = run_ctx.run_dir / "report.html"
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report_content)
-        
+
     typer.echo(f"✅ Report generated: {report_path.absolute()}")
+
 
 @app.command()
 def report(
     run_id: str = typer.Option(..., "--run", help="Run ID to report"),
     eval_name: Optional[str] = typer.Option(None, "--eval", help="Evaluation name"),
     template: Optional[str] = typer.Option(None, "--template", help="Custom report template"),
+    eval_root: _EvalRootArg = None,
 ) -> None:
     """Generate evaluation report."""
     try:
-        _generate_report(run_id, eval_name, template)
+        _generate_report(run_id, eval_name, template, resolve_eval_root(eval_root))
     except ConfigError as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from None
@@ -319,18 +325,20 @@ def report(
 @app.command(name="list")
 def list_runs(
     eval_name: Optional[str] = typer.Option(None, "--eval", help="Evaluation name to filter"),
+    eval_root: _EvalRootArg = None,
 ) -> None:
     """List evaluation runs."""
     try:
-        evals_to_check = []
+        resolved_root: Path = resolve_eval_root(eval_root)
+        evals_to_check: List[Path] = []
         if eval_name:
-            _, eval_dir = _get_eval_dir(eval_name)
+            _, eval_dir = _get_eval_dir(eval_name, eval_root=resolved_root)
             evals_to_check = [eval_dir]
         else:
-            if not DEFAULT_EVAL_ROOT.exists():
+            if not resolved_root.exists():
                 raise ConfigError("No evaluations found. Use 'gavel oneshot create' first.")
-            evals_to_check = [d for d in DEFAULT_EVAL_ROOT.iterdir() if d.is_dir()]
-            
+            evals_to_check = [d for d in resolved_root.iterdir() if d.is_dir()]
+
         table = Table(title="Evaluation Runs")
         table.add_column("Run ID", style="cyan", no_wrap=True)
         table.add_column("Eval", style="magenta", no_wrap=True)
@@ -343,17 +351,17 @@ def list_runs(
             runs_dir = eval_dir / "runs"
             if not runs_dir.exists():
                 continue
-                
+
             for run_dir in sorted(runs_dir.iterdir(), key=lambda d: d.name, reverse=True):
                 if not run_dir.is_dir():
                     continue
                 has_runs = True
-                
+
                 metadata_file = run_dir / "manifest.json"
                 timestamp = "Unknown"
                 scenarios = "Unknown"
                 milestone = ""
-                
+
                 if metadata_file.exists():
                     try:
                         with open(metadata_file, "r") as f:
@@ -366,9 +374,9 @@ def list_runs(
                             milestone = f"⭐ {comment}" if comment else "⭐"
                     except Exception:
                         pass
-                
+
                 table.add_row(run_dir.name, eval_dir.name, timestamp, scenarios, milestone)
-                
+
         if not has_runs:
             if eval_name:
                 console.print(f"No runs found for evaluation '{eval_name}'")
@@ -376,7 +384,7 @@ def list_runs(
                 console.print("No runs found")
         else:
             console.print(table)
-            
+
     except (ConfigError, ResourceNotFoundError) as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from None
@@ -388,19 +396,21 @@ def milestone(
     eval_name: Optional[str] = typer.Option(None, "--eval", help="Evaluation name"),
     comment: Optional[str] = typer.Option(None, "--comment", help="Milestone comment"),
     remove: bool = typer.Option(False, "--remove", help="Remove milestone status"),
+    eval_root: _EvalRootArg = None,
 ) -> None:
     """Mark run as milestone."""
     try:
-        eval_name, eval_dir = _get_eval_dir(eval_name, run_id)
+        resolved_root: Path = resolve_eval_root(eval_root)
+        eval_name, eval_dir = _get_eval_dir(eval_name, run_id, resolved_root)
         run_dir = eval_dir / "runs" / run_id
         metadata_file = run_dir / "manifest.json"
-        
+
         if not metadata_file.exists():
             raise ResourceNotFoundError(f"Manifest not found for run '{run_id}'")
-            
+
         with open(metadata_file, "r") as f:
             data = json.load(f)
-            
+
         if remove:
             data["is_milestone"] = False
             data["milestone_comment"] = None
@@ -411,12 +421,12 @@ def milestone(
             data["milestone_comment"] = comment
             data["milestone_timestamp"] = datetime.now(timezone.utc).isoformat()
             action = f"marked as milestone{f' ({comment})' if comment else ''}"
-            
+
         with open(metadata_file, "w") as f:
             json.dump(data, f, indent=2)
-            
+
         console.print(f"[bold green]✅ Run {run_id}[/bold green] {action}")
-        
+
     except (ConfigError, ResourceNotFoundError) as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from None

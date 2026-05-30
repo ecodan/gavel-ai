@@ -1,17 +1,16 @@
-import pytest
+"""Unit tests for CLI common utilities and error handling."""
 
-pytestmark = pytest.mark.unit
-"""
-Unit tests for CLI common utilities and error handling.
-"""
-
+import json
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 import typer
 
-from gavel_ai.cli.common import handle_error
+from gavel_ai.cli.common import handle_error, read_project_config, resolve_eval_root
 from gavel_ai.core.exceptions import GavelError
+
+pytestmark = pytest.mark.unit
 
 
 class TestHandleError:
@@ -74,3 +73,46 @@ class TestHandleError:
 
         hints = get_type_hints(handle_error)
         assert hints["return"].__name__ == "NoReturn"
+
+
+class TestReadProjectConfig:
+    def test_returns_empty_dict_when_no_config(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        assert read_project_config() == {}
+
+    def test_reads_config_json(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        config_path = tmp_path / ".gavel" / "config.json"
+        config_path.parent.mkdir()
+        config_path.write_text(json.dumps({"eval_root": "./evals"}))
+        assert read_project_config() == {"eval_root": "./evals"}
+
+    def test_returns_empty_dict_on_invalid_json(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        config_path = tmp_path / ".gavel" / "config.json"
+        config_path.parent.mkdir()
+        config_path.write_text("not-valid-json{{{")
+        assert read_project_config() == {}
+
+
+class TestResolveEvalRoot:
+    def test_explicit_string_returned_as_path(self) -> None:
+        assert resolve_eval_root("/tmp/my-evals") == Path("/tmp/my-evals")
+
+    def test_none_with_no_config_returns_default(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        assert resolve_eval_root(None) == Path(".gavel/evaluations")
+
+    def test_none_with_config_returns_config_value(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        config_path = tmp_path / ".gavel" / "config.json"
+        config_path.parent.mkdir()
+        config_path.write_text(json.dumps({"eval_root": "./evals"}))
+        assert resolve_eval_root(None) == Path("./evals")
+
+    def test_explicit_string_beats_config(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        config_path = tmp_path / ".gavel" / "config.json"
+        config_path.parent.mkdir()
+        config_path.write_text(json.dumps({"eval_root": "./evals"}))
+        assert resolve_eval_root("/override") == Path("/override")
