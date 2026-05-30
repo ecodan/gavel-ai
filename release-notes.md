@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Feature**: `gavel init [--eval-root DIR] [--force]` command initializes a project by writing `.gavel/config.json` with the chosen eval root. Idempotent; `--force` overwrites. All eval-touching commands emit a soft yellow warning to stderr if config is absent.
+- **Feature**: 4-tier eval root resolution via `resolve_eval_root()` in `cli/common.py`: explicit `--eval-root` flag → `GAVEL_EVAL_ROOT` env var → `.gavel/config.json` → `.gavel/evaluations` default. All `oneshot` and `conv` commands accept `--eval-root` (with `GAVEL_EVAL_ROOT` envvar) using the `Annotated` pattern so direct Python calls in tests receive `None` rather than Typer's `OptionInfo` object.
+- **Fix**: `pyproject.toml` now declares `[tool.setuptools.packages.find] where = ["src"]` and `[tool.setuptools.package-data] gavel_ai = ["reporters/templates/*"]` so `pip install gavel-ai` / `uv add gavel-ai` from an external project correctly includes all modules and Jinja2 report templates.
+- **Fix**: Removed `exc_info=True` from app-logger error calls in `Step.safe_execute()` and `OneShotWorkflow.execute()`. The run-logger already captures the full trace; the duplicate caused stack traces to appear in the terminal.
+- **Fix**: Removed unsupported `cost_per_input_token` / `cost_per_output_token` kwargs from `GeminiModel` and `OllamaModel` constructors in `deepeval_judge.py`. Those constructors do not accept cost arguments, causing a `TypeError` on judge runs.
+- **Fix**: OTel tracer init in `spans.py` now checks `isinstance(current_global, trace.ProxyTracerProvider)` before calling `set_tracer_provider()`, replacing a broad `try/except`. Prevents the "Overriding of current TracerProvider is not allowed" warning when gavel-ai is used as a library inside a host app that already initialised OTel.
+
 - **Feature**: 4 new DeepEval judge types added to `JUDGE_TYPE_MAP`: `deepeval.toxicity`, `deepeval.conversation_completeness`, `deepeval.conversational_geval`, `deepeval.turn_relevancy`. CLI threshold help text updated with recommended ranges per type.
 - **Feature**: Judge config supports `markdown_path` — a path relative to the eval dir pointing to a Markdown file with `## Criteria`, `## Evaluation Steps`, `## Threshold`, and `## Guidelines` sections. Merged after `config_ref` resolution; path traversal rejected with `ConfigError`.
 - **Feature**: Judge `criteria` strings and `evaluation_steps` list items support `{{key}}` template substitution using scenario fields, resolved at run time by `JudgeRunnerStep._render_judge_template()`.

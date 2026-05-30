@@ -60,8 +60,10 @@ pytest tests/path/test.py::test_name  # Specific test
 
 ### Running Evaluations
 ```bash
+gavel init                             # Initialize project (writes .gavel/config.json)
+gavel init --eval-root ./evals         # Or specify a custom root
 gavel oneshot create --eval my_eval    # Create evaluation
-gavel oneshot run --eval my_eval       # Run evaluation
+gavel oneshot run --eval my_eval       # Run evaluation (--eval-root or GAVEL_EVAL_ROOT override)
 gavel oneshot judge --eval my_eval     # Run judges
 gavel oneshot report --eval my_eval    # Generate reports
 ```

@@ -16,7 +16,13 @@ Open-source, provider-agnostic AI evaluation framework for testing LLM applicati
 ### 1. Install
 
 ```bash
+# Development (editable)
 pip install -e .
+
+# As a library in another project
+pip install gavel-ai
+# or with uv:
+uv add /path/to/gavel-ai
 ```
 
 ### 2. Configure API Keys
@@ -30,7 +36,14 @@ cp .env.example .env
 
 Gavel automatically loads `.env` on startup. See [SETUP.md](SETUP.md) for complete configuration guide.
 
-### 3. Create Your First Evaluation
+### 3. Initialize Your Project
+
+```bash
+gavel init                    # Uses .gavel/evaluations (default)
+gavel init --eval-root ./evals  # Or specify a custom root
+```
+
+### 4. Create Your First Evaluation
 
 ```bash
 gavel oneshot create --eval my_first_eval
@@ -42,7 +55,7 @@ Edit the config files:
 - `data/scenarios.json` - Add test scenarios
 - `config/eval_config.json` - Configure judges
 
-### 4. Run Evaluation
+### 5. Run Evaluation
 
 ```bash
 gavel oneshot run --eval my_first_eval
@@ -128,6 +141,7 @@ Gavel automatically loads `.env` files using `python-dotenv`. Configuration file
 - `OPENAI_API_KEY` - GPT models
 - `GOOGLE_API_KEY` - Gemini models
 - `OLLAMA_BASE_URL` - Local Ollama instance
+- `GAVEL_EVAL_ROOT` - Override the default evaluations root directory
 
 ## License
 

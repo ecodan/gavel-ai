@@ -178,6 +178,9 @@ Each phase produces artifacts that feed into subsequent phases, ensuring alignme
 - **Judge criteria templating**: `criteria` strings and `evaluation_steps` items support `{{key}}` substitution using scenario fields, resolved by `JudgeRunnerStep` at run time.
 - **Error display**: Failed runs print a Rich panel to stderr with the human-readable cause and path to `run.log`. Never print stack traces to the terminal.
 - **Token fields**: `ProviderFactory` reads `input_tokens`/`output_tokens` from pydantic-ai `RunUsage`. `OutputRecord.timing_ms` maps to `metadata["total_latency_ms"]`.
+- **Eval root resolution**: `cli/common.py::resolve_eval_root()` applies 4-tier lookup: `--eval-root` flag → `GAVEL_EVAL_ROOT` env var → `.gavel/config.json["eval_root"]` → `.gavel/evaluations`. Run `gavel init` to write the config file.
+- **CLI option pattern**: Use `Annotated[Optional[str], typer.Option("--eval-root", envvar="GAVEL_EVAL_ROOT", ...)] = None` for options that must also work when the function is called directly in tests. The `= None` default prevents Typer's `OptionInfo` object from being passed instead of `None`.
+- **Packaging (library use)**: `pyproject.toml` declares `[tool.setuptools.packages.find] where = ["src"]` and `[tool.setuptools.package-data] gavel_ai = ["reporters/templates/*"]` so external projects installing gavel-ai via `pip install` or `uv add` get all modules and Jinja2 templates.
 
 ## Schema Reference
 
