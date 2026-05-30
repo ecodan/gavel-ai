@@ -39,6 +39,12 @@ dev = [
 [project.scripts]
 gavel = "gavel_ai.cli.main:app"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+gavel_ai = ["reporters/templates/*"]
+
 [tool.black]
 line-length = 100
 target-version = ["py310", "py311", "py312", "py313"]
