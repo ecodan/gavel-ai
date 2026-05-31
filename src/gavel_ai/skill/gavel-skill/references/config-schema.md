@@ -5,19 +5,42 @@
 
 ---
 
+## Project Initialization
+
+Run `gavel init` once per project to write `.gavel/config.json`:
+
+```bash
+gavel init                      # uses ./evals as eval root
+gavel init --eval-root ./evals  # explicit path
+gavel init --force              # overwrite existing config
+```
+
+`.gavel/config.json` format:
+```json
+{ "eval_root": "./evals" }
+```
+
+All commands resolve the eval root via 4-tier lookup: `--eval-root` flag →
+`GAVEL_EVAL_ROOT` env var → `.gavel/config.json["eval_root"]` → `.gavel/evaluations`.
+
+---
+
 ## Directory Layout
 
 ```
-.gavel/evaluations/{eval_name}/
+.gavel/
+└── config.json                 ← project config (written by `gavel init`)
+
+{eval_root}/{eval_name}/        ← default: .gavel/evaluations/{eval_name}
 ├── config/
-│   ├── eval_config.json      ← evaluation config (required)
-│   ├── agents.json           ← model + agent definitions (required)
+│   ├── eval_config.json        ← evaluation config (required)
+│   ├── agents.json             ← model + agent definitions (required)
 │   ├── prompts/
-│   │   └── {name}.toml       ← versioned prompt templates
+│   │   └── {name}.toml         ← versioned prompt templates
 │   └── judges/
-│       └── {name}.json       ← optional external judge configs
+│       └── {name}.toml         ← optional external judge configs (config_ref)
 ├── data/
-│   └── scenarios.json        ← test scenario array
+│   └── scenarios.json          ← test scenario array
 └── runs/
     └── {run_id}/
         ├── results_raw.jsonl
@@ -69,7 +92,19 @@ Pydantic model: `gavel_ai.models.config.EvalConfig`
 | `criteria` | string | No | Top-level shorthand for `config.criteria` (geval) |
 | `evaluation_steps` | string[] | No | Top-level shorthand for `config.evaluation_steps` (geval) |
 | `config` | object | No | Judge-specific config (see below and `references/judges-reference.md`) |
-| `config_ref` | string | No | Path to external judge config TOML in `config/judges/` |
+| `config_ref` | string | No | Name key for external judge config in `config/judges/{name}.toml` (loaded and merged at run time) |
+
+#### `judges[].config` for `classifier` and `regression`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `prediction_field` | string | `"prediction"` | Dot-notation path into the JSON processor output for the predicted value |
+| `actual_field` | string | `"actual"` | Dot-notation path into the scenario (`input` dict first, then top-level) for the ground-truth value |
+| `report_metric` | string | `"accuracy"` / `"mean_absolute_error"` | scikit-learn metric. Classifier: `accuracy`, `f1`, `fbeta`. Regression: `mean_absolute_error`, `mean_squared_error`, `r2_score`. |
+| `beta` | float | `1.0` | Required when `report_metric == "fbeta"` (classifier only) |
+
+Results appear in the HTML report under a separate **Deterministic Metrics** section.
+They are **never** written to `results_raw.jsonl` or `results_judged.jsonl`.
 
 #### `judges[].config` for `deepeval.geval`
 

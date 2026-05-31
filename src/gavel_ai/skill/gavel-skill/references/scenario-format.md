@@ -50,13 +50,25 @@ When `input` is a dict, the judge test case also reads special keys:
 Different judges need different scenario fields populated. Failing to provide
 them causes a `MissingTestCaseParamsError` at run time.
 
-| Judge type | `input` | `expected_behavior` | `context` | `retrieval_context` |
-|---|---|---|---|---|
-| `deepeval.geval` | Required | Recommended | — | — |
-| `deepeval.answer_relevancy` | Required | — | — | — |
-| `deepeval.contextual_relevancy` | Required | — | Required | — |
-| `deepeval.faithfulness` | Required | — | Required | — |
-| `deepeval.hallucination` | Required | — | — | Required |
+| Judge type | `input` | `expected_behavior` | `context` | `retrieval_context` | `actual_field` |
+|---|---|---|---|---|---|
+| `deepeval.geval` | Required | Recommended | — | — | — |
+| `deepeval.answer_relevancy` | Required | — | — | — | — |
+| `deepeval.contextual_relevancy` | Required | — | Required | — | — |
+| `deepeval.faithfulness` | Required | — | Required | — | — |
+| `deepeval.hallucination` | Required | — | — | Required | — |
+| `deepeval.contextual_precision` | Required | Required | — | Required | — |
+| `deepeval.contextual_recall` | Required | Required | — | Required | — |
+| `deepeval.toxicity` | Required | — | — | — | — |
+| `deepeval.conversation_completeness` | Required | — | — | — | — |
+| `deepeval.conversational_geval` | Required | — | — | — | — |
+| `deepeval.turn_relevancy` | Required | — | — | — | — |
+| `classifier` | Required | — | — | — | Required |
+| `regression` | Required | — | — | — | Required (numeric) |
+
+**`actual_field`**: For deterministic judges, the ground-truth value is resolved
+from the scenario via `config.actual_field` (default: `"actual"`). It is read
+from `scenario.input` dict keys first, then top-level scenario fields.
 
 **Providing `context` / `retrieval_context`**: Put these in the `input` dict:
 ```json

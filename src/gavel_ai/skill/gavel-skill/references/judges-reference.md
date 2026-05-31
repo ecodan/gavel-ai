@@ -196,16 +196,250 @@ the ground truth. Penalizes any output claim not supported by those documents.
 
 ---
 
+### `deepeval.contextual_precision` — Retrieval Precision Judge
+
+**Use when**: You have a RAG system and want to check whether the retrieved chunks
+are ranked in a useful order — specifically that the most relevant context appears
+earliest.
+
+**How it works**: Checks whether nodes in `retrieval_context` that support the
+`expected_output` appear before nodes that don't.
+
+**Required scenario fields**: `input` (required), `expected_behavior` (required),
+`retrieval_context` in `input` dict (required)
+
+**Config:**
+```json
+{
+  "name": "retrieval-precision",
+  "type": "deepeval.contextual_precision",
+  "threshold": 0.7,
+  "config": { "model": "claude-haiku-4-5-20251001" }
+}
+```
+
+---
+
+### `deepeval.contextual_recall` — Retrieval Recall Judge
+
+**Use when**: You want to check whether all information needed to produce the
+`expected_output` is present in the retrieved context.
+
+**How it works**: Measures what fraction of the expected output's claims are
+supported by at least one node in `retrieval_context`.
+
+**Required scenario fields**: `input` (required), `expected_behavior` (required),
+`retrieval_context` in `input` dict (required)
+
+**Config:**
+```json
+{
+  "name": "retrieval-recall",
+  "type": "deepeval.contextual_recall",
+  "threshold": 0.7,
+  "config": { "model": "claude-haiku-4-5-20251001" }
+}
+```
+
+---
+
+### `deepeval.toxicity` — Toxicity Judge
+
+**Use when**: The model's output must not contain harmful, offensive, or abusive
+content. Use for content moderation, safety testing, or any user-facing application.
+
+**How it works**: Detects hate speech, profanity, personal attacks, and similar
+harmful content in the model's response.
+
+**Required scenario fields**: `input` (required)
+
+**Recommended threshold**: 0.85–0.95 (higher = stricter moderation)
+
+**Config:**
+```json
+{
+  "name": "safety-check",
+  "type": "deepeval.toxicity",
+  "threshold": 0.9,
+  "config": { "model": "claude-haiku-4-5-20251001" }
+}
+```
+
+---
+
+### `deepeval.conversation_completeness` — Conversation Completeness Judge
+
+**Use when**: Evaluating multi-turn conversations where the assistant must resolve
+all user intents before the conversation ends.
+
+**How it works**: Checks whether each user intent raised during the conversation
+was eventually addressed and resolved.
+
+**Use with**: `conv` eval type only. Not applicable to oneshot evals.
+
+**Recommended threshold**: 0.70–0.85
+
+**Config:**
+```json
+{
+  "name": "completeness",
+  "type": "deepeval.conversation_completeness",
+  "threshold": 0.75,
+  "config": { "model": "claude-haiku-4-5-20251001" }
+}
+```
+
+---
+
+### `deepeval.conversational_geval` — Conversational Custom Criteria Judge
+
+**Use when**: You need custom criteria applied to a full multi-turn conversation
+rather than a single turn.
+
+**How it works**: Like `deepeval.geval` but evaluated over the full conversation
+history rather than a single input/output pair.
+
+**Use with**: `conv` eval type only.
+
+**Config:**
+```json
+{
+  "name": "conv-quality",
+  "type": "deepeval.conversational_geval",
+  "config": {
+    "model": "claude-haiku-4-5-20251001",
+    "criteria": "Does the assistant maintain coherent context across the full conversation?",
+    "evaluation_steps": [
+      "Check if the assistant remembers information from earlier turns",
+      "Verify the assistant never contradicts its own prior statements",
+      "Assess whether the conversation reaches a satisfying resolution"
+    ],
+    "threshold": 0.7
+  }
+}
+```
+
+---
+
+### `deepeval.turn_relevancy` — Turn Relevancy Judge
+
+**Use when**: Evaluating multi-turn conversations to check whether each assistant
+turn is relevant to the immediately preceding user message.
+
+**How it works**: Scores each turn individually and aggregates across the
+conversation. Catches off-topic responses within an otherwise coherent conversation.
+
+**Use with**: `conv` eval type only.
+
+**Recommended threshold**: 0.70–0.85
+
+**Config:**
+```json
+{
+  "name": "turn-relevancy",
+  "type": "deepeval.turn_relevancy",
+  "threshold": 0.75,
+  "config": { "model": "claude-haiku-4-5-20251001" }
+}
+```
+
+---
+
+## Deterministic Judges (No LLM Call)
+
+Deterministic judges compare model output against a ground-truth value from the
+scenario using scikit-learn metrics. No LLM call is made — they are fast, free,
+and fully reproducible.
+
+**Requirement**: The model must output **valid JSON** containing the prediction
+field. Set the extraction path with `prediction_field` (default: `"prediction"`).
+
+**Results**: Written to `ReportData.deterministic_results`, rendered as a separate
+section in the HTML report. **Not** written to `results_raw.jsonl` or
+`results_judged.jsonl`.
+
+---
+
+### `classifier` — Classification Accuracy
+
+**Use when**: The model classifies inputs into discrete labels and you have
+ground-truth labels in the scenario data.
+
+**How it works**: Parses the processor output as JSON, extracts `prediction_field`,
+compares case-insensitively to `actual_field` from the scenario. Computes
+population metric (accuracy, f1, fbeta) via scikit-learn.
+
+**Required scenario fields**: A field matching `actual_field` (default: `"actual"`)
+must be present in `scenario.input` (as a dict key) or at the top level.
+
+**Config:**
+```json
+{
+  "name": "label-accuracy",
+  "type": "classifier",
+  "config": {
+    "prediction_field": "prediction",
+    "actual_field": "expected",
+    "report_metric": "accuracy"
+  }
+}
+```
+
+**`report_metric` options**: `"accuracy"` (default), `"f1"`, `"fbeta"` (requires `"beta": float`)
+
+**Scaffold**: `gavel oneshot create --template classification` generates a ready-to-use
+classifier eval. `field_mapping.expected_output` defaults to `"expected"`.
+
+---
+
+### `regression` — Regression Error Metric
+
+**Use when**: The model predicts a numeric value and you want to measure error
+against known ground-truth values.
+
+**How it works**: Parses processor output as JSON, extracts `prediction_field` as
+float, computes error against `actual_field` from the scenario. Aggregates via
+scikit-learn regression metric.
+
+**Required scenario fields**: A field matching `actual_field` containing a numeric
+value.
+
+**Config:**
+```json
+{
+  "name": "score-error",
+  "type": "regression",
+  "config": {
+    "prediction_field": "score",
+    "actual_field": "ground_truth_score",
+    "report_metric": "mean_absolute_error"
+  }
+}
+```
+
+**`report_metric` options**: `"mean_absolute_error"` (default), `"mean_squared_error"`, `"r2_score"`
+
+**Scaffold**: `gavel oneshot create --template regression` generates a ready-to-use
+regression eval.
+
+---
+
 ## Choosing Judges
 
 | Evaluation goal | Recommended judges |
 |---|---|
 | General response quality | `deepeval.geval` with custom criteria |
 | Response relevance / staying on topic | `deepeval.answer_relevancy` |
-| RAG accuracy (does output match retrieved docs) | `deepeval.faithfulness` + `deepeval.hallucination` |
-| Retrieval quality check | `deepeval.contextual_relevancy` |
-| Comprehensive RAG eval | `deepeval.contextual_relevancy` + `deepeval.faithfulness` + `deepeval.geval` |
+| RAG grounding (output vs retrieved docs) | `deepeval.faithfulness` + `deepeval.hallucination` |
+| Retrieval ranking quality | `deepeval.contextual_precision` + `deepeval.contextual_recall` |
+| Retrieval relevance check | `deepeval.contextual_relevancy` |
+| Comprehensive RAG eval | `contextual_precision` + `contextual_recall` + `faithfulness` + `geval` |
 | Instruction-following | `deepeval.geval` with step-by-step instruction checks |
+| Safety / content moderation | `deepeval.toxicity` (threshold 0.85–0.95) |
+| Multi-turn conversation quality | `deepeval.conversation_completeness` + `deepeval.turn_relevancy` |
+| Multi-turn with custom criteria | `deepeval.conversational_geval` |
+| Classification labeling accuracy | `classifier` (no LLM cost) |
+| Numeric prediction accuracy | `regression` (no LLM cost) |
 
 **Using multiple judges**: Combine judges to get layered coverage. Example for
 a customer support bot: `answer_relevancy` (stays on topic) + `faithfulness`
