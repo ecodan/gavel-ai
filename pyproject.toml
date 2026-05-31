@@ -43,7 +43,12 @@ gavel = "gavel_ai.cli.main:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-gavel_ai = ["reporters/templates/*"]
+gavel_ai = [
+    "reporters/templates/*",
+    "skill/gavel-skill/SKILL.md",
+    "skill/gavel-skill/references/*",
+    "skill/gavel-skill/scripts/*",
+]
 
 [tool.black]
 line-length = 100

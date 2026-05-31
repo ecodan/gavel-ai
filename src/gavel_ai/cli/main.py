@@ -7,7 +7,7 @@ from typing import Optional
 import typer
 from dotenv import load_dotenv
 
-from gavel_ai.cli.commands import autotune, conv, oneshot
+from gavel_ai.cli.commands import autotune, conv, oneshot, skill
 from gavel_ai.log_config import get_application_logger
 from gavel_ai.telemetry import get_tracer
 
@@ -44,7 +44,7 @@ def main(
 ) -> None:
     """Gavel-AI: Open-source, provider-agnostic AI evaluation framework."""
     load_dotenv(verbose=False, override=False)
-    if ctx.invoked_subcommand not in ("init", None) and not _PROJECT_CONFIG_PATH.exists():
+    if ctx.invoked_subcommand not in ("init", "skill", None) and not _PROJECT_CONFIG_PATH.exists():
         typer.secho(
             "Warning: project not initialized. Run `gavel init` to configure this project.",
             fg=typer.colors.YELLOW,
@@ -73,12 +73,14 @@ def init(
     _PROJECT_CONFIG_PATH.write_text(json.dumps({"eval_root": root}, indent=2), encoding="utf-8")
     typer.secho(f"Initialized. Eval root: {root}", fg=typer.colors.GREEN)
     typer.echo("Next: gavel oneshot create --eval <name>")
+    typer.echo("Tip:  gavel skill install  — adds the Claude Code skill to this project")
 
 
 # Register workflow subcommands
 app.add_typer(oneshot.app, name="oneshot", help="OneShot evaluation workflow commands")
 app.add_typer(conv.app, name="conv", help="Conversational evaluation workflow commands (v2+)")
 app.add_typer(autotune.app, name="autotune", help="Autotune evaluation workflow commands (v3+)")
+app.add_typer(skill.app, name="skill", help="Manage the gavel Claude Code skill")
 
 
 if __name__ == "__main__":

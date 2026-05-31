@@ -16,6 +16,8 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
+from dotenv import load_dotenv
+
 from gavel_ai.core.contexts import LocalFileSystemEvalContext, LocalRunContext
 from gavel_ai.core.steps.base import Step
 from gavel_ai.core.steps.judge_runner import JudgeRunnerStep
@@ -52,6 +54,7 @@ class OneShotWorkflow:
             eval_ctx: Evaluation context with configs and scenarios
             logger: Logger for workflow execution (application-level)
         """
+        load_dotenv(verbose=False, override=False)
         self.eval_ctx = eval_ctx
         self.logger = logger
         self.run_ctx: Optional[LocalRunContext] = None
