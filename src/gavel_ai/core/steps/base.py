@@ -16,7 +16,9 @@ from enum import Enum
 from typing import List, Optional
 
 from gavel_ai.core.contexts import RunContext
-from gavel_ai.core.exceptions import ConfigError, ValidationError
+from gavel_ai.core.exceptions import ConfigError, RunPolicyError, ValidationError
+from gavel_ai.core.issue_classifier import classify
+from gavel_ai.models.config import ErrorPolicy
 from gavel_ai.telemetry import get_tracer
 
 DEFAULT_EVAL_ROOT: str = ".gavel/evaluations"
@@ -80,32 +82,40 @@ class Step(ABC):
         """
         pass
 
-    async def safe_execute(self, context: RunContext) -> bool:
+    async def safe_execute(
+        self, context: RunContext, error_policy: Optional[ErrorPolicy] = None
+    ) -> bool:
         """
         Execute with error handling wrapper.
 
-        Called by workflow orchestrator. Public method (no underscore).
+        Called by workflow orchestrator. Classifies exceptions via IssueClassifier
+        and respects the eval's ErrorPolicy (exit_on_error / exit_on_warning).
 
         Returns:
             True if successful, False on terminal error
+        Raises:
+            RunPolicyError: immediately when a classified tier exceeds policy
         """
+        policy = error_policy or ErrorPolicy()
         try:
             await self.execute(context)
             context.mark_step_complete(self.phase)
             return True
-        except (ValidationError, ConfigError) as e:
-            self.logger.error(f"{self.phase.value} failed: {e}")
-            context.run_logger.error(f"{self.phase.value} failed: {e}", exc_info=True)
-            context.last_step_error = e
-            return False
+        except RunPolicyError:
+            raise
         except Exception as e:
-            self.logger.error(
-                f"{self.phase.value} failed with unexpected error: {e}"
-            )
-            context.run_logger.error(
-                f"{self.phase.value} failed with unexpected error: {e}", exc_info=True
-            )
+            tier = classify(e)
+            log_msg = f"{self.phase.value} failed [{tier}]: {e}"
+            if tier == "WARNING":
+                self.logger.warning(log_msg)
+                context.run_logger.warning(log_msg, exc_info=True)
+            else:
+                self.logger.error(log_msg)
+                context.run_logger.error(log_msg, exc_info=True)
             context.last_step_error = e
+
+            if policy.should_halt(tier):
+                raise RunPolicyError(log_msg, tier=tier, cause=e) from e
             return False
 
 

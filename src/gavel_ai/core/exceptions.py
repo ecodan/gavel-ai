@@ -67,6 +67,20 @@ class StorageError(GavelError):
     pass
 
 
+class RunPolicyError(GavelError):
+    """
+    Raised when a classified issue exceeds the configured error_policy threshold.
+
+    Halts the run immediately (fail-fast). Caught at the CLI layer and displayed
+    in the Rich error panel. Carries the original cause and its issue tier.
+    """
+
+    def __init__(self, message: str, tier: str, cause: BaseException) -> None:
+        super().__init__(message)
+        self.tier = tier
+        self.cause = cause
+
+
 class ResourceNotFoundError(StorageError):
     """
     Resource not found in storage (storage-agnostic).

@@ -5,6 +5,19 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+class ErrorPolicy(BaseModel):
+    """Controls how the eval run responds to ERROR and WARNING-tier issues."""
+
+    exit_on_error: bool = Field(True, description="Halt immediately on ERROR-tier issues")
+    exit_on_warning: bool = Field(False, description="Halt immediately on WARNING-tier issues")
+
+    def should_halt(self, tier: str) -> bool:
+        """Return True if the given issue tier should halt the run under this policy."""
+        return (tier == "ERROR" and self.exit_on_error) or (
+            tier == "WARNING" and self.exit_on_warning
+        )
+
+
 class JudgeConfig(BaseModel):
     """Judge configuration for both config files and runtime usage."""
 
@@ -208,6 +221,9 @@ class EvalConfig(BaseModel):
     )
     conversational: Optional[ConversationalConfig] = Field(
         None, description="Conversational evaluation configuration"
+    )
+    error_policy: ErrorPolicy = Field(
+        default_factory=ErrorPolicy, description="Run error/warning policy"
     )
 
     @model_validator(mode="after")

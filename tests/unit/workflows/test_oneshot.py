@@ -345,28 +345,28 @@ class TestOneShotWorkflow:
         mock_validator = MagicMock()
         mock_validator.phase.value = "validation"
         mock_validator.safe_execute = AsyncMock(
-            side_effect=lambda ctx: execution_order.append("validator") or True
+            side_effect=lambda ctx, **kw: execution_order.append("validator") or True
         )
         mock_validator_step_class.return_value = mock_validator
 
         mock_processor = MagicMock()
         mock_processor.phase.value = "processing"
         mock_processor.safe_execute = AsyncMock(
-            side_effect=lambda ctx: execution_order.append("processor") or True
+            side_effect=lambda ctx, **kw: execution_order.append("processor") or True
         )
         mock_processor_step_class.return_value = mock_processor
 
         mock_judge = MagicMock()
         mock_judge.phase.value = "judging"
         mock_judge.safe_execute = AsyncMock(
-            side_effect=lambda ctx: execution_order.append("judge") or True
+            side_effect=lambda ctx, **kw: execution_order.append("judge") or True
         )
         mock_judge_step_class.return_value = mock_judge
 
         mock_reporter = MagicMock()
         mock_reporter.phase.value = "reporting"
         mock_reporter.safe_execute = AsyncMock(
-            side_effect=lambda ctx: execution_order.append("reporter") or True
+            side_effect=lambda ctx, **kw: execution_order.append("reporter") or True
         )
         mock_report_step_class.return_value = mock_reporter
 
