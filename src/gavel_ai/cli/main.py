@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import typer
 from dotenv import load_dotenv
@@ -71,9 +71,34 @@ def init(
     root: str = eval_root or typer.prompt("Eval root directory", default="./evals")
     _PROJECT_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     _PROJECT_CONFIG_PATH.write_text(json.dumps({"eval_root": root}, indent=2), encoding="utf-8")
+    _update_gitignore(root)
     typer.secho(f"Initialized. Eval root: {root}", fg=typer.colors.GREEN)
     typer.echo("Next: gavel oneshot create --eval <name>")
     typer.echo("Tip:  gavel skill install  — adds the Claude Code skill to this project")
+
+
+def _update_gitignore(eval_root: str) -> None:
+    """Append gavel-specific ignore patterns to .gitignore (idempotent)."""
+    # Normalise: strip leading ./ so patterns are clean
+    root = eval_root.lstrip("./").rstrip("/") or eval_root.rstrip("/")
+    patterns: List[str] = [
+        f"{root}/*/runs/",
+        ".gavel/gavel.log",
+    ]
+
+    gitignore = Path(".gitignore")
+    existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
+
+    new_lines: List[str] = [p for p in patterns if p not in existing]
+    if not new_lines:
+        return
+
+    block = "\n# gavel\n" + "\n".join(new_lines) + "\n"
+    with gitignore.open("a", encoding="utf-8") as fh:
+        if existing and not existing.endswith("\n"):
+            fh.write("\n")
+        fh.write(block)
+    typer.echo(f"Updated .gitignore with {len(new_lines)} gavel pattern(s)")
 
 
 # Register workflow subcommands

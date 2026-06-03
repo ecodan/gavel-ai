@@ -23,11 +23,17 @@ try:
     from pydantic_ai.providers.ollama import OllamaProvider
     from pydantic_ai.providers.openai import OpenAIProvider
 except ImportError:
-    # Fallback if provider imports change in future versions
     AnthropicProvider = None  # type: ignore
     OpenAIProvider = None  # type: ignore
     GoogleProvider = None  # type: ignore
     OllamaProvider = None  # type: ignore
+
+# pydantic-ai ≥1.100 splits Vertex AI into a dedicated GoogleCloudProvider.
+# Fall back to GoogleProvider on older installs where the split hasn't happened yet.
+try:
+    from pydantic_ai.providers.google_cloud import GoogleCloudProvider
+except ImportError:
+    GoogleCloudProvider = None  # type: ignore
 
 tracer = get_tracer(__name__)
 
@@ -179,15 +185,22 @@ class ProviderFactory:
                                 "Google provider not available - "
                                 "Install pydantic-ai with google support"
                             )
-                        # Supports AI Studio (api_key / GOOGLE_API_KEY env var) and
-                        # Vertex AI (project + location, uses GOOGLE_APPLICATION_CREDENTIALS ADC).
-                        # GoogleProvider reads GOOGLE_API_KEY from env automatically when api_key=None.
-                        return GoogleProvider(
-                            api_key=api_key or None,
-                            project=gcp_project or None,
-                            location=gcp_location or None,
-                            base_url=base_url or None,
-                        )
+                        is_vertex = bool(gcp_project or gcp_location)
+                        # pydantic-ai ≥1.100: Vertex AI args moved to GoogleCloudProvider.
+                        # Fall back to GoogleProvider (with vertexai=True) on older installs.
+                        if is_vertex and GoogleCloudProvider is not None:
+                            return GoogleCloudProvider(
+                                project=gcp_project or None,
+                                location=gcp_location or None,
+                            )
+                        # AI Studio path, or Vertex fallback for older pydantic-ai.
+                        kwargs: Dict[str, Any] = {"api_key": api_key or None}
+                        if is_vertex:
+                            kwargs["project"] = gcp_project or None
+                            kwargs["location"] = gcp_location or None
+                        if base_url:
+                            kwargs["base_url"] = base_url
+                        return GoogleProvider(**kwargs)
 
                     elif provider_name == "ollama":
                         if OllamaProvider is None:
