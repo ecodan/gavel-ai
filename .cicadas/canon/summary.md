@@ -12,6 +12,7 @@ Supports two evaluation modes: **OneShot** (single-turn prompt→response) and *
 
 - **Clean Architecture**: Pluggable storage, judges, and providers using domain-driven patterns.
 - **RunContext Lifecycle**: Immutable result storage (JSONL) managed via central state. `RunContext.last_step_error` holds the triggering exception from the last failed step (set by `Step.safe_execute()`).
+- **Error Policy**: `EvalConfig.error_policy` (`ErrorPolicy` model: `exit_on_error=True`, `exit_on_warning=False`) controls fail-fast behaviour. `core/issue_classifier.py::classify(exc)` maps to `ERROR`/`WARNING`/`OK`. `RunPolicyError` is raised immediately when threshold exceeded; never re-wrapped by `safe_execute`.
 - **OTel Instrumentation**: Native OpenTelemetry spans for all execution and judge steps.
 - **Local-First**: Filesystem-based artifacts for git-friendly history and reproducibility.
 - **Step-based Workflows**: `OneShotWorkflow` and conversational flows compose discrete `Step` objects (Validator, Processor, JudgeRunner, ReportRunner).

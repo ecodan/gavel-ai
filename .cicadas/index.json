@@ -119,6 +119,13 @@
       "summary": "Added gavel init command, 4-tier eval root resolution (--eval-root flag / GAVEL_EVAL_ROOT env / .gavel/config.json / default), setuptools src layout + package-data, suppress duplicate exc_info in logging, fix Gemini/Ollama model kwargs, fix OTel init warning",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-06-03T04:12:36.096900+00:00",
+      "branch": "tweak/eval-run-error-policy",
+      "summary": "Three-tier issue classifier (ERROR/WARNING/OK) with ErrorPolicy on EvalConfig; fail-fast RunPolicyError; per-scenario error capture in ScenarioProcessorStep with collect_all mode",
+      "decisions": "",
+      "modules": []
     }
   ]
 }

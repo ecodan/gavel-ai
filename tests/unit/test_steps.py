@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 
 from gavel_ai.core.contexts import RunContext
-from gavel_ai.core.exceptions import ConfigError
+from gavel_ai.core.exceptions import ConfigError, RunPolicyError
 from gavel_ai.core.steps import (
     JudgeRunnerStep,
     ReportRunnerStep,
@@ -20,6 +20,7 @@ from gavel_ai.core.steps import (
     ValidatorStep,
 )
 from gavel_ai.core.steps.base import StepPhase
+from gavel_ai.models.config import ErrorPolicy
 from gavel_ai.models.runtime import OutputRecord, ProcessorResult
 
 
@@ -185,6 +186,7 @@ def _base_eval_context(variants=None, num_scenarios=1):
     mock_eval_config.test_subjects = [mock_test_subject]
     mock_eval_config.variants = variants
     mock_eval_config.async_config = mock_async_config
+    mock_eval_config.error_policy = ErrorPolicy()
 
     scenarios = []
     for i in range(num_scenarios):
@@ -302,6 +304,57 @@ class TestScenarioProcessorStep:
 
         # context.model_variant is a comma-joined display string
         assert mock_context.model_variant == "test_model, variant_b"
+
+    @pytest.mark.asyncio
+    @patch("gavel_ai.core.steps.scenario_processor.PromptInputProcessor")
+    @patch("gavel_ai.core.steps.scenario_processor.Executor")
+    async def test_scenario_error_captured_when_exit_on_error_false(
+        self, mock_executor_class: MagicMock, mock_processor_class: MagicMock
+    ) -> None:
+        """exit_on_error=False: scenario error is captured in record, step completes."""
+        logger = logging.getLogger("test")
+        step = ScenarioProcessorStep(logger)
+
+        mock_processor_class.return_value = MagicMock()
+        error_result = ProcessorResult(output="", metadata={}, error="HTTP 500: server error")
+        mock_executor_class.return_value = _make_executor_mock_that_calls_callback([error_result])
+
+        mock_eval_context, _ = _base_eval_context(variants=["test_model"], num_scenarios=1)
+        mock_eval_context.eval_config.read.return_value.error_policy = ErrorPolicy(exit_on_error=False)
+
+        mock_context = MagicMock(spec=RunContext)
+        mock_context.eval_context = mock_eval_context
+        mock_context.results_raw = MagicMock()
+
+        await step.execute(mock_context)
+
+        assert len(mock_context.processor_results) == 1
+        assert mock_context.processor_results[0].error == "HTTP 500: server error"
+
+    @pytest.mark.asyncio
+    @patch("gavel_ai.core.steps.scenario_processor.PromptInputProcessor")
+    @patch("gavel_ai.core.steps.scenario_processor.Executor")
+    async def test_scenario_error_raises_run_policy_error_when_exit_on_error_true(
+        self, mock_executor_class: MagicMock, mock_processor_class: MagicMock
+    ) -> None:
+        """exit_on_error=True (default): scenario error raises RunPolicyError immediately."""
+        logger = logging.getLogger("test")
+        step = ScenarioProcessorStep(logger)
+
+        mock_processor_class.return_value = MagicMock()
+        error_result = ProcessorResult(output="", metadata={}, error="HTTP 429: rate limit")
+        mock_executor_class.return_value = _make_executor_mock_that_calls_callback([error_result])
+
+        mock_eval_context, _ = _base_eval_context(variants=["test_model"], num_scenarios=1)
+
+        mock_context = MagicMock(spec=RunContext)
+        mock_context.eval_context = mock_eval_context
+        mock_context.results_raw = MagicMock()
+
+        with pytest.raises(RunPolicyError) as exc_info:
+            await step.execute(mock_context)
+
+        assert exc_info.value.tier == "ERROR"
 
 
 class TestJudgeRunnerStep:

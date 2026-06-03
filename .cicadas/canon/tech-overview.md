@@ -170,7 +170,7 @@ gavel autotune <run|report>
 
 ### Key Patterns
 
-- **Error Handling:** Use custom exceptions from `gavel_ai.core.exceptions`. Never swallow transient API errors; use the built-in retry logic.
+- **Error Handling:** Use custom exceptions from `gavel_ai.core.exceptions`. Never swallow transient API errors; use the built-in retry logic. `core/issue_classifier.py::classify(exc)` maps exceptions to three tiers: `ERROR` (HTTP 4xx/5xx, rate limits, unclassified), `WARNING` (schema/config validation failures). `EvalConfig.error_policy` (`ErrorPolicy` model) carries `exit_on_error: bool = True` and `exit_on_warning: bool = False`. `Step.safe_execute()` accepts `error_policy` and raises `RunPolicyError` immediately when a classified tier exceeds the configured threshold (fail-fast; `RunPolicyError` is never re-wrapped). `ScenarioProcessorStep` applies the same policy per-scenario using `collect_all` executor mode: error records are always written before the policy check fires.
 - **Testing:** New features MUST include unit tests in `tests/unit` and, if they touch execution, integration tests in `tests/integration`.
 - **OTel Spans:** Use the `tracer` from `gavel_ai.telemetry` to wrap LLM calls and judge evaluations.
 - **Step Tracking:** `Step.safe_execute()` calls `context.mark_step_complete(self.phase)` on success. `LocalRunContext` appends entries to `{run_dir}/.workflow_status` (JSONL, append-only). On init, `StepPhase.PREPARE` is written after `snapshot_run_config()`. Call `context.get_completed_steps()` to read the log.

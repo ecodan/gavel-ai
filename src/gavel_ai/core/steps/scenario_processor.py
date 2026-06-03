@@ -19,9 +19,11 @@ from string import Template
 from typing import Any, Dict, List, Set
 
 from gavel_ai.core.contexts import RunContext
-from gavel_ai.core.exceptions import ConfigError, ProcessorError
+from gavel_ai.core.exceptions import ConfigError, ProcessorError, RunPolicyError
 from gavel_ai.core.executor import Executor
+from gavel_ai.core.issue_classifier import classify_message
 from gavel_ai.core.steps.base import Step, StepPhase
+from gavel_ai.models.config import ErrorPolicy
 from gavel_ai.models.agents import ModelDefinition
 from gavel_ai.models.config import AsyncConfig
 from gavel_ai.models.runtime import (
@@ -160,6 +162,7 @@ class ScenarioProcessorStep(Step):
         agents_config = context.eval_context.agents.read()
         scenarios = context.eval_context.scenarios.read()
         async_config = eval_config.async_config or AsyncConfig()
+        error_policy: ErrorPolicy = eval_config.error_policy
 
         if not eval_config.variants:
             raise ConfigError("No variants configured in eval_config")
@@ -255,7 +258,7 @@ class ScenarioProcessorStep(Step):
                 processor_type=processor_type,
                 parallelism=async_config.num_workers,
                 timeout_seconds=async_config.task_timeout_seconds,
-                error_handling="fail_fast",
+                error_handling="collect_all",
             )
 
             # Instantiate appropriate processor
@@ -276,15 +279,26 @@ class ScenarioProcessorStep(Step):
                 )
 
             def _spool_result(input_item: PromptInput, result: ProcessorResult) -> None:
-                """Convert result to OutputRecord, stream to disk, accumulate in list."""
+                """Convert result to OutputRecord, stream to disk, accumulate in list.
+
+                Raises RunPolicyError immediately when the error policy requires halting.
+                """
                 record = _make_output_record(result, input_item, test_subject, model_variant)
                 context.results_raw.append(record)
                 all_records.append(record)
 
+                if result.error is not None:
+                    tier = classify_message(result.error)
+                    log_msg = f"scenario {input_item.id} failed [{tier}]: {result.error}"
+                    self.logger.error(log_msg)
+                    context.run_logger.error(log_msg)
+                    if error_policy.should_halt(tier):
+                        raise RunPolicyError(log_msg, tier=tier, cause=Exception(result.error))
+
             executor = Executor(
                 processor=processor,
                 parallelism=async_config.num_workers,
-                error_handling="fail_fast",
+                error_handling="collect_all",
                 test_subject=test_subject,
                 variant_id=model_variant,
             )

@@ -124,6 +124,8 @@ class OneShotWorkflow:
         Raises:
             ProcessorError: If step execution fails
         """
+        error_policy = self.eval_ctx.eval_config.read().error_policy
+
         # Create steps (pass application logger for class-level logging)
         steps: List[Step] = [
             ValidatorStep(self.logger),
@@ -135,7 +137,7 @@ class OneShotWorkflow:
         # Execute steps in order
         for step in steps:
             self.logger.info(f"Running {step.phase.value}...")
-            success: bool = await step.safe_execute(run_ctx)
+            success: bool = await step.safe_execute(run_ctx, error_policy=error_policy)
             if not success:
                 err = ProcessorError(f"Step {step.phase.value} failed")
                 cause = run_ctx.last_step_error if isinstance(run_ctx.last_step_error, BaseException) else None

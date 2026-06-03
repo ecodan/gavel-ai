@@ -279,8 +279,10 @@ class TestStepABC:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_safe_execute_returns_false_on_error(self) -> None:
-        """Test that safe_execute returns False on error."""
+    async def test_safe_execute_returns_false_on_error_when_policy_allows(self) -> None:
+        """Test that safe_execute returns False when exit_on_error=False."""
+        from gavel_ai.models.config import ErrorPolicy
+
         logger = logging.getLogger("test")
 
         class FailingStep(Step):
@@ -294,8 +296,28 @@ class TestStepABC:
         step = FailingStep(logger)
         mock_context = MagicMock()
 
-        result = await step.safe_execute(mock_context)
+        result = await step.safe_execute(mock_context, error_policy=ErrorPolicy(exit_on_error=False))
         assert result is False
+
+    async def test_safe_execute_raises_run_policy_error_on_default_policy(self) -> None:
+        """Test that safe_execute raises RunPolicyError with default policy (exit_on_error=True)."""
+        from gavel_ai.core.exceptions import RunPolicyError
+
+        logger = logging.getLogger("test")
+
+        class FailingStep(Step):
+            @property
+            def phase(self) -> StepPhase:
+                return StepPhase.VALIDATION
+
+            async def execute(self, context) -> None:
+                raise ValueError("Test error")
+
+        step = FailingStep(logger)
+        mock_context = MagicMock()
+
+        with pytest.raises(RunPolicyError):
+            await step.safe_execute(mock_context)
 
 
 class TestGavelWorkflow:

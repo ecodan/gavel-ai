@@ -265,3 +265,7 @@ cython_debug/
 /context.md
 /ref/
 /coverage_reports/
+
+# gavel
+evals/*/runs/
+.gavel/gavel.log

@@ -70,6 +70,31 @@ Pydantic model: `gavel_ai.models.config.EvalConfig`
 | `execution` | object | No | Simple concurrency config (mutually exclusive with `async`) |
 | `async` | object | No | Advanced async config (takes precedence over `execution`) |
 | `conversational` | object | Cond. | Required when `eval_type == "conversational"` |
+| `error_policy` | object | No | Controls run behaviour on errors (see below). Omit to use defaults. |
+
+### `error_policy`
+
+Controls how the run responds to ERROR and WARNING-tier issues. All fields are optional; omitting the section is equivalent to the defaults.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `exit_on_error` | bool | `true` | Halt immediately on ERROR-tier issues (LLM 4xx/5xx, rate limits). Set `false` to record the error in `OutputRecord.error` and continue to the next scenario. |
+| `exit_on_warning` | bool | `false` | Halt immediately on WARNING-tier issues (schema/config validation failures). Set `true` for fail-fast on validation errors. |
+
+**Example** — tolerate per-scenario LLM failures:
+```json
+"error_policy": {
+  "exit_on_error": false
+}
+```
+
+**Example** — strict mode, halt on any issue:
+```json
+"error_policy": {
+  "exit_on_error": true,
+  "exit_on_warning": true
+}
+```
 
 ### `test_subjects[]`
 
