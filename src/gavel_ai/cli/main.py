@@ -27,7 +27,7 @@ app = typer.Typer(
 def version_callback(value: bool) -> None:
     """Show version and exit."""
     if value:
-        typer.echo("gavel-ai version 0.1.0")
+        typer.echo("gavel-ai version 0.2.0")
         raise typer.Exit()
 
 

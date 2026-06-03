@@ -1,6 +1,6 @@
 # Release Notes
 
-## Unreleased
+## 0.2.0
 
 - **Feature**: Three-tier issue classifier (`ERROR` / `WARNING` / `OK`) and `error_policy` on `EvalConfig`. Set `error_policy.exit_on_error: false` to let scenarios with LLM 4xx/5xx errors be recorded and skipped rather than aborting the run; set `exit_on_warning: true` for fail-fast on schema/config validation issues. Defaults preserve existing behaviour (`exit_on_error: true`, `exit_on_warning: false`). `RunPolicyError` is raised immediately on threshold breach (fail-fast, not batched). New module `core/issue_classifier.py` with `classify(exc)` and `classify_message(msg)`.
 - **Feature**: `EvalConfig.error_policy` (`ErrorPolicy` model) wired into `OneShotWorkflow` and threaded to all steps via `safe_execute(error_policy=...)`. `Step.safe_execute()` now re-raises `RunPolicyError` without re-wrapping; `ErrorPolicy.should_halt(tier)` centralises the halt predicate.
