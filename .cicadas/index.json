@@ -126,6 +126,20 @@
       "summary": "Three-tier issue classifier (ERROR/WARNING/OK) with ErrorPolicy on EvalConfig; fail-fast RunPolicyError; per-scenario error capture in ScenarioProcessorStep with collect_all mode",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-06-06T01:24:09.383417+00:00",
+      "branch": "tweak/unify-template-syntax",
+      "summary": "Standardized all prompt template syntax from string.Template dollar-sign to {{var}} regex. Fixed 4 live eval prompts, 4 scaffolding templates (including missed classification/regression), merged metadata keys into render variables, updated tests, CLAUDE.md, SKILL.md, and canon.",
+      "decisions": "",
+      "modules": []
+    },
+    {
+      "timestamp": "2026-06-06T01:24:24.221365+00:00",
+      "branch": "initiative/unify-template-syntax",
+      "summary": "Initiative complete: standardized all prompt template syntax from string.Template dollar-sign to {{var}} regex substitution.",
+      "decisions": "",
+      "modules": []
     }
   ]
 }

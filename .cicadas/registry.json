@@ -6,12 +6,6 @@
       "owner": "unknown",
       "signals": [],
       "created_at": "2026-06-03T04:02:40.709698+00:00"
-    },
-    "unify-template-syntax": {
-      "intent": "Standardize all prompt template variable syntax to {{var}} everywhere \u2014 replace string.Template dollar-sign syntax with lightweight regex substitution in scenario_processor.py and migrate all live config/prompts/*.toml files",
-      "owner": "unknown",
-      "signals": [],
-      "created_at": "2026-06-06T01:10:29.161630+00:00"
     }
   },
   "branches": {
@@ -28,17 +22,6 @@
       "owner": "unknown",
       "created_at": "2026-06-03T04:02:49.195853+00:00",
       "initiative": "eval-run-error-policy"
-    },
-    "tweak/unify-template-syntax": {
-      "intent": "Replace string.Template dollar-sign renderer with regex {{var}} renderer in scenario_processor.py; migrate live config/prompts/*.toml files; update tests and docs",
-      "modules": [
-        "core/steps/base",
-        "core/steps/scenario_processor",
-        "models/config"
-      ],
-      "owner": "unknown",
-      "created_at": "2026-06-06T01:10:36.717268+00:00",
-      "initiative": "unify-template-syntax"
     }
   }
 }
