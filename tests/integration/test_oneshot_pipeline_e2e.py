@@ -84,9 +84,9 @@ def eval_dir(tmp_path: Path, eval_name: str, model_data: Dict[str, Any]) -> Path
     agents = {"_models": {"claude-test": model_data}}
     (config_dir / "agents.json").write_text(json.dumps(agents))
 
-    # default.toml prompt template (v1 only, uses string.Template $var syntax)
+    # default.toml prompt template (v1 only, uses {{var}} syntax)
     (prompts_dir / "default.toml").write_text(
-        'v1 = "Extract headlines from $site: $html"'
+        'v1 = "Extract headlines from {{site}}: {{html}}"'
     )
 
     # scenarios.json with two scenarios
@@ -178,7 +178,7 @@ class TestScenarioProcessorStepE2E:
         tmp_path: Path,
         logger: logging.Logger,
     ) -> None:
-        """Template variables {{ scenario.site }} and {{ scenario.html }} are substituted."""
+        """Template variables {{site}} and {{ scenario.html }} are substituted."""
         run_ctx = make_run_ctx(eval_dir, eval_name, tmp_path)
 
         captured_prompts: List[str] = []
@@ -292,8 +292,8 @@ class TestPromptVersionResolution:
         prompts_dir = eval_dir / eval_name / "config" / "prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)
         (prompts_dir / "default.toml").write_text(
-            'v1 = "old prompt {{ scenario.site }}"\n'
-            'v2 = "new prompt {{ scenario.site }}"\n'
+            'v1 = "old prompt {{site}}"\n'
+            'v2 = "new prompt {{site}}"\n'
         )
 
         run_ctx = make_run_ctx(eval_dir, eval_name, tmp_path)
@@ -332,8 +332,8 @@ class TestPromptVersionResolution:
 
         # Write multi-version prompt
         (prompts_dir / "default.toml").write_text(
-            'v1 = "v1 prompt {{ scenario.site }}"\n'
-            'v2 = "v2 prompt {{ scenario.site }}"\n'
+            'v1 = "v1 prompt {{site}}"\n'
+            'v2 = "v2 prompt {{site}}"\n'
         )
 
         # Update eval_config to pin v1 explicitly

@@ -15,7 +15,6 @@ Phase 2: Template rendering added to fix prompt loading bug.
 import logging
 import re
 from datetime import datetime, timezone
-from string import Template
 from typing import Any, Dict, List, Set
 
 from gavel_ai.core.contexts import RunContext
@@ -92,17 +91,16 @@ class ScenarioProcessorStep(Step):
     def _validate_prompt_placeholders(
         self, template_text: str, scenarios: List[Any], prompt_ref: str
     ) -> None:
-        """Validate that every $var placeholder in the template resolves from scenario fields.
+        """Validate that every {{var}} placeholder in the template resolves from scenario fields.
 
         Raises:
             ConfigError: If any placeholder has no corresponding field in any scenario.
         """
-        # Extract all $var and ${var} placeholder names from the template
-        placeholders: Set[str] = set(re.findall(r"\$\{?([A-Za-z_][A-Za-z0-9_.]*)\}?", template_text))
+        placeholders: Set[str] = set(re.findall(r"\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}", template_text))
         if not placeholders:
             raise ConfigError(
-                f"Prompt template '{prompt_ref}' contains no $variable placeholders. "
-                "Use $input (string scenarios) or ${field} (dict scenarios) to inject scenario data."
+                f"Prompt template '{prompt_ref}' contains no {{{{var}}}} placeholders. "
+                "Use {{input}} (string scenarios) or {{field}} (dict scenarios) to inject scenario data."
             )
 
         # Build available keys from the first scenario as representative
@@ -125,28 +123,28 @@ class ScenarioProcessorStep(Step):
 
     def _render_template(self, template_text: str, variables: Dict[str, Any]) -> str:
         """
-        Render a prompt template with scenario variables using string.Template.
+        Render a prompt template with scenario variables using {{var}} syntax.
 
         Args:
-            template_text: Template string using $var or ${var} syntax (e.g., "... $html")
+            template_text: Template string using {{var}} syntax (e.g., "... {{html}}")
             variables: Dict of scenario variables (e.g., {"html": "...", "url": "..."})
 
         Returns:
             Rendered prompt with variables substituted
 
         Raises:
-            ProcessorError: If template rendering fails
+            ProcessorError: If a placeholder key is missing from variables
         """
-        try:
-            return Template(template_text).substitute(variables)
-        except KeyError as e:
-            keys = list(variables.keys())
-            raise ProcessorError(
-                f"Template variable {e} not found in scenario. "
-                f"Available keys: {keys}"
-            ) from e
-        except ValueError as e:
-            raise ProcessorError(f"Malformed template placeholder: {str(e)}") from e
+        def _replace(m: re.Match) -> str:  # type: ignore[type-arg]
+            key = m.group(1)
+            if key not in variables:
+                raise ProcessorError(
+                    f"Template variable '{{{{{key}}}}}' not found in scenario. "
+                    f"Available keys: {sorted(variables.keys())}"
+                )
+            return str(variables[key])
+
+        return re.sub(r"\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}", _replace, template_text)
 
     async def execute(self, context: RunContext) -> None:
         """
@@ -196,9 +194,11 @@ class ScenarioProcessorStep(Step):
             # Convert scenarios to PromptInput with rendered prompts (shared across all variants)
             for scenario in scenarios:
                 if isinstance(scenario.input, dict):
-                    variables = scenario.input
+                    variables: Dict[str, Any] = dict(scenario.input)
                 else:
                     variables = {"input": str(scenario.input)}
+                if scenario.metadata:
+                    variables = {**variables, **scenario.metadata}
 
                 rendered_prompt = self._render_template(template_text, variables)
                 prompt_input = PromptInput(
