@@ -221,8 +221,9 @@ Read `references/config-schema.md` for the full schema. Walk the user through:
    ```
 
 3. **Set the prompt** (`test_subjects[].prompt_name`): Must match a `.toml`
-   file in `config/prompts/`. Prompt files use `$var` / `${var}` syntax for
-   scenario field substitution (not `{{var}}`).
+   file in `config/prompts/`. Prompt files use `{{var}}` syntax for scenario
+   field substitution. Literal `{` and `}` in prompt text (JSON examples,
+   code snippets) are passed through unchanged.
 
 4. **Set API keys**: Use environment variables — `{{ANTHROPIC_API_KEY}}` is
    resolved from the process environment in DeepEval judge model creation.
@@ -303,7 +304,7 @@ Trace failures to:
 |---|---|---|
 | `ConfigError: variant not found` | `variants` key in `eval_config.json` doesn't match `_models` key in `agents.json` | Align the names exactly |
 | `ConfigError: prompt file not found` | `prompt_name` points to a `.toml` that doesn't exist | Check `config/prompts/` |
-| `ConfigError: placeholder not found` | `$var` in prompt has no matching scenario field | Add the field to scenarios or fix the prompt |
+| `ConfigError: placeholder not found` | `{{var}}` in prompt has no matching scenario field | Add the field to scenarios or fix the prompt |
 | `ConfigError: expected_output not resolvable` | GEval judge has no `expected_behavior` and no `field_mapping.expected_output` | Add `expected_behavior` to scenarios or configure `field_mapping` |
 | Auth error | API key not set or invalid | Export the env var |
 | `MissingTestCaseParamsError` | Judge needs a field (`context`, `retrieval_context`) not in the scenario | Add the required field |

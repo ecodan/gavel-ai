@@ -167,7 +167,7 @@ def generate_prompts_toml(eval_root: Path, eval_name: str) -> None:
     prompt_template = """v1 = '''
 You are a helpful AI assistant.
 
-User question: $input
+User question: {{input}}
 
 Provide a short, clear, accurate answer.
 '''
@@ -290,7 +290,7 @@ def _generate_classification_templates(eval_root: Path, eval_name: str, eval_typ
 You are a sentiment classifier. Classify the following text as positive, neutral, or negative.
 Respond with ONLY a JSON object in this exact format: {"label": "<sentiment>"}
 
-Text: ${input.text}
+Text: {{text}}
 '''
 """
 
@@ -366,7 +366,7 @@ def _generate_regression_templates(eval_root: Path, eval_name: str, eval_type: s
 You are a precise calculator. Answer the following arithmetic question.
 Respond with ONLY a JSON object in this exact format: {"value": <number>}
 
-Question: ${input.question}
+Question: {{question}}
 '''
 """
 
@@ -458,7 +458,7 @@ def _generate_conversational_templates(eval_root: Path, eval_name: str, eval_typ
 You are a helpful AI assistant. Engage in a natural, helpful conversation with the user.
 Provide clear, accurate, and actionable responses.
 
-User message: $input
+User message: {{input}}
 '''
 """
 
