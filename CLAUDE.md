@@ -174,7 +174,7 @@ Each phase produces artifacts that feed into subsequent phases, ensuring alignme
 
 ## Runtime Conventions
 
-- **Prompt templates**: Use `$var` or `${var}` syntax (Python `string.Template`) in `.toml` prompt files — **not** `{{var}}`. Placeholders are validated against scenario fields at run-start for `local` evals.
+- **Prompt templates**: Use `{{var}}` syntax in `.toml` prompt files. Placeholders are validated against scenario fields at run-start for `local` evals. The renderer is a lightweight regex substitution — literal `{` and `}` in prompt text (JSON examples, code snippets) are passed through unchanged.
 - **Judge criteria templating**: `criteria` strings and `evaluation_steps` items support `{{key}}` substitution using scenario fields, resolved by `JudgeRunnerStep` at run time.
 - **Error display**: Failed runs print a Rich panel to stderr with the human-readable cause and path to `run.log`. Never print stack traces to the terminal.
 - **Error policy**: `EvalConfig.error_policy` (`ErrorPolicy` model, defaults `exit_on_error=True`, `exit_on_warning=False`) controls fail-fast behaviour. `core/issue_classifier.py::classify(exc)` and `classify_message(str)` map to `ERROR`/`WARNING`/`OK`. `Step.safe_execute()` raises `RunPolicyError` immediately when policy threshold is exceeded; it never re-wraps an already-raised `RunPolicyError`. Use `error_policy.should_halt(tier)` for the halt predicate — do not duplicate the expression inline.
