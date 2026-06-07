@@ -140,6 +140,13 @@
       "summary": "Initiative complete: standardized all prompt template syntax from string.Template dollar-sign to {{var}} regex substitution.",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-06-07T20:58:49.620212+00:00",
+      "branch": "feat/autotune-foundations",
+      "summary": "Merged Partition 1 (Foundations) into initiative/feat-autotune: TuningConfig/IterationMetadata/AutotuneRunSummary models, CompositeStep base, IterationEvalContext/IterationRunContext, TuningAgent, bundled meta-prompt template, full unit test coverage. Code review: PASS WITH NOTES (0 blocking, 2 advisory).",
+      "decisions": "",
+      "modules": []
     }
   ]
 }
