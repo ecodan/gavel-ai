@@ -6,6 +6,12 @@
       "owner": "unknown",
       "signals": [],
       "created_at": "2026-06-03T04:02:40.709698+00:00"
+    },
+    "feat-autotune": {
+      "intent": "Automated iterative prompt optimization using an LLM-as-meta-optimizer (TuningAgent) that runs execute\u2192judge\u2192improve loops until convergence, plus an agent skill extension for guided end-to-end autotune setup",
+      "owner": "unknown",
+      "signals": [],
+      "created_at": "2026-06-06T02:30:40.593861+00:00"
     }
   },
   "branches": {

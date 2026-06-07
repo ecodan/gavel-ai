@@ -1,6 +1,16 @@
 # Standard Start Flow
 
-**All** entry points (initiative, tweak, bug, skill) MUST run this flow before collecting requirements or drafting specs. No matter how the user phrases the request, execute these steps in order. If the user provides information up front (e.g. "Start a tweak called XYZ"), pre-populate the answers but **still run the flow and verify** (e.g. "What is the name? 1. XYZ, 2. Other (enter the name)").
+> Deprecated for skill authoring: the `skill` branch of this flow is retained
+> only for legacy compatibility. Initiative, tweak, and bug flows remain the
+> current Cicadas entrypoints.
+
+All current entry points (initiative, tweak, bug) MUST run this flow before
+collecting requirements or drafting specs. The legacy `skill` path is still
+documented below for compatibility only. No matter how the user phrases the
+request, execute the applicable steps in order. If the user provides
+information up front (e.g. "Start a tweak called XYZ"), pre-populate the
+answers but **still run the flow and verify** (e.g. "What is the name? 1. XYZ,
+2. Other (enter the name)").
 
 ## Mandatory sequence
 
@@ -26,14 +36,18 @@ Then **start collecting requirements** via Q&A, doc, or Loom as chosen.
 | Publish destination | —          | —     | —   | ✓     |
 | PR preference       | ✓          | ✓     | ✓   | ✓     |
 
-Initiatives run all steps except Publish destination. Tweaks and bugs run Name → Draft folder → LLMs and Evals? → PR preference, then their own clarify/draft steps. Skills run Name → Draft folder → LLMs and Evals? → Publish destination → PR preference, then `skill-create.md`.
+Initiatives run all steps except Publish destination. Tweaks and bugs run Name
+→ Draft folder → LLMs and Evals? → PR preference, then their own
+clarify/draft steps. Skills run Name → Draft folder → LLMs and Evals? →
+Publish destination → PR preference, then `skill-create.md` (deprecated legacy
+path).
 
 ## References
 
 - Initiative start: [Clarify](./clarify.md) (runs this flow then PRD drafting).
 - Tweak start: [Tweak](./tweak.md) (runs this flow then tweaklet).
 - Bug start: [Bug Fix](./bug-fix.md) (runs this flow then buglet).
-- Skill start: [Skill Create](./skill-create.md) (runs this flow then dialogue-driven SKILL.md authoring).
+- Skill start (deprecated legacy path): [Skill Create](./skill-create.md) (runs this flow then dialogue-driven SKILL.md authoring).
 
 ---
 _Copyright 2026 Cicadas Contributors_

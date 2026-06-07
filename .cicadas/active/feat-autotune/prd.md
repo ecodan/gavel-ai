@@ -97,7 +97,7 @@ The system is successful when:
 
 ### Journey 1: Prompt Engineer — First Automated Optimization
 
-Sarah is a prompt engineer at a mid-sized SaaS company. She has been manually tweaking a customer-support summarization prompt for three days, running gavel oneshot after each edit and comparing scores by hand. She discovers that gavel now has `autotune`, scaffolds a new eval, drops in her prompt as `v1`, configures two GEval judges (accuracy, conciseness), and sets `max_rounds: 5`. She runs `gavel autotune run`, grabs a coffee, and comes back to an HTML report showing that `v3` achieved the best score (8.7/10) and that the improvement plateaued after that. She exports `v3` from `prompts.toml` and deploys it.
+Sarah is a prompt engineer at a mid-sized SaaS company. She has been manually tweaking a customer-support summarization prompt for three days, running gavel oneshot after each edit and comparing scores by hand. She discovers that gavel now has `autotune`, scaffolds a new eval, drops in her prompt as `v1`, configures two GEval judges (accuracy, conciseness), and sets `max_rounds: 5`. She runs `gavel autotune run`, grabs a coffee, and comes back to an HTML report showing that `v3` achieved the best score (0.87) and that the improvement plateaued after that. She exports `v3` from `prompts.toml` and deploys it.
 
 **Requirements Revealed:** scaffold command, configurable judges, per-iteration artifact storage, HTML report with best-iteration highlight, prompts.toml export.
 
@@ -105,7 +105,7 @@ Sarah is a prompt engineer at a mid-sized SaaS company. She has been manually tw
 
 ### Journey 2: ML Engineer — Convergence Tuning on a Budget
 
-Marcus is running autotune on a cost-sensitive project. He sets `target_score: 8.5` and `degradation_tolerance: 0.3` to stop as soon as quality is good enough or deteriorates. After iteration 2 the score hits 8.6, optimization stops, and the report shows "target_score_achieved." He is billed for exactly 2 iterations of LLM calls instead of the default 5.
+Marcus is running autotune on a cost-sensitive project. He sets `target_score: 0.85` and `degradation_tolerance: 0.05` to stop as soon as quality is good enough or deteriorates. After iteration 2 the score hits 0.86, optimization stops, and the report shows "target_score_achieved." He is billed for exactly 2 iterations of LLM calls instead of the default 5.
 
 **Requirements Revealed:** target_score convergence, degradation_tolerance, convergence_reason in report.
 
@@ -202,16 +202,16 @@ Alex is a backend engineer who needs to optimize a classification prompt but has
 
 **FR-2.1:** The `AutotuneIterationStep` must execute the following sequence per iteration: `ScenarioProcessorStep` (with iteration-specific output dir) → `JudgeRunnerStep` (reading from that dir) → convergence check → `TuneStep` (if not converged).
 
-**FR-2.2:** Each iteration must write its artifacts to `runs/<id>/iterations/iteration_<N>/`: `output_raw.jsonl`, `output_judged.jsonl`, `metadata.json`.
+**FR-2.2:** Each iteration must write its artifacts to `runs/<id>/iterations/iteration_<N>/`: `output_raw.jsonl`, `output_judged.jsonl`, `metadata.json`. The outer run directory must also contain `run_summary.json` (written on loop exit) with the full `AutotuneRunSummary` used by the reporter.
 
-**FR-2.3:** `metadata.json` per iteration must record: `iteration`, `score`, `improvement`, `converged`, `convergence_reason`, `prompt_version`.
+**FR-2.3:** `metadata.json` per iteration must record: `iteration`, `score` (0.0–1.0), `improvement`, `converged`, `convergence_reason`, `prompt_version`, `judge_scores` (dict of per-judge mean scores, 0.0–1.0).
 
 **FR-2.4:** All generated prompt versions must be appended to `runs/<id>/prompts.toml` in the format:
 ```toml
 [v2]
 prompt = "..."
 iteration = 1
-avg_score = 7.5
+avg_score = 0.75   # normalized 0.0–1.0
 ```
 
 ---
@@ -232,9 +232,9 @@ avg_score = 7.5
 
 **FR-4.1:** `TuningAgent.generate_improved_prompt(current_prompt, judge_feedback, iteration)` must return `(improved_prompt_text, analysis_metadata)`.
 
-**FR-4.2:** The agent must preserve all `$var`-style placeholder variables from the original prompt in the generated version.
+**FR-4.2:** The agent must preserve all `{{var}}`-style placeholder variables from the original prompt in the generated version. If any placeholder is missing from the generated text, the agent must retry once; if still missing after retry, it must abort the iteration with an error.
 
-**FR-4.3:** The agent must extract and pass common issues from feedback to the meta-prompt (top 5 by keyword frequency).
+**FR-4.3:** The agent must pass the full judge feedback (all `{scenario_id, judge_name, score, reason}` records) as a JSON list to the meta-prompt. No frequency filtering — the meta-prompt template is responsible for synthesizing the feedback.
 
 **FR-4.4:** The agent must parse the improved prompt from the LLM response using: explicit `IMPROVED PROMPT:` marker first, then code-fenced block, then full response as fallback.
 
@@ -315,7 +315,7 @@ avg_score = 7.5
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| TuningAgent produces prompts that break `$var` placeholder syntax | Medium | High | Validate that all original variables appear in generated prompt; if not, retry once then abort iteration |
+| TuningAgent produces prompts that drop `{{var}}` placeholders | Medium | High | Validate that all original `{{var}}` placeholders appear in generated prompt; if not, retry once then abort iteration |
 | LLM response parsing fails to extract improved prompt | Medium | Medium | Three-strategy fallback (marker → code fence → raw response); log warning on fallback |
 | Long iteration runs consume excessive API budget | Medium | Medium | `max_rounds` is required and enforced; document cost estimates in scaffold |
 | Resume logic misidentifies completed iterations | Low | High | Detect completion by presence of both `output_judged.jsonl` AND `metadata.json` in iteration dir |

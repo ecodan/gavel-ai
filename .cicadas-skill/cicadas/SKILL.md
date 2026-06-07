@@ -1,6 +1,6 @@
 ---
 name: cicadas
-description: Use when the user says "kickoff", "start feature", "complete initiative", "check status", "signal", "prune", "bootstrap", "reflect", "create a skill", "build a skill", "edit skill", "start a skill", or any other Cicadas lifecycle command. Orchestrates the Cicadas spec-driven development methodology.
+description: Use when the user says "kickoff", "start feature", "complete initiative", "check status", "signal", "prune", "bootstrap", "reflect", or any other Cicadas lifecycle command. Orchestrates the Cicadas spec-driven development methodology.
 argument-hint: "[command] [name]"
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 ---
@@ -62,6 +62,7 @@ project-root/
 │   │   ├── tasks.md                  # Active spec template
 │   │   ├── buglet.md                 # Lightweight bug spec template
 │   │   ├── tweaklet.md               # Lightweight tweak spec template
+│   │   ├── handoff.md                # Context-handoff artifact for directive reset checkpoints
 │   │   └── skill-SKILL.md            # Agent Skill SKILL.md scaffold template
 │   └── emergence/                    # Instruction modules for spec authoring
 │       ├── EMERGENCE.md              # Emergence phase overview
@@ -74,8 +75,8 @@ project-root/
 │       ├── bug-fix.md                # Bug clarification drafting instruction module
 │       ├── tweak.md                  # Minor tweak drafting instruction module
 │       ├── code-review.md            # Code Review instruction module
-│       ├── skill-create.md           # Agent Skill creation instruction module
-│       └── skill-edit.md             # Agent Skill editing instruction module
+│       ├── skill-create.md           # Deprecated legacy Agent Skill creation module
+│       └── skill-edit.md             # Deprecated legacy Agent Skill editing module
 └── .cicadas/                         # Cicadas artifacts (managed by scripts)
     ├── config.json                   # Local configuration
     ├── registry.json                 # Global registry (initiatives + feature branches)
@@ -214,6 +215,32 @@ Context resets are workflow boundaries, not magic memory deletion. A skill canno
 3. Treat other partitions as out of scope unless compatibility, sequencing, or ambiguity requires expansion.
 4. Escalate to broader spec loading only when the compact partition context is insufficient.
 
+### Directive Handoff Checkpoints
+
+The Reset rules above are conditional ("if the host supports it, ask…") because a skill cannot force a host to clear or compact. But at four specific workflow boundaries the work that follows is **execution-driven** — structured, derivable from approved artifacts, and not dependent on continuous Builder dialogue — so Cicadas treats the reset as a **directive checkpoint** rather than an optional ask. (Note: an agent has no tool to self-trigger a host-level `/clear`/`/compact`; the only fully agent-controlled equivalent is delegating to a fresh subagent with an isolated context.)
+
+**The four execution-driven boundaries**:
+
+| Boundary | Why it's execution-driven |
+|---|---|
+| After drafting & approving Approach + Tasks | Structured/derivable once PRD/UX/Tech are approved — no Builder sparring required to execute it |
+| After Kickoff | Mechanical, script-driven; light context either way |
+| After each partition (feature branch) completion | Natural isolation boundary already (separate `feat/` branch / optional worktree) |
+| After Initiative completion | Canon synthesis is heavy lifting a subagent can absorb; final commit/review stays with the Builder per the Agent Autonomy Boundaries table |
+
+> **PRD/UX/Tech-design is intentionally excluded.** That phase is the Builder-sparring loop the Emergence Hard Stop Rule protects (one spec at a time, approval between each). Adding a directive checkpoint there would either interrupt the dialogue with reset prompts or hand drafting to a subagent and flatten the sparring into one-shot generation. It keeps the conditional **Phase Reset** guidance above, untouched.
+
+**At each of the four boundaries, the agent MUST**:
+1. Refresh front matter on the affected specs per the relevant Reset rule above (Phase/Partition Reset steps for front matter refresh still apply).
+2. Write a `handoff.md` (see template below) capturing what just completed and what comes next.
+3. Then fork on host capability:
+   - **Host supports spawning isolated subagents** → delegate the next chunk of work to a fresh subagent, passing the `handoff.md` contents as its self-contained briefing, so the orchestrator's own context stays flat across the boundary (no human pause required — enables long autonomous runs). Before accepting the subagent's output, run the **Code Review** operation as a gate: evaluate the subagent's draft/diff/synthesis against the relevant specs (task completeness, conformance, security/correctness/quality scan, tiered Blocking/Advisory findings) and surface results before proceeding or handing back to the Builder. This compensates for the lost continuous human dialogue during delegated execution.
+   - **Host lacks subagent support** → write the handoff, explicitly recommend the Builder run `/clear` (or the host's equivalent reset), state the exact reload list from the handoff, then resume from it per the Resume rule below.
+
+**`handoff.md` template** (`{cicadas-dir}/templates/handoff.md`): a compact, agent-authored artifact with front matter (`boundary`: one of `approach-tasks | kickoff | partition-complete | initiative-complete`, `initiative`) and sections **Just completed**, **Approved/authoritative state** (pointers to files + headings, not prose copies), **Next action**, **Reload list**, and **Carry forward** (open decisions, deviations, signals to recheck).
+
+**Storage convention**: `.cicadas/active/{initiative}/handoff.md` for in-initiative boundaries (`approach-tasks`, `partition-complete`); `.cicadas/handoff.md` for boundaries that span initiative lifecycles (`kickoff`, `initiative-complete`), since `active/{name}/` may not yet exist (pre-kickoff) or may already be archived (post-completion).
+
 ### Kickoff (Initiative Start)
 **Trigger**: Drafts reviewed and approved.
 ```
@@ -287,11 +314,12 @@ git push origin --delete initiative/{name}
 
 If picking up a session already in progress (new conversation, resumed context):
 
-1. Run `python {cicadas-dir}/scripts/cicadas.py status` to get current state.
-2. Read `.cicadas/active/{initiative}/tasks.md` to find the first unchecked task.
-3. Check for any unread signals in the status output.
-4. Verify you are on the correct registered branch (`git branch --show-current` and cross-check against `registry.json`) before proceeding.
-5. Apply the relevant reset rule before continuing: Branch Reset for a branch resume, or Phase Reset if resuming a spec-writing step.
+1. **Resume from handoff first**: check for `.cicadas/active/{initiative}/handoff.md` and `.cicadas/handoff.md`. If either exists, read it as the authoritative pointer to current state, consume its **Reload list** before opening anything else, then delete or archive the file so it can't linger as stale state someone trusts later. This applies whether the resume is a Builder picking the conversation back up after `/clear` or a freshly spawned subagent starting from the handoff as its prompt.
+2. Run `python {cicadas-dir}/scripts/cicadas.py status` to get current state.
+3. Read `.cicadas/active/{initiative}/tasks.md` to find the first unchecked task.
+4. Check for any unread signals in the status output.
+5. Verify you are on the correct registered branch (`git branch --show-current` and cross-check against `registry.json`) before proceeding.
+6. If no handoff was present, apply the relevant reset rule before continuing: Branch Reset for a branch resume, or Phase Reset if resuming a spec-writing step.
 
 ### Check Status & Signals
 ```
@@ -309,8 +337,14 @@ When `.cicadas/graph/metadata.json` and `.cicadas/graph/codegraph.sqlite` exist,
 - `python {cicadas-dir}/scripts/cicadas.py graph build` builds or refreshes local graph artifacts.
 - `python {cicadas-dir}/scripts/cicadas.py graph status` reports freshness and analyzer coverage.
 - `python {cicadas-dir}/scripts/cicadas.py graph area {artifact}` routes from a file, test, or symbol to a canon-seeded area.
-- `python {cicadas-dir}/scripts/cicadas.py graph tests {symbol}` and `graph signature-impact {symbol}` help find first tests and likely blast radius after a signature change.
-- `python {cicadas-dir}/scripts/cicadas.py graph usage [--initiative name] [--since ISO8601] [--view table|json|html]` summarizes local graph usage and end-to-end timings.
+- `python {cicadas-dir}/scripts/cicadas.py graph search {term} [--kind file|symbol|entrypoint|test] [--exclude-tests]` finds likely files, symbols, entrypoints, and tests with deterministic candidate ranking.
+- `python {cicadas-dir}/scripts/cicadas.py graph neighbors {artifact}` ranks graph-connected neighboring areas when edges exist and labels metadata fallback when they do not.
+- `python {cicadas-dir}/scripts/cicadas.py graph callers|callees {symbol} [--exclude-tests]` inspects direct call edges.
+- `python {cicadas-dir}/scripts/cicadas.py graph tests {symbol}` and `graph signature-impact {symbol} [--exclude-tests]` help find first tests and likely blast radius after a signature change.
+- `python {cicadas-dir}/scripts/cicadas.py graph eval --repo {path} --scenario-file {jsonl} --output {json}` runs local graph-quality scenarios; keep private Jira/Confluence scenario files outside the public repo or in gitignored local paths.
+- `python {cicadas-dir}/scripts/cicadas.py graph usage [--initiative name] [--since ISO8601] [--view table|json|html]` summarizes local graph usage, result-summary availability, overlap-ready fields, and end-to-end timings.
+
+Analyzer coverage is layered. Python uses AST extraction, Java can use structural plus semantic enrichment, JavaScript/TypeScript and Rust use fallback structural extraction and may report `tree-sitter` when optional Tree-sitter packages and grammars are locally available. Tree-sitter is never required; absence is reported as analyzer metadata and must not block scan, build, query, or non-graph Cicadas workflows.
 
 If the graph is missing or stale, continue with `canon/summary.md`, `canon/repo-context.md`, routing guides, and targeted code inspection. Do not block the workflow waiting for graph support.
 
@@ -362,23 +396,12 @@ If a lightweight path discovers new complexity (e.g., "this fix requires a datab
 2. Upgrade to a full initiative: Draft `tech-design.md`, `approach.md`, and `tasks.md`.
 3. Move the work to an `initiative/` and `feat/` branch hierarchy.
 
-### Skills (Agent Skill Authoring)
+### Deprecated: Skill Authoring
 
-Cicadas manages the full lifecycle of Agent Skills — portable instruction modules that teach agents new capabilities.
-
-**Triggers**: "create a skill", "start a skill", "build a skill for X", "I need a skill that…"
-
-**The Workflow**:
-1. **Emergence**: Run `skill-create.md` — dialogue-driven authoring of `SKILL.md` + optional bundled files + `eval_queries.json`. Includes the standard start flow (name, draft folder, LLMs and Evals?, publish destination, PR preference).
-2. **Kickoff**: `python {cicadas-dir}/scripts/cicadas.py kickoff skill-{slug} --intent "..."`. Promotes `drafts/skill-{slug}/` to `active/skill-{slug}/`.
-3. **Branch**: `python {cicadas-dir}/scripts/cicadas.py branch skill/{slug} --intent "..." --initiative skill-{slug}`. Forks from `main`.
-4. **Validate**: `python {cicadas-dir}/scripts/cicadas.py validate-skill {slug}`. Check spec compliance before publishing.
-5. **Implement bundled files** (if any) on `skill/{slug}` branch.
-6. **Complete**: Merge `skill/{slug}` to `main`. Run `skill_publish.py` to copy the skill to its publish destination (includes pre-publish validation). Archive the initiative.
-
-**Edit an existing skill**:
-- **Triggers**: "edit skill X", "update skill X", "the skill isn't triggering", "the skill fires too much", "the skill output is wrong"
-- Run `skill-edit.md` — one diagnostic question, targeted minimum change, validate, done.
+Cicadas no longer advertises built-in skill creation or editing through this
+skill definition. The legacy markdown modules remain in the repo for
+compatibility, but new skill-authoring work should use dedicated skill tooling
+instead of the Cicadas lifecycle prompts.
 
 **Validate a skill manually**:
 ```
@@ -532,10 +555,7 @@ The Builder interacts via natural-language commands. The Agent handles all scrip
 - **"Prune {name}"** → Runs `python {cicadas-dir}/scripts/cicadas.py prune ...`. Rollback and restore to drafts.
 - **"Abort"** → Runs `python {cicadas-dir}/scripts/cicadas.py abort`. Context-aware escape hatch: detects the current branch type, rolls back the branch(es), deregisters from registry, and prompts whether to move active specs to drafts or delete them.
 - **"Project history"** or **"Generate history"** → Runs `python {cicadas-dir}/scripts/cicadas.py history`. Generates `.cicadas/canon/history.html` timeline from archive and index.
-- **"Create skill {name}"** or **"Build a skill for X"** → Reads `skill-create.md`. Runs start flow (name, draft folder, LLMs and Evals?, publish destination, PR preference), then dialogue-driven SKILL.md authoring, kickoff, branch, validate.
-- **"Edit skill {name}"** → Reads `skill-edit.md`. One diagnostic question, targeted minimum change, validate.
 - **"Validate skill {name}"** → Runs `python {cicadas-dir}/scripts/cicadas.py validate-skill {slug}`. Reports spec compliance errors or confirms valid.
-- **"Complete skill {name}"** or **"Publish skill {name}"** → Merges `skill/{slug}` to `main`, runs `python {cicadas-dir}/scripts/cicadas.py skill-publish {slug}`, archives initiative.
 
 ---
 
@@ -560,8 +580,9 @@ The Builder interacts via natural-language commands. The Agent handles all scrip
 | **History** | `python {cicadas-dir}/scripts/cicadas.py history [--output path]` | Generate HTML timeline to `.cicadas/canon/history.html` |
 | **Graph Build** | `python {cicadas-dir}/scripts/cicadas.py graph build [--languages auto]` | Build optional local graph artifacts |
 | **Graph Status** | `python {cicadas-dir}/scripts/cicadas.py graph status` | Report graph freshness and analyzer coverage |
-| **Graph Route** | `python {cicadas-dir}/scripts/cicadas.py graph area\|neighbors\|tests\|callers\|callees\|signature-impact\|route ...` | Use the optional graph for routing and blast-radius analysis |
-| **Graph Usage** | `python {cicadas-dir}/scripts/cicadas.py graph usage [--initiative name] [--since ISO8601] [--view table\|json\|html]` | Summarize local graph usage and timings |
+| **Graph Route** | `python {cicadas-dir}/scripts/cicadas.py graph area\|neighbors\|tests\|callers\|callees\|signature-impact\|route\|search ... [--exclude-tests]` | Use the optional graph for routing, search, tests, and blast-radius analysis |
+| **Graph Eval** | `python {cicadas-dir}/scripts/cicadas.py graph eval --repo path --scenario-file scenarios.jsonl --output report.json` | Run local graph-quality scenarios against synthetic or private repos |
+| **Graph Usage** | `python {cicadas-dir}/scripts/cicadas.py graph usage [--initiative name] [--since ISO8601] [--view table\|json\|html]` | Summarize local graph usage, value proxies, and timings |
 | **Validate skill** | `python {cicadas-dir}/scripts/cicadas.py validate-skill {slug-or-path}` | Check Agent Skill spec compliance |
 | **Publish skill** | `python {cicadas-dir}/scripts/cicadas.py skill-publish {slug} [--publish-dir DIR] [--symlink] [--force]` | Copy/symlink active skill to publish destination (pre-validates) |
 
@@ -580,6 +601,7 @@ The Builder interacts via natural-language commands. The Agent handles all scrip
 Use templates in `{cicadas-dir}/templates/` directory:
 - `product-overview.md`, `ux-overview.md`, `tech-overview.md`, `module-snapshot.md`: Canon templates
 - `prd.md`, `ux.md`, `tech-design.md`, `approach.md`, `tasks.md`: Active spec templates
+- `handoff.md`: Compact context-handoff artifact written at directive reset checkpoints (see Directive Handoff Checkpoints)
 - `lifecycle-default.json`, `lifecycle-schema.md`: Per-initiative lifecycle (PR boundaries + steps)
 - `synthesis-prompt.md`: System prompt for canon synthesis
 

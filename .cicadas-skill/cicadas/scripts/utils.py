@@ -6,6 +6,7 @@ import os
 import re
 import sqlite3
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -96,6 +97,15 @@ def load_config() -> dict:
     return load_json(get_registry_dir() / "config.json")
 
 
+def active_dir_name_for_branch(branch_name: str, initiative: str | None = None) -> str:
+    """Return the active spec directory name for a branch or initiative key."""
+    if initiative:
+        return initiative
+    if "/" in branch_name:
+        return branch_name.split("/", 1)[1]
+    return branch_name
+
+
 REPO_METADATA_FILENAME = "repo.json"
 REPO_TREE_FILENAME = "repo-tree.jsonl"
 REPO_CONTEXT_FILENAME = "repo-context.md"
@@ -106,6 +116,7 @@ GRAPH_AREA_PLAN_FILENAME = "area-plan.json"
 GRAPH_USAGE_FILENAME = "usage.jsonl"
 GRAPH_PROGRESS_FILENAME = "progress.json"
 GRAPH_PROGRESS_LOG_FILENAME = "progress-log.jsonl"
+GRAPH_EXPERIMENTAL_ENV = "CICADAS_GRAPH_EXPERIMENTAL"
 EXCLUDED_COMPLEXITY_PREFIXES = (
     ".agents",
     ".claude",
@@ -135,6 +146,85 @@ EXCLUDED_COMPLEXITY_PREFIXES = (
     "target",
     "venv",
 )
+
+SOURCE_CLASS_CODE = "code"
+SOURCE_CLASS_TEST = "test"
+SOURCE_CLASS_DOCUMENTATION = "documentation"
+SOURCE_CLASS_CONFIG = "config"
+SOURCE_CLASS_GENERATED_OR_LOCAL = "generated_or_local"
+SOURCE_CLASS_UNKNOWN = "unknown"
+
+CODE_EXTENSIONS = {
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cs",
+    ".go",
+    ".h",
+    ".hpp",
+    ".java",
+    ".js",
+    ".jsx",
+    ".kt",
+    ".kts",
+    ".php",
+    ".py",
+    ".rb",
+    ".rs",
+    ".scala",
+    ".sh",
+    ".sql",
+    ".swift",
+    ".ts",
+    ".tsx",
+}
+DOCUMENTATION_EXTENSIONS = {
+    ".adoc",
+    ".md",
+    ".mdx",
+    ".rst",
+    ".txt",
+}
+CONFIG_EXTENSIONS = {
+    ".bazel",
+    ".cfg",
+    ".conf",
+    ".gradle",
+    ".ini",
+    ".json",
+    ".lock",
+    ".properties",
+    ".toml",
+    ".xml",
+    ".yaml",
+    ".yml",
+}
+CONFIG_FILENAMES = {
+    ".gitignore",
+    "BUILD",
+    "BUILD.bazel",
+    "Cargo.toml",
+    "Dockerfile",
+    "Makefile",
+    "MODULE.bazel",
+    "WORKSPACE",
+    "WORKSPACE.bazel",
+    "build.gradle",
+    "build.gradle.kts",
+    "package.json",
+    "pnpm-workspace.yaml",
+    "pom.xml",
+    "pyproject.toml",
+    "settings.gradle",
+    "settings.gradle.kts",
+}
+TEST_PATH_SEGMENTS = {
+    "__tests__",
+    "spec",
+    "specs",
+    "test",
+    "tests",
+}
 
 
 def canon_dir(root: Path | None = None) -> Path:
@@ -201,6 +291,29 @@ def save_graph_metadata(data: dict, root: Path | None = None) -> Path:
     return path
 
 
+def graph_experimental_enabled() -> bool:
+    env_value = os.environ.get(GRAPH_EXPERIMENTAL_ENV, "").strip().lower()
+    if env_value in {"1", "true", "yes", "on"}:
+        return True
+    if env_value in {"0", "false", "no", "off"}:
+        return False
+
+    config = load_config()
+    if config.get("graph_experimental_enabled") is True:
+        return True
+    experimental = config.get("experimental")
+    return isinstance(experimental, dict) and experimental.get("graph") is True
+
+
+def graph_experimental_disabled_message() -> str:
+    return (
+        "[ERR] Graph support is experimental and disabled by default.\n"
+        f"Enable for local experiments with `{GRAPH_EXPERIMENTAL_ENV}=1 python src/cicadas/scripts/cicadas.py graph ...` "
+        "or set `.cicadas/config.json` key `graph_experimental_enabled` to true.\n"
+        "Fallback: use `canon/repo-context.md`, `canon/summary.md`, slice canon, and targeted code inspection."
+    )
+
+
 def graph_available(root: Path | None = None) -> bool:
     db_path = graph_db_path(root)
     metadata_path = graph_metadata_path(root)
@@ -215,6 +328,12 @@ def graph_available(root: Path | None = None) -> bool:
 
 
 def format_graph_status(root: Path | None = None) -> str:
+    if not graph_experimental_enabled():
+        return (
+            "Graph: experimental disabled\n"
+            f"Enable: set `{GRAPH_EXPERIMENTAL_ENV}=1` for local graph experiments\n"
+            "Fallback: use `canon/repo-context.md`, `canon/summary.md`, slice canon, and targeted code inspection."
+        )
     metadata = load_graph_metadata(root)
     if metadata is None or not graph_available(root):
         return (
@@ -527,6 +646,54 @@ def scale_exclusion_reason(rel_path: str) -> str | None:
     return None
 
 
+def _is_test_like_path(rel_path: str) -> bool:
+    normalized = rel_path.strip("/")
+    if not normalized:
+        return False
+    parts = normalized.split("/")
+    lower_parts = [part.lower() for part in parts]
+    if any(part in TEST_PATH_SEGMENTS for part in lower_parts[:-1]):
+        return True
+    filename = lower_parts[-1]
+    path = Path(normalized)
+    stem = path.stem
+    ext = path.suffix.lower()
+    return (
+        filename.startswith("test_")
+        or filename.endswith("_test.py")
+        or filename.endswith("_tests.py")
+        or filename.endswith(".test.js")
+        or filename.endswith(".test.jsx")
+        or filename.endswith(".test.ts")
+        or filename.endswith(".test.tsx")
+        or filename.endswith(".spec.js")
+        or filename.endswith(".spec.jsx")
+        or filename.endswith(".spec.ts")
+        or filename.endswith(".spec.tsx")
+        or (ext in {".java", ".kt", ".kts", ".cs", ".scala"} and (stem.endswith("Test") or stem.endswith("Tests")))
+    )
+
+
+def classify_source_path(rel_path: str, extension: str | None = None) -> str:
+    """Classify repository paths for source-aware scan and graph routing."""
+    normalized = rel_path.strip("/")
+    if not normalized:
+        return SOURCE_CLASS_UNKNOWN
+    if scale_exclusion_reason(normalized) is not None:
+        return SOURCE_CLASS_GENERATED_OR_LOCAL
+
+    path = Path(normalized)
+    ext = (extension if extension is not None else path.suffix).lower()
+    filename = path.name
+    if ext in CODE_EXTENSIONS:
+        return SOURCE_CLASS_TEST if _is_test_like_path(normalized) else SOURCE_CLASS_CODE
+    if ext in DOCUMENTATION_EXTENSIONS:
+        return SOURCE_CLASS_DOCUMENTATION
+    if ext in CONFIG_EXTENSIONS or filename in CONFIG_FILENAMES:
+        return SOURCE_CLASS_CONFIG
+    return SOURCE_CLASS_UNKNOWN
+
+
 def path_counts_toward_complexity(rel_path: str) -> bool:
     return scale_exclusion_reason(rel_path) is None
 
@@ -699,6 +866,15 @@ def generate_repo_context(repo_metadata: dict, repo_tree: list[dict] | None = No
     repo_mode = repo_metadata.get("repo_mode", "unknown")
     scan = repo_metadata.get("scan", {})
     dominant_languages = scan.get("dominant_languages", [])
+    source_file_count = int(scan.get("source_file_count", 0) or 0)
+    code_file_count = int(scan.get("code_file_count", 0) or 0)
+    test_file_count = int(scan.get("test_file_count", 0) or 0)
+    documentation_file_count = int(scan.get("documentation_file_count", 0) or 0)
+    generated_or_local_file_count = int(scan.get("generated_or_local_file_count", 0) or 0)
+    config_file_count = int(scan.get("config_file_count", 0) or 0)
+    unknown_file_count = int(scan.get("unknown_file_count", 0) or 0)
+    estimated_code_loc = int(scan.get("estimated_code_loc", 0) or 0)
+    estimated_documentation_loc = int(scan.get("estimated_documentation_loc", 0) or 0)
     build_systems = scan.get("build_systems", [])
     build_paths = scan.get("build_paths", [])
     test_paths = scan.get("test_paths", [])
@@ -710,6 +886,9 @@ def generate_repo_context(repo_metadata: dict, repo_tree: list[dict] | None = No
         "",
         f"- Repo mode candidate: `{repo_mode}`",
         f"- Dominant languages: {', '.join(f'`{lang}`' for lang in dominant_languages) if dominant_languages else '`unknown`'}",
+        f"- Source volume: `{source_file_count}` source/test files (`{code_file_count}` code, `{test_file_count}` test) and `{estimated_code_loc}` estimated code LoC",
+        f"- Documentation/context volume: `{documentation_file_count}` documentation files and `{estimated_documentation_loc}` estimated documentation LoC",
+        f"- Non-source inventory: `{config_file_count}` config files, `{unknown_file_count}` unknown files, `{generated_or_local_file_count}` generated/local files",
         f"- Build systems: {', '.join(f'`{item}`' for item in build_systems) if build_systems else '`unknown`'}",
         f"- Declared modules: {', '.join(f'`{item}`' for item in declared_modules[:6]) if declared_modules else '`none detected`'}",
         "- Major code zones:",
@@ -751,6 +930,7 @@ def generate_repo_context(repo_metadata: dict, repo_tree: list[dict] | None = No
 def collect_code_context(root: Path, modules: list[str], repo_tree: list[dict] | None = None) -> dict[str, str]:
     code_context: dict[str, str] = {}
     matched_any = False
+    root = root.resolve()
     normalized_modules = [module.strip() for module in modules if module.strip()]
     for mod in normalized_modules:
         mod_path = root / "src" / mod.replace(".", "/")
@@ -758,10 +938,18 @@ def collect_code_context(root: Path, modules: list[str], repo_tree: list[dict] |
             mod_path = root / mod.replace(".", "/")
 
         if mod_path.exists():
+            resolved_mod_path = mod_path.resolve()
+            try:
+                resolved_mod_path.relative_to(root)
+            except ValueError:
+                continue
             matched_any = True
-            for py_file in mod_path.glob("**/*.py"):
-                rel_path = py_file.relative_to(root)
-                code_context[str(rel_path)] = py_file.read_text()
+            for py_file in resolved_mod_path.glob("**/*.py"):
+                try:
+                    rel_path = py_file.resolve().relative_to(root)
+                    code_context[str(rel_path)] = py_file.read_text()
+                except (OSError, ValueError):
+                    continue
 
     if matched_any or not repo_tree:
         return code_context
@@ -775,8 +963,16 @@ def collect_code_context(root: Path, modules: list[str], repo_tree: list[dict] |
     ]
     for rel_str in high_signal_files[:25]:
         path = root / rel_str
-        if path.exists():
-            code_context[rel_str] = path.read_text()
+        try:
+            resolved_path = path.resolve()
+            resolved_path.relative_to(root)
+        except ValueError:
+            continue
+        if resolved_path.exists():
+            try:
+                code_context[rel_str] = resolved_path.read_text()
+            except OSError:
+                continue
     return code_context
 
 
@@ -967,3 +1163,93 @@ def emit(initiative: str, event_type: str, data: dict | None = None) -> None:
         emit_event(initiative, event_type, data or {})
     except Exception:
         pass
+
+
+# ---------------------------------------------------------------------------
+# Hint subsystem
+# ---------------------------------------------------------------------------
+# ANSI escape codes — applied only when stdout is a TTY (see _colorize).
+
+_ANSI_CYAN = "\033[36m"
+_ANSI_GREEN = "\033[32m"
+_ANSI_BOLD = "\033[1m"
+_ANSI_DIM = "\033[2m"
+_ANSI_RESET = "\033[0m"
+
+_HINT_BOX_WIDTH = 66  # total width including border chars
+
+
+def _colorize(text: str, code: str) -> str:
+    """Apply an ANSI escape code to text only when stdout is a TTY."""
+    if sys.stdout.isatty():
+        return f"{code}{text}{_ANSI_RESET}"
+    return text
+
+
+def hints_enabled(args: object | None = None, config: dict | None = None) -> bool:
+    """Return True when next-step hints should be printed.
+
+    Priority (highest to lowest):
+      1. ``--no-hints`` flag present on *args* → False
+      2. ``config['hints'] == False`` → False
+      3. stdout is not a TTY (pipe / CI) → False
+      4. Otherwise → True
+    """
+    if args is not None and getattr(args, "no_hints", False):
+        return False
+    if config is not None and config.get("hints") is False:
+        return False
+    if not sys.stdout.isatty():
+        return False
+    return True
+
+
+def print_hint(lines: list[str], args: object | None = None, config: dict | None = None) -> None:
+    """Print a framed next-step hint block when hints are enabled.
+
+    *lines* is a list of plain-text strings to display inside the box.
+    Each line is truncated or padded to fit within the box interior
+    (``_HINT_BOX_WIDTH - 4`` chars: 2 border chars + 2 padding spaces).
+
+    The box is printed in cyan when stdout is a TTY; plain otherwise.
+    Does nothing when ``hints_enabled()`` returns False.
+    """
+    if not hints_enabled(args, config):
+        return
+
+    # Layout: ║ (1) + space (1) + content + space (1) + ║ (1) = content + 4
+    inner_width = _HINT_BOX_WIDTH - 4  # content area width
+    top = _colorize("╔" + "═" * (_HINT_BOX_WIDTH - 2) + "╗", _ANSI_CYAN)
+    bot = _colorize("╚" + "═" * (_HINT_BOX_WIDTH - 2) + "╝", _ANSI_CYAN)
+
+    print(top)
+    for line in lines:
+        # Truncate to inner width to keep box consistent.
+        truncated = line[:inner_width]
+        padded = truncated.ljust(inner_width)
+        border = _colorize("║", _ANSI_CYAN)
+        print(f"{border} {padded} {border}")
+    print(bot)
+
+
+def print_tutorial_banner(step: int, total: int, title: str) -> None:
+    """Print a bold tutorial step banner.
+
+    Example::
+
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+         STEP 2 of 7 — Kickoff the initiative
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    """
+    divider = _colorize("━" * 53, _ANSI_BOLD)
+    step_label = _colorize(f"STEP {step} of {total}", _ANSI_CYAN)
+    title_text = _colorize(title, _ANSI_BOLD)
+    print(divider)
+    print(f" {step_label} — {title_text}")
+    print(divider)
+
+
+def print_tutorial_checkmark(message: str) -> None:
+    """Print a green checkmark confirmation line."""
+    check = _colorize("✓", _ANSI_GREEN)
+    print(f" {check} {message}")

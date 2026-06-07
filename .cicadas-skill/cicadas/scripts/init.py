@@ -1,13 +1,41 @@
 # Copyright 2026 Cicadas Contributors
 # SPDX-License-Identifier: Apache-2.0
 
+import argparse
 import shutil
 import stat
 from pathlib import Path
 
-from utils import get_project_root, save_json
+from utils import get_project_root, load_config, print_hint, save_json
 
 _HOOKS_SRC = Path(__file__).parent / "hooks"
+
+
+def _is_first_run(root: Path) -> bool:
+    """Return True if .cicadas/ was just created (does not already exist)."""
+    return not (root / ".cicadas").exists()
+
+
+def _offer_tutorial(root: Path) -> None:
+    """Prompt the user to run the interactive tutorial; run it if they say yes."""
+    import sys
+
+    if not sys.stdin.isatty():
+        return
+    print()
+    try:
+        answer = input("  Would you like to run the Cicadas tutorial now? [Y/n]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+    if answer in ("", "y", "yes"):
+        # Deferred import: tutorial.py is a sibling script, not a package.
+        # Importing at module level would require sys.path to already include
+        # the scripts directory at init.py load time, which isn't guaranteed
+        # when init.py is imported by other modules (e.g. tests). Deferring
+        # keeps init.py importable without side-effects.
+        import tutorial as _tutorial  # noqa: PLC0415
+        _tutorial.main()
 
 
 def init_cicadas(root: Path) -> None:
@@ -18,9 +46,15 @@ def init_cicadas(root: Path) -> None:
     (cicadas / "drafts").mkdir(exist_ok=True)
     (cicadas / "archive").mkdir(exist_ok=True)
 
-    save_json(cicadas / "registry.json", {"schema_version": "2.0", "initiatives": {}, "branches": {}})
-    save_json(cicadas / "index.json", {"schema_version": "2.0", "entries": []})
-    save_json(
+    _save_default_json_if_missing(
+        cicadas / "registry.json",
+        {"schema_version": "2.0", "initiatives": {}, "branches": {}},
+    )
+    _save_default_json_if_missing(
+        cicadas / "index.json",
+        {"schema_version": "2.0", "entries": []},
+    )
+    _save_default_json_if_missing(
         cicadas / "config.json",
         {
             "project_name": root.name,
@@ -29,12 +63,24 @@ def init_cicadas(root: Path) -> None:
                 "lightweight": False,
                 "parallel_features": True,
             },
+            "tracing": {
+                "enabled": False,
+                "endpoint": "http://localhost:4318/v1/traces",
+                "service_name": "cicadas",
+                "headers": {},
+            },
         },
     )
 
     print(f"Initialized Cicadas in {cicadas}")
 
     _install_hooks(root)
+
+
+def _save_default_json_if_missing(path: Path, data: dict) -> None:
+    if path.exists():
+        return
+    save_json(path, data)
 
 
 def _install_hooks(root: Path) -> None:
@@ -53,4 +99,26 @@ def _install_hooks(root: Path) -> None:
 
 
 if __name__ == "__main__":
-    init_cicadas(get_project_root())
+    parser = argparse.ArgumentParser(description="Initialize Cicadas in a project")
+    parser.add_argument("--no-hints", action="store_true", help="Suppress next-step hints")
+    parser.add_argument("--tutorial", action="store_true", help="Run the interactive tutorial after init (skip prompt)")
+    parser.add_argument("--no-tutorial", action="store_true", help="Skip the tutorial prompt after init")
+    args = parser.parse_args()
+
+    root = get_project_root()
+    first_run = _is_first_run(root)
+    init_cicadas(root)
+    try:
+        config = load_config()
+    except Exception:
+        config = {}
+    print_hint([
+        "Welcome to Cicadas! Start your first initiative.",
+        '  Tell your agent: 💬 "Start an initiative called <name>"',
+    ], args, config)
+
+    if args.tutorial:
+        import tutorial as _tutorial
+        _tutorial.main()
+    elif first_run and not args.no_tutorial:
+        _offer_tutorial(root)

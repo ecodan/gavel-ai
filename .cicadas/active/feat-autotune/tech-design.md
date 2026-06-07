@@ -1,5 +1,5 @@
 ---
-summary: "Autotune is implemented as a new GavelWorkflow subclass (AutotuneWorkflow): Prepare → Validate → AutotuneIterationStep → Report. A new CompositeStep base class in core/steps/base.py lets AutotuneIterationStep call run_children() per iteration so inner steps (ScenarioProcessorStep, JudgeRunnerStep, TuneStep) get proper safe_execute() wrapping, error-policy enforcement, workflow_status tracking, and OTel spans. Each iteration is routed through a lightweight IterationRunContext redirecting DataSources to iterations/iteration_N/. TuningAgent wraps ProviderFactory. TuningConfig is an optional EvalConfig field. Autotune section added to gavel-skill/SKILL.md."
+summary: "Autotune: new AutotuneWorkflow (Prepare → Validate → AutotuneIterationStep → Report). CompositeStep base lets AutotuneIterationStep call run_children() with safe_execute() wrapping per iteration. IterationEvalContext (wraps LocalFileSystemEvalContext, overrides get_prompt() to read vN from runs/<id>/prompts.toml) + IterationRunContext (redirects DataSources to iterations/iteration_N/) per iteration. All scores normalized to 0.0–1.0; IterationMetadata.judge_scores gives per-judge breakdown. TuningAgent meta-prompt uses {{var}} with 7 injected variables (current_prompt, judge_feedback, avg_score, iteration, max_rounds, target_score, placeholder_vars). Reporter: score table with per-judge columns, Best Prompt section with promotion instructions. 7-stage skill setup flow specified."
 phase: "tech"
 when_to_load:
   - "When implementing or reviewing architecture, interfaces, data models, conventions, and sequencing."
@@ -25,6 +25,7 @@ index:
   data_models: "## Data Models"
   interfaces: "## API & Interface Design"
   conventions: "## Implementation Patterns & Conventions"
+  skill_spec: "## Skill Extension Specification"
   security_performance: "## Security & Performance"
   implementation_sequence: "## Implementation Sequence"
 next_section: null
@@ -181,19 +182,50 @@ class CompositeStep(Step):
 
 ---
 
-### ADR-AT-2: Per-iteration context via `IterationRunContext` — share `eval_ctx`, redirect DataSources
+### ADR-AT-2: Per-iteration context via `IterationRunContext` + `IterationEvalContext`
 
-**Decision:** Create `IterationRunContext` — a thin dataclass that wraps the outer `LocalRunContext` and provides `results_raw`, `evaluation_results`, and `run_dir` pointed at `iterations/iteration_N/`. `eval_ctx`, `run_logger`, and `run_id` are shared from the outer context.
+**Decision:** Each iteration gets two lightweight wrappers:
 
-**Rationale:** `ScenarioProcessorStep` and `JudgeRunnerStep` interact with RunContext through DataSources (`context.results_raw`, `context.evaluation_results`, `context.run_dir`). By replacing these three attributes, the existing steps route their I/O to the iteration subdirectory without modification. The alternative — creating a full `LocalRunContext` per iteration — would trigger config snapshotting, logger initialization, and telemetry setup per iteration, which is wasteful and produces redundant artifacts.
+1. **`IterationRunContext`** — redirects `results_raw`, `evaluation_results`, and `run_dir` to `iterations/iteration_N/`. Shares `eval_ctx`, `run_logger`, and `run_id` from the outer `LocalRunContext`. The `eval_ctx` field holds an `IterationEvalContext` (not the raw `LocalFileSystemEvalContext`).
 
-**Affects:** `core/contexts.py`, `core/steps/autotune_iteration_step.py`, `core/steps/scenario_processor.py` (read-only, must not change), `core/steps/judge_runner.py` (read-only, must not change)
+2. **`IterationEvalContext`** — wraps `LocalFileSystemEvalContext` and overrides `get_prompt(prompt_ref)` to read from `runs/<id>/prompts.toml` for the current iteration's version (vN). Falls back to the base `get_prompt()` for v1 if `prompts.toml` is absent (first iteration before PrepareStep writes it). All other `EvalContext` methods delegate unchanged to the wrapped instance.
+
+**Why `IterationEvalContext` is required (Gap 6):** `ScenarioProcessorStep.execute()` calls `context.eval_ctx.get_prompt(prompt_ref)` to load the prompt template before rendering scenarios. Without `IterationEvalContext`, every iteration would re-load v1 from `config/prompts/<name>.toml` — the generated v2, v3, ... in `runs/<id>/prompts.toml` are never seen by the processor. The iteration loop would run the same prompt repeatedly with no improvement.
+
+**Rationale:** Creating a full `LocalRunContext` + `LocalFileSystemEvalContext` per iteration would trigger config snapshotting, logger initialization, and telemetry setup per iteration — wasteful and producing redundant artifacts. The two lightweight wrappers add only the overrides needed.
+
+**Affects:** `core/contexts.py` (both new classes), `core/steps/autotune_iteration_step.py`, `core/steps/scenario_processor.py` (read-only, must not change), `core/steps/judge_runner.py` (read-only, must not change)
 
 ```python
+class IterationEvalContext:
+    """Wraps LocalFileSystemEvalContext; overrides get_prompt() to read from prompts.toml."""
+
+    def __init__(self, base: LocalFileSystemEvalContext, prompts_toml_path: Path, version: str):
+        self._base = base
+        self._prompts_toml_path = prompts_toml_path
+        self._version = version  # e.g. "v2"
+
+    def get_prompt(self, prompt_ref: str) -> str:
+        """Load vN from runs/<id>/prompts.toml; fall back to base for v1."""
+        name, _ = prompt_ref.split(":", 1) if ":" in prompt_ref else (prompt_ref, "latest")
+        if self._prompts_toml_path.exists():
+            with open(self._prompts_toml_path, "rb") as f:
+                data = tomllib.load(f)
+            version_key = self._version.lstrip("v") if self._version.startswith("v") else self._version
+            section = data.get(self._version) or data.get(f"v{version_key}")
+            if section and "prompt" in section:
+                return section["prompt"]
+        return self._base.get_prompt(prompt_ref)
+
+    # All other attributes delegate to base:
+    def __getattr__(self, name: str):
+        return getattr(self._base, name)
+
+
 @dataclass
 class IterationRunContext:
     """Thin per-iteration context that redirects DataSources to iterations/iteration_N/."""
-    eval_ctx: EvalContext           # shared from outer run
+    eval_ctx: IterationEvalContext  # wraps outer eval_ctx with iteration-specific get_prompt()
     run_id: str                     # shared from outer run
     run_logger: logging.Logger      # shared from outer run
     run_dir: Path                   # iterations/iteration_N/
@@ -206,6 +238,23 @@ class IterationRunContext:
 
     def mark_step_complete(self, phase: StepPhase) -> None:
         pass  # no-op; outer context tracks top-level steps only
+```
+
+**Construction in `AutotuneIterationStep`** (per iteration):
+```python
+iter_eval_ctx = IterationEvalContext(
+    base=outer_run_ctx.eval_ctx,
+    prompts_toml_path=outer_run_ctx.run_dir / "prompts.toml",
+    version=f"v{iteration}",
+)
+iteration_ctx = IterationRunContext(
+    eval_ctx=iter_eval_ctx,
+    run_id=outer_run_ctx.run_id,
+    run_logger=outer_run_ctx.run_logger,
+    run_dir=outer_run_ctx.run_dir / "iterations" / f"iteration_{iteration}",
+    results_raw=...,
+    evaluation_results=...,
+)
 ```
 
 ---
@@ -249,11 +298,31 @@ await tune_step.safe_execute(iteration_ctx, error_policy)
 
 ### ADR-AT-6: `AutotuneReporter` extends `Jinja2Reporter` with a new template
 
-**Decision:** Create `AutotuneReporter(Jinja2Reporter)` that builds an autotune-specific `ReportData`-like context dict and renders `templates/autotune.html`. The HTML template uses vanilla JS for the score progression table (no external chart library).
+**Decision:** Create `AutotuneReporter(Jinja2Reporter)` that builds an autotune-specific context dict and renders `templates/autotune.html`. The HTML template uses vanilla JS for the score progression table (no external chart library).
 
 **Rationale:** `Jinja2Reporter` already handles file writing and template loading. A subclass that overrides `_build_context()` is all that's needed, matching the `OneShotReporter` pattern. No chart library dependency is introduced — a simple HTML table with inline CSS highlights the best row.
 
 **Affects:** `reporters/autotune_reporter.py`, `reporters/templates/autotune.html`
+
+**Report sections (Gaps 9 and 10):**
+
+1. **Score Progression Table** — one row per iteration:
+   - Columns: Iteration, Prompt Version, Avg Score, Improvement, Convergence Reason
+   - Best-scoring row highlighted in green; final row bolded
+   - Each judge's per-iteration mean score shown as sub-columns (Gap 9 — per-judge breakdown)
+
+2. **Per-Judge Detail** — expandable section per judge:
+   - Shows the judge name, type, and threshold
+   - Table of scenario × iteration scores for that judge
+   - Helps identify whether one judge drove convergence or all agree
+
+3. **Best Prompt Version** — dedicated section (Gap 10):
+   - Displays the prompt text of the best-scoring iteration inline (copyable pre-block)
+   - Shows the exact file path: `runs/<run_id>/prompts.toml`, section `[v{N}]`
+   - Instructs the user to copy the prompt text into `config/prompts/<name>.toml` as a new version to make it permanent: `echo 'v_final = """..."""' >> config/prompts/<name>.toml`
+   - Warns that `runs/<id>/prompts.toml` is a run artifact, not the eval's live prompt
+
+4. **Run Summary** — eval name, run ID, total iterations, convergence reason, total wall-clock time
 
 ---
 
@@ -270,13 +339,14 @@ class TuningConfig(BaseModel):
 
     max_rounds: int = Field(..., description="Hard upper bound on optimization iterations", ge=1)
     convergence_threshold: float = Field(
-        ..., description="Stop if |current_score - previous_score| < threshold", ge=0.0
+        0.02,
+        description="Stop if |current_score - previous_score| < threshold (0.0–1.0 scale)", ge=0.0, le=1.0
     )
     target_score: Optional[float] = Field(
-        None, description="Stop early when this score is reached", ge=0.0, le=10.0
+        None, description="Stop early when avg_score reaches this value (0.0–1.0 scale)", ge=0.0, le=1.0
     )
     degradation_tolerance: float = Field(
-        0.2, description="Stop if score drops by more than this amount", ge=0.0
+        0.05, description="Stop if avg_score drops by more than this amount (0.0–1.0 scale)", ge=0.0, le=1.0
     )
     tuning_agent_model: str = Field(
         ..., description="Model ID from agents.json to use for TuningAgent"
@@ -286,17 +356,22 @@ class TuningConfig(BaseModel):
     )
 ```
 
+**Score scale (Gap 4):** All `avg_score` values are normalized to a **0.0–1.0 scale**. `IterationMetadata.score` is computed as the mean of normalized `JudgedRecord.score` values from `output_judged.jsonl` for that iteration (across all scenarios and all LLM judges). DeepEval GEval judges return scores on a 0–10 scale; `AutotuneIterationStep` divides these by 10.0 before computing the iteration mean. Deterministic classifier/regression judges already produce 0/1 scores and are included unchanged. `convergence_threshold`, `target_score`, and `degradation_tolerance` are all on the same 0.0–1.0 scale.
+
+Per-judge breakdown is also tracked for the reporter (see `IterationMetadata.judge_scores` below).
+
 **`IterationMetadata`** — persisted to `iterations/iteration_N/metadata.json`:
 
 ```python
 class IterationMetadata(BaseModel):
     iteration: int
-    prompt_version: str         # e.g. "v1", "v2"
-    score: float                # average judge score this iteration
-    improvement: float          # current_score - previous_score (0.0 for iteration 1)
+    prompt_version: str                 # e.g. "v1", "v2"
+    score: float                        # mean normalized score across all scenarios+judges (0.0–1.0)
+    improvement: float                  # current_score - previous_score (0.0 for iteration 1)
+    judge_scores: Dict[str, float]      # {judge_name: mean_score} for per-judge breakdown (Gap 9)
     converged: bool
-    convergence_reason: Optional[str]  # "max_rounds_reached" | "target_score_achieved" |
-                                       # "minimal_improvement" | "performance_degraded" | null
+    convergence_reason: Optional[str]   # "max_rounds_reached" | "target_score_achieved" |
+                                        # "minimal_improvement" | "performance_degraded" | null
 ```
 
 **`AutotuneRunSummary`** — persisted to `runs/<id>/run_summary.json` and used by the reporter:
@@ -332,18 +407,20 @@ name = "my_prompt"
 run_id = "20260604_140000"
 
 [v1]
-prompt = "Original prompt text with $variable..."
+prompt = "Original prompt text with {{variable}}..."
 
 [v2]
-prompt = "Improved prompt text with $variable..."
+prompt = "Improved prompt text with {{variable}}..."
 iteration = 1
-avg_score = 7.5
+avg_score = 0.75   # 0.0–1.0 scale (normalized)
 
 [v3]
-prompt = "Further improved prompt with $variable..."
+prompt = "Further improved prompt with {{variable}}..."
 iteration = 2
-avg_score = 8.2
+avg_score = 0.82   # 0.0–1.0 scale (normalized)
 ```
+
+Prompt versions use `{{var}}` syntax matching the unified template convention. `avg_score` is normalized to the 0.0–1.0 scale.
 
 ---
 
@@ -418,6 +495,20 @@ class TuningAgent:
         """
 ```
 
+**Meta-prompt template variable syntax (Gap 7):** The meta-prompt template (`autotune.toml`) uses `{{var}}` substitution (same renderer as scenario prompts). The following variables are injected by `TuningAgent.generate_improved_prompt()`:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `{{current_prompt}}` | str | The full text of the current prompt version (vN) |
+| `{{judge_feedback}}` | str | JSON-formatted list of `{scenario_id, judge_name, score, reason}` dicts from `output_judged.jsonl` |
+| `{{avg_score}}` | float | Mean normalized score this iteration (0.0–1.0 scale) |
+| `{{iteration}}` | int | Current iteration number (1-based) |
+| `{{max_rounds}}` | int | `TuningConfig.max_rounds` |
+| `{{target_score}}` | str | `TuningConfig.target_score` or `"none"` if not set |
+| `{{placeholder_vars}}` | str | Comma-separated list of `{{var}}` placeholders the generated prompt must preserve |
+
+The bundled fallback template instructs the LLM to: (1) analyze the feedback, (2) identify failure patterns, (3) rewrite the prompt to address them, (4) preserve all `{{placeholder_vars}}`, and (5) return only the improved prompt text with no explanation.
+
 **`TuneStep`**:
 ```python
 class TuneStep(Step):
@@ -467,12 +558,13 @@ Never catch `RunPolicyError` inside `AutotuneIterationStep` — let it propagate
 
 ### Prompt Variable Preservation
 
-Before appending vN+1 to `prompts.toml`, validate that all `$var` placeholders from v1 are present in the generated text:
+Before appending vN+1 to `prompts.toml`, validate that all `{{var}}` placeholders from v1 are present in the generated text:
 
 ```python
 import re
-original_vars = set(re.findall(r'\$\{?([a-zA-Z_][a-zA-Z0-9_]*)\}?', v1_prompt))
-generated_vars = set(re.findall(r'\$\{?([a-zA-Z_][a-zA-Z0-9_]*)\}?', generated_prompt))
+_PLACEHOLDER_RE = re.compile(r'\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}')
+original_vars = set(_PLACEHOLDER_RE.findall(v1_prompt))
+generated_vars = set(_PLACEHOLDER_RE.findall(generated_prompt))
 missing = original_vars - generated_vars
 if missing:
     logger.warning(f"TuningAgent dropped variables {missing}; retrying once")
@@ -487,9 +579,9 @@ Unit tests mock `ProviderFactory` and the file system:
 async def test_convergence_target_score_achieved():
     step = AutotuneIterationStep(...)
     converged, reason = step._check_convergence(
-        iteration=2, current_score=9.1, previous_score=8.3,
-        config=TuningConfig(max_rounds=5, convergence_threshold=0.1,
-                            target_score=9.0, tuning_agent_model="x",
+        iteration=2, current_score=0.91, previous_score=0.83,
+        config=TuningConfig(max_rounds=5, convergence_threshold=0.02,
+                            target_score=0.90, tuning_agent_model="x",
                             tuning_agent_temperature=0.7)
     )
     assert converged is True
@@ -510,6 +602,67 @@ async def test_autotune_workflow_two_iterations(tmp_path):
 
 ---
 
+## Skill Extension Specification
+
+The autotune section added to `gavel-skill/SKILL.md` must guide a user (or agent) through a 7-stage setup and interpretation flow. This section specifies what each stage must cover so the implementation (Step 10) has a clear target.
+
+### Stage 1 — Prerequisite check (Gap 1)
+Before starting autotune setup, the skill must verify:
+- A working oneshot eval exists for this prompt (run at least once successfully)
+- `workflow_type` is not yet set to `"autotune"` (if it is, resume from Stage 5)
+- At least one LLM judge is configured in `eval_config.json` (autotune requires a numeric score signal — deterministic judges alone are insufficient)
+- `gavel autotune create` command is available
+
+If prerequisites are not met, the skill must explain what is missing and how to resolve it before continuing.
+
+### Stage 2 — Config setup (Gap 2)
+Walk the user through adding the `tuning` block to `eval_config.json`:
+```json
+"tuning": {
+  "max_rounds": 5,
+  "convergence_threshold": 0.02,
+  "target_score": 0.8,
+  "degradation_tolerance": 0.05,
+  "tuning_agent_model": "<model-id-from-agents-json>",
+  "tuning_agent_temperature": 0.7
+}
+```
+Explain each field. Emphasize: `tuning_agent_model` must match a `_models` key in `agents.json`. `target_score` is on the 0.0–1.0 scale (e.g. `0.8` = 80% of max). Recommend `max_rounds` of 3–5 for first runs.
+
+### Stage 3 — Meta-prompt setup (Gap 3)
+Explain that autotune uses a bundled meta-prompt by default. Show the user how to inspect or override it:
+- Default location after `pip install`: bundled in `processors/autotune_template/autotune.toml`
+- Override: create `config/prompts/autotune.toml` in the eval directory
+- Available template variables: `{{current_prompt}}`, `{{judge_feedback}}`, `{{avg_score}}`, `{{iteration}}`, `{{max_rounds}}`, `{{target_score}}`, `{{placeholder_vars}}`
+- Advise: only override if the default guidance is producing poor rewrites for this domain
+
+### Stage 4 — Run autotune
+```bash
+gavel autotune run --eval <name>
+```
+Show expected output: iteration progress lines, convergence message, report path. Explain the `--run <run-id>` resume flag for interrupted runs.
+
+### Stage 5 — Interpret the report (Gap 5)
+Guide interpretation of `autotune.html`:
+- Score Progression Table: look for steady improvement; plateau = convergence; drop = degradation stop
+- Per-Judge Detail: if one judge diverges from others, check its criteria for misconfiguration
+- Best Prompt section: the highlighted row is the iteration to extract
+- Warn: a single autotune run is a starting point, not a final answer — re-run on fresh scenarios to validate generalization
+
+### Stage 6 — Promote the best prompt (Gap 8)
+Step-by-step promotion of the winning prompt version to the eval's permanent config:
+1. Open `runs/<run_id>/prompts.toml`, find `[v{N}]` (the best version shown in the report)
+2. Copy the `prompt = "..."` value
+3. Open `config/prompts/<eval-name>.toml`
+4. Append it as a new versioned entry (e.g. `v2 = '''...'''`)
+5. Update `eval_config.json` `test_subjects[0].prompt_name` to `"<eval-name>:v2"` if pinning, or leave as `"<eval-name>:latest"` to always use the newest
+6. Run `gavel oneshot run --eval <name>` to validate on the full scenario set
+
+### Stage 7 — Next iteration
+After promotion, ask: "Do you want to continue tuning from the promoted prompt?" If yes, the `prompts.toml` from the previous run should NOT be reused — start a fresh run with the promoted version as the new v1.
+
+---
+
 ## Security & Performance
 
 ### Security
@@ -517,7 +670,7 @@ async def test_autotune_workflow_two_iterations(tmp_path):
 | Concern | Mitigation |
 |---------|-----------|
 | Meta-prompt template file as attack vector | File is read as data (TOML string); no `eval()` or `exec()`. Pydantic validates structure. Path is resolved relative to `eval_dir` with traversal check (matching existing `markdown_path` pattern). |
-| TuningAgent-generated prompt injection | Generated prompt is stored as a versioned string; it is only passed to the LLM as a prompt template, not executed. Placeholder validation (`$var`) uses `re.findall`, not `eval`. |
+| TuningAgent-generated prompt injection | Generated prompt is stored as a versioned string; it is only passed to the LLM as a prompt template, not executed. Placeholder validation (`{{var}}`) uses `re.findall`, not `eval`. |
 | Provider credentials | Handled exclusively by existing `ProviderFactory` — no new credential handling in TuningAgent. |
 | Autotune scaffold overwrites existing files | `autotune create` checks for existing eval dir and refuses to overwrite without `--force` (matching `oneshot create` behavior). |
 
