@@ -22,7 +22,7 @@ index:
   p1: "## Partition 1: Foundations"
   p2: "## Partition 2: Engine"
   p3: "## Partition 3: Surface"
-next_section: "## Partition 1: Foundations — Open PR (id: 111)"
+next_section: "## Partition 1: Foundations — Merge to initiative (id: 111)"
 ---
 
 # Tasks: feat-autotune
@@ -42,7 +42,7 @@ next_section: "## Partition 1: Foundations — Open PR (id: 111)"
 - [x] **Unit tests — IterationEvalContext + LocalRunContext** — `get_prompt("name:v2")` reads `[v2]` from a tmp `prompts.toml`; falls back to base when `prompts.toml` absent; all other attributes delegate to base; `LocalRunContext(snapshot=False)` skips config snapshot file writes (test name kept the spec's `skip_snapshot` framing but exercises the existing `snapshot` flag per the id-102 divergence note) <!-- id: 108 -->
 - [x] **Unit tests — TuningAgent** — `generate_improved_prompt()` calls `ProviderFactory` once with correct args; returns non-empty string; OTel span emitted <!-- id: 109 -->
 - [x] **Run unit tests** — `uv run pytest -m unit` passes green. **Note**: required copying `.env` (API keys) from the main checkout into the worktree to get deepeval-judge tests to run; the only remaining failure (`test_gavel_version` expecting `"0.1.0"`) is a pre-existing stale assertion against the `0.2.0` version bump (commit `39314a9`) and reproduces identically on `master` — unrelated to this partition. <!-- id: 110 -->
-- [ ] **Open PR: Partition 1** → target `initiative/feat-autotune` <!-- id: 111 -->
+- [ ] **Merge to initiative** — Push `feat/autotune-foundations`, merge directly into `initiative/feat-autotune` (no PR — single PR deferred to initiative completion per updated lifecycle rule) <!-- id: 111 -->
 
 ---
 
@@ -60,7 +60,7 @@ next_section: "## Partition 1: Foundations — Open PR (id: 111)"
 - [ ] **Unit tests — AutotuneReporter** — `_build_context()` produces correct structure from fixture `AutotuneRunSummary`; best iteration correctly identified <!-- id: 209 -->
 - [ ] **Integration test** — `tests/integration/test_autotune_workflow.py`: scaffold real eval dir in `tmp_path`; mock `TuningAgent.generate_improved_prompt()` to return fixed improved prompt; run `AutotuneWorkflow` with `max_rounds=2`; assert `iterations/iteration_1/` and `iterations/iteration_2/` exist with `metadata.json` and `output_raw.jsonl`; assert `prompts.toml` has `[v1]` and `[v2]`; assert `run_summary.json` exists with correct `total_iterations=2`; assert `report.html` is non-empty; assert v2 prompt was used for iteration 2 scenarios (captured via mock LLM call) <!-- id: 210 -->
 - [ ] **Run full test suite** — `uv run pytest -m unit && uv run pytest -m integration` passes green <!-- id: 211 -->
-- [ ] **Open PR: Partition 2** → target `initiative/feat-autotune` <!-- id: 212 -->
+- [ ] **Merge to initiative** — Push `feat/autotune-engine`, merge directly into `initiative/feat-autotune` (no PR — single PR deferred to initiative completion per updated lifecycle rule) <!-- id: 212 -->
 
 ---
 
@@ -76,7 +76,7 @@ next_section: "## Partition 1: Foundations — Open PR (id: 111)"
 - [ ] **config-schema.md** — Update `skill/gavel-skill/references/config-schema.md`: add `tuning` block schema table (all `TuningConfig` fields with types, defaults, and 0.0–1.0 scale note); add `prompts.toml` format section <!-- id: 307 -->
 - [ ] **cli-reference.md** — Run `uv run python scripts/update_cli_reference.py` (or equivalent) to regenerate `skill/gavel-skill/references/cli-reference.md` with the new `autotune create` and `autotune run` commands <!-- id: 308 -->
 - [ ] **Manual smoke test** — Run `gavel autotune create smoke-test`, inspect scaffolded files, run `gavel autotune run --eval smoke-test` against a real LLM with `max_rounds=1`; confirm report.html renders correctly in browser <!-- id: 309 --> <!-- NEEDS MANUAL REVIEW -->
-- [ ] **Open PR: Partition 3** → target `initiative/feat-autotune` <!-- id: 310 -->
+- [ ] **Merge to initiative** — Push `feat/autotune-surface`, merge directly into `initiative/feat-autotune` (no PR — single PR deferred to initiative completion per updated lifecycle rule) <!-- id: 310 -->
 
 ---
 

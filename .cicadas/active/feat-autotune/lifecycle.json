@@ -2,7 +2,7 @@
   "pr_boundaries": {
     "specs": false,
     "initiatives": true,
-    "features": true,
+    "features": false,
     "tasks": false
   },
   "steps": [
@@ -24,8 +24,8 @@
     {
       "id": "complete_feature",
       "name": "Complete each feature",
-      "description": "Update index, push, open PR to initiative (if enabled), merge",
-      "opens_pr": true
+      "description": "Update index, push, merge directly to initiative (no PR — single PR deferred to initiative completion)",
+      "opens_pr": false
     },
     {
       "id": "complete_initiative",
