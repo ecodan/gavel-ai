@@ -105,7 +105,7 @@ class TestIterationRunContext:
         run_dir = tmp_path / "iterations" / "iteration_1"
         run_dir.mkdir(parents=True)
         results_raw = MagicMock()
-        evaluation_results = MagicMock()
+        evaluation_results = None
 
         ctx = IterationRunContext(
             eval_ctx=eval_ctx,
@@ -117,12 +117,15 @@ class TestIterationRunContext:
         )
 
         assert ctx.eval_ctx is eval_ctx
+        assert ctx.eval_context is eval_ctx
         assert ctx.run_id == "run-001"
         assert ctx.run_dir == run_dir
         assert ctx.last_step_error is None
         assert ctx.processor_results == []
         assert ctx.evaluation_results_data == []
         assert ctx.deterministic_metrics == {}
+        assert ctx.test_subject is None
+        assert ctx.model_variant is None
 
     def test_mark_step_complete_is_a_noop(self, tmp_path) -> None:
         """mark_step_complete() does nothing — the outer LocalRunContext owns step tracking."""
@@ -141,7 +144,7 @@ class TestIterationRunContext:
             run_logger=logging.getLogger("test"),
             run_dir=run_dir,
             results_raw=MagicMock(),
-            evaluation_results=MagicMock(),
+            evaluation_results=None,
         )
 
         # Should not raise and should not create any tracking artifacts.

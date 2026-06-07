@@ -738,6 +738,16 @@ class IterationEvalContext:
         self._prompts_toml_path = prompts_toml_path
         self._version = version  # e.g. "v2"
 
+    @property
+    def prompts_toml_path(self) -> Path:
+        """Path to the run-local prompts.toml that holds generated prompt versions."""
+        return self._prompts_toml_path
+
+    @property
+    def version(self) -> str:
+        """Current iteration's prompt version key, e.g. "v2"."""
+        return self._version
+
     def get_prompt(self, prompt_ref: str) -> str:
         """Load vN from runs/<id>/prompts.toml; fall back to base for v1."""
         import tomllib
@@ -770,11 +780,19 @@ class IterationRunContext:
     run_logger: logging.Logger
     run_dir: Path
     results_raw: RecordDataSource
-    evaluation_results: RecordDataSource
     last_step_error: Optional[Exception] = None
     processor_results: List[OutputRecord] = field(default_factory=list)
+    evaluation_results: Optional[List[Dict[str, Any]]] = None
     evaluation_results_data: List[JudgedRecord] = field(default_factory=list)
     deterministic_metrics: Dict[str, Any] = field(default_factory=dict)
+    test_subject: Optional[str] = None
+    model_variant: Optional[str] = None
+
+    @property
+    def eval_context(self) -> IterationEvalContext:
+        """Alias for eval_ctx — satisfies the RunContext.eval_context contract that
+        ScenarioProcessorStep and JudgeRunnerStep rely on via duck typing."""
+        return self.eval_ctx
 
     def mark_step_complete(self, phase: "StepPhase") -> None:
         """No-op — the outer LocalRunContext tracks top-level step completion."""
