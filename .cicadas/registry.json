@@ -28,6 +28,19 @@
       "owner": "unknown",
       "created_at": "2026-06-03T04:02:49.195853+00:00",
       "initiative": "eval-run-error-policy"
+    },
+    "feat/autotune-foundations": {
+      "intent": "Foundations for autotune: data models (TuningConfig, IterationMetadata, AutotuneRunSummary), CompositeStep base, IterationEvalContext/IterationRunContext, TuningAgent, bundled meta-prompt template",
+      "modules": [
+        "src/gavel_ai/core/steps/base.py",
+        "src/gavel_ai/core/contexts.py",
+        "src/gavel_ai/core/autotune/tuning_agent.py",
+        "src/gavel_ai/models/config.py"
+      ],
+      "owner": "unknown",
+      "created_at": "2026-06-07T15:21:58.843604+00:00",
+      "worktree_path": "/Users/dan/dev/code/projects/python/gavel-ai-feat-autotune-foundations",
+      "initiative": "feat-autotune"
     }
   }
 }
