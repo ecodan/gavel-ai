@@ -22,7 +22,7 @@ index:
   p1: "## Partition 1: Foundations"
   p2: "## Partition 2: Engine"
   p3: "## Partition 3: Surface"
-next_section: "## Partition 2: Engine — Merge to initiative (id: 212)"
+next_section: "## Partition 3: Surface — Autotune scaffolding (id: 300)"
 ---
 
 # Tasks: feat-autotune
@@ -60,7 +60,7 @@ next_section: "## Partition 2: Engine — Merge to initiative (id: 212)"
 - [x] **Unit tests — AutotuneReporter** — `_build_context()` produces correct structure from fixture `AutotuneRunSummary`; best iteration correctly identified. **Divergence**: tests build the fixture as an `AutotuneRunData(run_summary=..., best_prompt_text=..., prompts_toml_path=...)` wrapper per the id-205 divergence, not a bare `AutotuneRunSummary`. <!-- id: 209 -->
 - [x] **Integration test** — `tests/integration/test_autotune_workflow.py`: scaffold real eval dir in `tmp_path`; mock `TuningAgent.generate_improved_prompt()` to return fixed improved prompt; run `AutotuneWorkflow` with `max_rounds=2`; assert `iterations/iteration_1/` and `iterations/iteration_2/` exist with `metadata.json` and `output_raw.jsonl`; assert `prompts.toml` has `[v1]` and `[v2]`; assert `run_summary.json` exists with correct `total_iterations=2`; assert `report.html` is non-empty; assert v2 prompt was used for iteration 2 scenarios (captured via mock LLM call). **Divergence**: also mocks `gavel_ai.processors.prompt_processor.ProviderFactory` and `gavel_ai.core.steps.judge_runner.JudgeExecutor.execute_batch` (in addition to `TuningAgent`) — required because a real end-to-end run must also exercise `ScenarioProcessorStep` and `JudgeRunnerStep` LLM calls, and `JudgeRunnerStep`'s GEval judge enforces an `expected_output`-present validation that needed real `expected_behavior` text in fixture scenarios. Chose `max_rounds=2` deliberately so `_check_convergence`'s priority-ordered checks guarantee `max_rounds_reached` convergence at iteration 2 regardless of score — yielding a fully deterministic, assertable 2-round run with exactly one `TuneStep` invocation. <!-- id: 210 -->
 - [x] **Run full test suite** — `uv run pytest -m unit && uv run pytest -m integration` passes green. **Result**: unit `1110 passed / 1 pre-existing failure (test_gavel_version, stale "0.1.0" assertion) / 2 skipped`; integration `28 passed / 4 pre-existing failures (3× test_judge_runner_mixed.py GEval expected_behavior validation, 1× test_oneshot_e2e.py stale DEFAULT_EVAL_ROOT monkeypatch)`. All 5 failures verified via `git stash`/`git stash pop` to reproduce identically without autotune changes — confirmed pre-existing and unrelated to this partition. <!-- id: 211 -->
-- [ ] **Merge to initiative** — Push `feat/autotune-engine`, merge directly into `initiative/feat-autotune` (no PR — single PR deferred to initiative completion per updated lifecycle rule) <!-- id: 212 -->
+- [x] **Merge to initiative** — Push `feat/autotune-engine`, merge directly into `initiative/feat-autotune` (no PR — single PR deferred to initiative completion per updated lifecycle rule). Pushed `feat/autotune-engine` (`a01cbe3`), merged clean via `--no-ff` into `initiative/feat-autotune` (merge commit `cb70c49`), pushed to `origin/initiative/feat-autotune`. Builder confirmed via "go". <!-- id: 212 -->
 
 ---
 
