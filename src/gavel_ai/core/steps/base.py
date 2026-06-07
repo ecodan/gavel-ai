@@ -32,6 +32,8 @@ class StepPhase(Enum):
     SCENARIO_PROCESSING = "scenario_processing"
     JUDGING = "judging"
     REPORTING = "reporting"
+    AUTOTUNE_ITERATION = "autotune_iteration"
+    TUNING = "tuning"
 
 
 class Step(ABC):
@@ -117,6 +119,26 @@ class Step(ABC):
             if policy.should_halt(tier):
                 raise RunPolicyError(log_msg, tier=tier, cause=e) from e
             return False
+
+
+class CompositeStep(Step):
+    """Base class for steps that loop over an ordered list of child steps."""
+
+    def __init__(self, child_steps: List[Step], logger: logging.Logger):
+        super().__init__(logger)
+        self.child_steps: List[Step] = child_steps
+
+    async def run_children(
+        self,
+        context: RunContext,
+        error_policy: Optional[ErrorPolicy] = None,
+    ) -> bool:
+        """Run each child step via safe_execute(); return False on first failure."""
+        for step in self.child_steps:
+            ok = await step.safe_execute(context, error_policy)
+            if not ok:
+                return False
+        return True
 
 
 class ValidationResult:

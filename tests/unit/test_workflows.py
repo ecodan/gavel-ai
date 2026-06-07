@@ -31,7 +31,7 @@ class TestStepPhase:
     def test_step_phase_iteration(self) -> None:
         """Test that StepPhase can be iterated."""
         phases = list(StepPhase)
-        assert len(phases) == 5
+        assert len(phases) == 7
 
 
 class TestValidationResult:

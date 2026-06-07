@@ -45,6 +45,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 gavel_ai = [
     "reporters/templates/*",
+    "processors/autotune_template/*",
     "skill/gavel-skill/SKILL.md",
     "skill/gavel-skill/references/*",
     "skill/gavel-skill/scripts/*",

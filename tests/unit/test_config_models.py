@@ -11,14 +11,17 @@ from pydantic import ValidationError
 from gavel_ai.models.config import (
     AgentConfig,
     AsyncConfig,
+    AutotuneRunSummary,
     ConversationalConfig,
     ElaborationConfig,
     EvalConfig,
     ExecutionConfig,
     GEvalConfig,
+    IterationMetadata,
     JudgeConfig,
     ScenariosConfig,
     TestSubject,
+    TuningConfig,
     TurnGeneratorConfig,
 )
 
@@ -817,3 +820,210 @@ class TestEvalConfigConversationalExtension:
         finally:
             # Clean up temporary file
             os.unlink(temp_file)
+
+
+class TestTuningConfig:
+    """Test TuningConfig model."""
+
+    def test_tuning_config_requires_max_rounds_and_model(self):
+        """TuningConfig requires max_rounds and tuning_agent_model."""
+        with pytest.raises(ValidationError):
+            TuningConfig()
+
+    def test_tuning_config_defaults(self):
+        """TuningConfig applies documented defaults for optional fields."""
+        config = TuningConfig(max_rounds=5, tuning_agent_model="claude-standard")
+        assert config.convergence_threshold == 0.02
+        assert config.target_score is None
+        assert config.degradation_tolerance == 0.05
+        assert config.tuning_agent_temperature == 0.7
+
+    def test_tuning_config_all_fields(self):
+        """TuningConfig accepts all documented fields."""
+        config = TuningConfig(
+            max_rounds=10,
+            convergence_threshold=0.01,
+            target_score=0.9,
+            degradation_tolerance=0.1,
+            tuning_agent_model="claude-creative",
+            tuning_agent_temperature=1.2,
+        )
+        assert config.max_rounds == 10
+        assert config.convergence_threshold == 0.01
+        assert config.target_score == 0.9
+        assert config.degradation_tolerance == 0.1
+        assert config.tuning_agent_model == "claude-creative"
+        assert config.tuning_agent_temperature == 1.2
+
+    def test_tuning_config_rejects_max_rounds_below_one(self):
+        """TuningConfig rejects max_rounds < 1."""
+        with pytest.raises(ValidationError):
+            TuningConfig(max_rounds=0, tuning_agent_model="claude-standard")
+
+    def test_tuning_config_rejects_out_of_range_scores(self):
+        """TuningConfig rejects target_score and threshold values outside [0.0, 1.0]."""
+        with pytest.raises(ValidationError):
+            TuningConfig(max_rounds=5, tuning_agent_model="claude-standard", target_score=1.5)
+        with pytest.raises(ValidationError):
+            TuningConfig(
+                max_rounds=5, tuning_agent_model="claude-standard", convergence_threshold=-0.1
+            )
+
+
+class TestIterationMetadata:
+    """Test IterationMetadata model."""
+
+    def test_iteration_metadata_basic_creation(self):
+        """IterationMetadata can be created with required fields."""
+        meta = IterationMetadata(
+            iteration=1,
+            prompt_version="v1",
+            score=0.75,
+            improvement=0.0,
+        )
+        assert meta.iteration == 1
+        assert meta.prompt_version == "v1"
+        assert meta.score == 0.75
+        assert meta.improvement == 0.0
+        assert meta.judge_scores == {}
+        assert meta.converged is False
+        assert meta.convergence_reason is None
+
+    def test_iteration_metadata_with_convergence(self):
+        """IterationMetadata records convergence details."""
+        meta = IterationMetadata(
+            iteration=3,
+            prompt_version="v3",
+            score=0.91,
+            improvement=0.01,
+            judge_scores={"similarity": 0.9, "accuracy": 0.92},
+            converged=True,
+            convergence_reason="target_score_achieved",
+        )
+        assert meta.judge_scores["similarity"] == 0.9
+        assert meta.converged is True
+        assert meta.convergence_reason == "target_score_achieved"
+
+    def test_iteration_metadata_requires_core_fields(self):
+        """IterationMetadata requires iteration, prompt_version, score, improvement."""
+        with pytest.raises(ValidationError):
+            IterationMetadata(prompt_version="v1", score=0.5, improvement=0.0)
+
+
+class TestAutotuneRunSummary:
+    """Test AutotuneRunSummary model."""
+
+    def test_autotune_run_summary_basic_creation(self):
+        """AutotuneRunSummary can be created with required fields."""
+        summary = AutotuneRunSummary(
+            eval_name="test-eval",
+            run_id="run-001",
+            total_iterations=3,
+            best_iteration=2,
+            best_score=0.91,
+            final_score=0.89,
+            converged=True,
+        )
+        assert summary.eval_name == "test-eval"
+        assert summary.run_id == "run-001"
+        assert summary.total_iterations == 3
+        assert summary.best_iteration == 2
+        assert summary.best_score == 0.91
+        assert summary.final_score == 0.89
+        assert summary.converged is True
+        assert summary.convergence_reason is None
+        assert summary.iterations == []
+
+    def test_autotune_run_summary_with_iterations(self):
+        """AutotuneRunSummary carries the full per-iteration history."""
+        summary = AutotuneRunSummary(
+            eval_name="test-eval",
+            run_id="run-002",
+            total_iterations=2,
+            best_iteration=2,
+            best_score=0.88,
+            final_score=0.88,
+            converged=True,
+            convergence_reason="minimal_improvement",
+            iterations=[
+                IterationMetadata(iteration=1, prompt_version="v1", score=0.80, improvement=0.0),
+                IterationMetadata(iteration=2, prompt_version="v2", score=0.88, improvement=0.08),
+            ],
+        )
+        assert summary.convergence_reason == "minimal_improvement"
+        assert len(summary.iterations) == 2
+        assert summary.iterations[1].score == 0.88
+
+
+class TestEvalConfigAutotuneExtension:
+    """Test EvalConfig autotune extensions."""
+
+    def test_eval_config_supports_workflow_type_autotune(self):
+        """EvalConfig accepts workflow_type='autotune' with a tuning block."""
+        config = EvalConfig(
+            workflow_type="autotune",
+            eval_type="autotune",
+            eval_name="test-autotune",
+            test_subject_type="local",
+            test_subjects=[
+                TestSubject(
+                    prompt_name="prompt",
+                    judges=[JudgeConfig(name="test", type="test.type")],
+                ),
+            ],
+            variants=["variant1"],
+            scenarios=ScenariosConfig(source="file.local", name="scenarios.json"),
+            tuning=TuningConfig(max_rounds=5, tuning_agent_model="claude-standard"),
+        )
+        assert config.workflow_type == "autotune"
+        assert config.tuning is not None
+        assert config.tuning.max_rounds == 5
+        assert config.tuning.tuning_agent_model == "claude-standard"
+
+    def test_eval_config_tuning_defaults_to_none(self):
+        """EvalConfig.tuning is optional and defaults to None for non-autotune workflows."""
+        config = EvalConfig(
+            eval_type="oneshot",
+            eval_name="test-eval",
+            test_subject_type="local",
+            test_subjects=[
+                TestSubject(
+                    prompt_name="prompt",
+                    judges=[JudgeConfig(name="test", type="test.type")],
+                ),
+            ],
+            variants=["v1"],
+            scenarios=ScenariosConfig(source="file.local", name="scenarios.json"),
+        )
+        assert config.tuning is None
+
+    def test_eval_config_load_autotune_from_json(self):
+        """EvalConfig can load an autotune config with a tuning block from JSON."""
+        config_dict = {
+            "workflow_type": "autotune",
+            "eval_type": "autotune",
+            "eval_name": "test-autotune",
+            "test_subject_type": "local",
+            "test_subjects": [
+                {"prompt_name": "prompt", "judges": [{"name": "test", "type": "test.type"}]}
+            ],
+            "variants": ["variant1"],
+            "scenarios": {"source": "file.local", "name": "scenarios.json"},
+            "tuning": {
+                "max_rounds": 8,
+                "convergence_threshold": 0.03,
+                "target_score": 0.85,
+                "degradation_tolerance": 0.07,
+                "tuning_agent_model": "claude-standard",
+                "tuning_agent_temperature": 0.5,
+            },
+        }
+        config = EvalConfig.model_validate(config_dict)
+        assert config.workflow_type == "autotune"
+        assert config.tuning is not None
+        assert config.tuning.max_rounds == 8
+        assert config.tuning.convergence_threshold == 0.03
+        assert config.tuning.target_score == 0.85
+        assert config.tuning.degradation_tolerance == 0.07
+        assert config.tuning.tuning_agent_model == "claude-standard"
+        assert config.tuning.tuning_agent_temperature == 0.5
