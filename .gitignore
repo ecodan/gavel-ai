@@ -269,3 +269,4 @@ cython_debug/
 # gavel
 evals/*/runs/
 .gavel/gavel.log
+/evals/
