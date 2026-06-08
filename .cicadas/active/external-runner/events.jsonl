@@ -1,0 +1,1 @@
+{"timestamp":"2026-06-08T17:41:52.049328+00:00","type":"initiative.kicked_off","initiative":"external-runner","branch":"master","data":{"intent":"Lets Gavel delegate task and judge execution to systems outside its own process via test_subject_type 'external' with protocol 'http' or 'script'"}}
