@@ -13,6 +13,7 @@ not data directly. Steps call .read() or .write() on data sources.
 
 import logging
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -722,6 +723,82 @@ class LocalRunContext(RunContext):
         return self._run_logger
 
 
+class IterationEvalContext:
+    """
+    Wraps a LocalFileSystemEvalContext for autotune iterations.
+
+    Overrides get_prompt() to read the current iteration's prompt version (vN)
+    from the run-local prompts.toml, falling back to the wrapped context's
+    base prompt (v1) when prompts.toml does not yet exist (first iteration,
+    before PrepareStep writes it). All other access delegates to the base.
+    """
+
+    def __init__(self, base: "LocalFileSystemEvalContext", prompts_toml_path: Path, version: str):
+        self._base = base
+        self._prompts_toml_path = prompts_toml_path
+        self._version = version  # e.g. "v2"
+
+    @property
+    def prompts_toml_path(self) -> Path:
+        """Path to the run-local prompts.toml that holds generated prompt versions."""
+        return self._prompts_toml_path
+
+    @property
+    def version(self) -> str:
+        """Current iteration's prompt version key, e.g. "v2"."""
+        return self._version
+
+    def get_prompt(self, prompt_ref: str) -> str:
+        """Load vN from runs/<id>/prompts.toml; fall back to base for v1."""
+        import tomllib
+
+        if self._prompts_toml_path.exists():
+            with open(self._prompts_toml_path, "rb") as f:
+                data = tomllib.load(f)
+            section = data.get(self._version)
+            if section and "prompt" in section:
+                return section["prompt"]
+        return self._base.get_prompt(prompt_ref)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._base, name)
+
+
+@dataclass
+class IterationRunContext:
+    """
+    Thin per-iteration run context that redirects result/judgment storage
+    to iterations/iteration_N/ within the outer run directory.
+
+    Shares eval_ctx (an IterationEvalContext), run_id, and run_logger with
+    the outer LocalRunContext; mark_step_complete() is a no-op since the
+    outer context tracks top-level step completion.
+    """
+
+    eval_ctx: IterationEvalContext
+    run_id: str
+    run_logger: logging.Logger
+    run_dir: Path
+    results_raw: RecordDataSource
+    last_step_error: Optional[Exception] = None
+    processor_results: List[OutputRecord] = field(default_factory=list)
+    evaluation_results: Optional[List[Dict[str, Any]]] = None
+    evaluation_results_data: List[JudgedRecord] = field(default_factory=list)
+    deterministic_metrics: Dict[str, Any] = field(default_factory=dict)
+    test_subject: Optional[str] = None
+    model_variant: Optional[str] = None
+
+    @property
+    def eval_context(self) -> IterationEvalContext:
+        """Alias for eval_ctx — satisfies the RunContext.eval_context contract that
+        ScenarioProcessorStep and JudgeRunnerStep rely on via duck typing."""
+        return self.eval_ctx
+
+    def mark_step_complete(self, phase: "StepPhase") -> None:
+        """No-op — the outer LocalRunContext tracks top-level step completion."""
+        pass
+
+
 __all__ = [
     # Abstract base classes
     "EvalContext",
@@ -729,4 +806,7 @@ __all__ = [
     # Concrete implementations
     "LocalFileSystemEvalContext",
     "LocalRunContext",
+    # Autotune per-iteration contexts
+    "IterationEvalContext",
+    "IterationRunContext",
 ]

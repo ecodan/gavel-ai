@@ -104,7 +104,7 @@ def _update_gitignore(eval_root: str) -> None:
 # Register workflow subcommands
 app.add_typer(oneshot.app, name="oneshot", help="OneShot evaluation workflow commands")
 app.add_typer(conv.app, name="conv", help="Conversational evaluation workflow commands (v2+)")
-app.add_typer(autotune.app, name="autotune", help="Autotune evaluation workflow commands (v3+)")
+app.add_typer(autotune.app, name="autotune", help="Autotune evaluation workflow commands")
 app.add_typer(skill.app, name="skill", help="Manage the gavel Claude Code skill")
 
 

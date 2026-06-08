@@ -52,6 +52,7 @@ Ask one clarifying question if needed, or infer from context:
 | Generate a report | `gavel oneshot report --run <run-id>` (§7) |
 | Interpret results | Explain scores, regressions, milestones (§8) |
 | Generate scenarios (conv) | `gavel conv generate --eval <name>` |
+| Automatically optimize a prompt | Walk the autotune setup flow (§13) |
 
 ---
 
@@ -354,7 +355,99 @@ gavel oneshot milestone --run <id> --remove    # remove milestone
 
 ---
 
-### 13. Keeping references current
+### 13. Autotune — automated prompt optimization
+
+Autotune runs an iterative `execute → judge → improve` loop: an LLM
+meta-optimizer (`TuningAgent`) rewrites the prompt based on judge feedback each
+round, until the score converges, plateaus, degrades, or `max_rounds` is
+reached. Walk the user through these seven stages in order.
+
+#### Stage 1 — Prerequisite check
+
+Before starting, confirm:
+- A working `oneshot` eval already exists for this prompt (it has run at least once successfully)
+- `workflow_type` in `eval_config.json` is **not** already `"autotune"` (if it is, skip to Stage 5 — setup is done)
+- At least one **LLM judge** (e.g. `deepeval.geval`) is configured — autotune needs a numeric score signal; deterministic judges (`classifier`/`regression`) alone are not enough
+- `gavel autotune create` is available (`gavel autotune --help`)
+
+If any prerequisite is missing, explain what's missing and how to fix it before continuing — don't proceed with a half-configured setup.
+
+#### Stage 2 — Config setup
+
+Either scaffold a new eval with `gavel autotune create --eval <name>` (writes a
+ready-to-edit `eval_config.json` with `workflow_type: "autotune"` and a
+`tuning` block already in place), or add a `tuning` block to an existing
+`eval_config.json`:
+
+```json
+"tuning": {
+  "max_rounds": 5,
+  "convergence_threshold": 0.02,
+  "target_score": 0.8,
+  "degradation_tolerance": 0.05,
+  "tuning_agent_model": "<model-id-from-agents-json>",
+  "tuning_agent_temperature": 0.7
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `max_rounds` | Hard upper bound on iterations (recommend 3–5 for first runs) |
+| `convergence_threshold` | Stop when `\|current_score - previous_score\| < threshold` (0.0–1.0 scale) |
+| `target_score` | Optional early stop once `avg_score` reaches this value (0.0–1.0 scale, e.g. `0.8` = 80%) |
+| `degradation_tolerance` | Stop if `avg_score` drops by more than this amount round-over-round |
+| `tuning_agent_model` | Must match a key under `_models` in `agents.json` — this is the meta-optimizer LLM |
+| `tuning_agent_temperature` | Temperature for the meta-optimizer's rewrite calls |
+
+#### Stage 3 — Meta-prompt setup
+
+Autotune ships with a bundled meta-prompt that instructs the optimizer LLM how
+to rewrite the prompt from judge feedback. Most users don't need to touch it.
+
+- Default (bundled): `processors/autotune_template/autotune.toml`
+- Override: create `config/prompts/autotune.toml` in the eval directory — autotune prefers this if present
+- Available `{{var}}` template variables: `{{current_prompt}}`, `{{judge_feedback}}`, `{{avg_score}}`, `{{iteration}}`, `{{max_rounds}}`, `{{target_score}}`, `{{placeholder_vars}}`
+- Only override if the bundled guidance is producing poor rewrites for this domain
+
+#### Stage 4 — Run autotune
+
+```bash
+gavel autotune run --eval <name>
+gavel autotune run --eval <name> --run <run-id>   # resume an interrupted run
+```
+
+Expected output: a per-iteration progress table (prompt version, score,
+improvement, convergence reason), a convergence summary, and the path to
+`runs/<run_id>/report.html`. On failure, gavel prints a Rich error panel to
+stderr — read it the same way as described in §10.
+
+#### Stage 5 — Interpret the report
+
+Open `runs/<run_id>/report.html`:
+- **Score Progression Table** — look for steady improvement; a plateau signals convergence, a drop signals a degradation stop
+- **Per-Judge Detail** — if one judge's trend diverges sharply from the others, check that judge's `criteria`/`evaluation_steps` for misconfiguration before trusting the overall trend
+- **Best Prompt Version** — the highlighted row is the iteration to promote
+- Treat a single run as a starting point, not a final answer — re-run on fresh scenarios to validate that the improvement generalizes
+
+#### Stage 6 — Promote the best prompt
+
+1. Open `runs/<run_id>/prompts.toml` and find the highlighted `[v{N}]` (the best version from the report)
+2. Copy its `prompt = "..."` value
+3. Open the eval's permanent `config/prompts/<eval-name>.toml`
+4. Append it as a new versioned entry, e.g. `v2 = '''...'''`
+5. Update `eval_config.json` → `test_subjects[0].prompt_name` to `"<eval-name>:v2"` to pin it, or leave it as `"<eval-name>:latest"` to always use the newest version
+6. Validate on the full scenario set: `gavel oneshot run --eval <name>`
+
+#### Stage 7 — Next iteration
+
+Ask: "Do you want to keep tuning from the promoted prompt?" If yes, start a
+**fresh** autotune run — don't resume the previous run's `prompts.toml`. The
+newly promoted prompt becomes the new `v1` baseline for the next round of
+tuning.
+
+---
+
+### 14. Keeping references current
 
 When CLI or config schemas change:
 ```bash

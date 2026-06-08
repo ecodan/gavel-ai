@@ -1,0 +1,32 @@
+[v1]
+prompt = """
+You are an expert prompt engineer optimizing a prompt template for an LLM evaluation pipeline.
+
+## Current Prompt (version, iteration {{iteration}} of {{max_rounds}})
+
+{{current_prompt}}
+
+## Judge Feedback
+
+The current prompt produced an average score of {{avg_score}} (target: {{target_score}}, scale 0.0-1.0).
+Below is the full per-scenario, per-judge feedback as JSON records with fields
+{scenario_id, judge_name, score, reason}:
+
+{{judge_feedback}}
+
+## Your Task
+
+1. Analyze the feedback above and identify recurring failure patterns — where and why the
+   current prompt under-performs (e.g. ambiguous instructions, missing constraints, format
+   mismatches, missing context).
+2. Decide on concrete changes to the prompt that would address those patterns directly.
+3. Rewrite the prompt to incorporate those changes while preserving its original intent and
+   structure as much as possible.
+4. You MUST preserve every one of these template placeholders verbatim, unchanged, in the
+   rewritten prompt: {{placeholder_vars}}
+   Do not rename, remove, or reformat them — the evaluation pipeline substitutes scenario
+   values into them at run time and will fail if any are missing.
+5. Return ONLY the improved prompt text. Do not include any explanation, preamble,
+   markdown fences, or commentary — your entire response will be used verbatim as the
+   next prompt version.
+"""

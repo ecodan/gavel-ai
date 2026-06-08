@@ -200,12 +200,76 @@ class ConversationalConfig(BaseModel):
     )
 
 
+class TuningConfig(BaseModel):
+    """Autotune optimization configuration."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    max_rounds: int = Field(..., description="Hard upper bound on optimization iterations", ge=1)
+    convergence_threshold: float = Field(
+        0.02,
+        description="Stop if |current_score - previous_score| < threshold (0.0-1.0 scale)",
+        ge=0.0,
+        le=1.0,
+    )
+    target_score: Optional[float] = Field(
+        None,
+        description="Stop early when avg_score reaches this value (0.0-1.0 scale)",
+        ge=0.0,
+        le=1.0,
+    )
+    degradation_tolerance: float = Field(
+        0.05,
+        description="Stop if avg_score drops by more than this amount (0.0-1.0 scale)",
+        ge=0.0,
+        le=1.0,
+    )
+    tuning_agent_model: str = Field(
+        ..., description="Model ID from agents.json to use for TuningAgent"
+    )
+    tuning_agent_temperature: float = Field(
+        0.7, description="Temperature for TuningAgent LLM calls", ge=0.0, le=2.0
+    )
+
+
+class IterationMetadata(BaseModel):
+    """Per-iteration record persisted to iterations/iteration_N/metadata.json."""
+
+    iteration: int
+    prompt_version: str = Field(..., description='Prompt version used this iteration, e.g. "v1"')
+    score: float = Field(..., description="Mean normalized score across all scenarios+judges (0.0-1.0)")
+    improvement: float = Field(..., description="current_score - previous_score (0.0 for iteration 1)")
+    judge_scores: Dict[str, float] = Field(
+        default_factory=dict, description="Per-judge mean score breakdown: {judge_name: mean_score}"
+    )
+    converged: bool = False
+    convergence_reason: Optional[str] = Field(
+        None,
+        description='One of "max_rounds_reached" | "target_score_achieved" | '
+        '"minimal_improvement" | "performance_degraded" | None',
+    )
+
+
+class AutotuneRunSummary(BaseModel):
+    """Run-level summary persisted to runs/<id>/run_summary.json and used by the reporter."""
+
+    eval_name: str
+    run_id: str
+    total_iterations: int
+    best_iteration: int
+    best_score: float
+    final_score: float
+    converged: bool
+    convergence_reason: Optional[str] = None
+    iterations: List[IterationMetadata] = Field(default_factory=list)
+
+
 class EvalConfig(BaseModel):
     """Evaluation configuration model."""
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)  # Forward compatible
 
-    workflow_type: Literal["oneshot", "conversational"] = Field(
+    workflow_type: Literal["oneshot", "conversational", "autotune"] = Field(
         "oneshot", description="Type of evaluation workflow"
     )
     eval_type: str = Field(..., description="Evaluation type (oneshot, conversational, autotune)")
@@ -224,6 +288,9 @@ class EvalConfig(BaseModel):
     )
     error_policy: ErrorPolicy = Field(
         default_factory=ErrorPolicy, description="Run error/warning policy"
+    )
+    tuning: Optional[TuningConfig] = Field(
+        None, description="Autotune optimization configuration (required when workflow_type='autotune')"
     )
 
     @model_validator(mode="after")
