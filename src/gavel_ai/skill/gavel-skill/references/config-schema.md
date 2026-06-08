@@ -63,7 +63,7 @@ Pydantic model: `gavel_ai.models.config.EvalConfig`
 | `workflow_type` | `"oneshot" \| "conversational"` | Auto | Code-internal field; defaults to `"oneshot"`. Set automatically — do not change manually. |
 | `eval_name` | string | Yes | Matches the directory name under `.gavel/evaluations/` |
 | `description` | string | No | Human-readable description of this eval |
-| `test_subject_type` | `"local" \| "remote"` | Yes | `"local"` = prompt-based; `"remote"` = in-situ system |
+| `test_subject_type` | `"local" \| "external"` | Yes | `"local"` = prompt-based; `"external"` = drives a real system under test via HTTP or subprocess. **Migration note:** `"in-situ"` is accepted as a deprecated alias — it normalizes internally to `"external"` and emits a `WARNING`-tier deprecation log; update configs still using `"in-situ"` to `"external"`. |
 | `test_subjects` | array | Yes | One or more test subjects (see below) |
 | `variants` | string[] | No | List of model keys from `agents.json._models` to test |
 | `scenarios` | object | Yes | Scenario source config (see below) |
@@ -101,10 +101,33 @@ Controls how the run responds to ERROR and WARNING-tier issues. All fields are o
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `prompt_name` | string | If local | Name of prompt in `prompts/` (without `.toml`) |
-| `system_id` | string | If remote | Identifier for the remote system under test |
-| `protocol` | `"acp" \| "open_ai"` | No | Remote protocol (remote only) |
-| `config` | object | No | Additional subject config |
+| `system_id` | string | If external | Identifier for the external system under test |
+| `protocol` | `"http" \| "script"` | If external | Transport for driving the external system. `Literal`, required when `test_subject_type == "external"`. `"http"` = call an HTTP endpoint; `"script"` = invoke a subprocess (CLI/script). |
+| `abort_on_exec_failure` | bool | No (default `True`) | Halt the run when the external invocation itself fails (process crash, non-2xx transport error, timeout) — i.e. a `PROCESS_FAILURE`-tier outcome. Set `false` to record the failure on the scenario's `OutputRecord` and continue. |
+| `abort_on_process_error` | bool | No (default `False`) | Halt the run when the external system executes but reports an application-level issue (`status: "error"` / non-empty `issue` in its response envelope) — i.e. a `PROCESS_SUCCESS_WITH_ISSUE`-tier outcome. Set `true` for fail-fast on application errors. |
+| `adapter` | `string \| null` | No (default `"gavel"`) | Wire-format/envelope identity, orthogonal to `protocol` (the transport axis). Reserved for future front-door (native-protocol) adapters; only `"gavel"` (Gavel's own `ExternalTaskRequest`/`ExternalResponseEnvelope` glue) is implemented today. Omitting it preserves current behavior exactly. |
+| `config` | object | No | Additional subject config; shape depends on `protocol` (see below) |
 | `judges` | array | No | Judges applied to this subject's output |
+
+#### `test_subjects[].config` for `protocol: "http"`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `endpoint` | string | Yes | URL of the HTTP endpoint to call |
+| `method` | string | No | HTTP method (e.g. `"POST"`) |
+| `headers` | object | No | Static headers to send with each request |
+| `auth` | object | No | Authentication config (e.g. bearer token, API key) |
+| `trace_header` | string | No | Header name used to round-trip a `trace_id` for request/response correlation |
+
+#### `test_subjects[].config` for `protocol: "script"`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `command` | string[] | Yes | Argument-list invocation (e.g. `["python", "run.py"]`) — never a shell string |
+| `args` | string[] | No | Additional arguments appended to `command` |
+| `working_dir` | string | No | Working directory for the subprocess |
+| `timeout` | number | No | Max seconds to wait for the subprocess to complete |
+| `request_filename` / `response_filename` | string | No | Filenames (not paths) used to exchange the request/response payloads in the per-invocation temp directory |
 
 ### `test_subjects[].judges[]`
 

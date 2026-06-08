@@ -4,6 +4,10 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from gavel_ai.log_config import create_logger
+
+logger = create_logger(__name__)
+
 
 class ErrorPolicy(BaseModel):
     """Controls how the eval run responds to ERROR and WARNING-tier issues."""
@@ -119,10 +123,40 @@ class TestSubject(BaseModel):
 
     prompt_name: Optional[str] = Field(None, description="Prompt template name")
     judges: List[JudgeConfig] = Field(..., description="Judges for this test subject")
-    # For remote (closed-box) evaluations
-    system_id: Optional[str] = Field(None, description="Remote system identifier")
-    protocol: Optional[str] = Field(None, description="Protocol (acp, open_ai)")
-    config: Optional[Dict[str, Any]] = Field(None, description="Remote system config")
+    # For external (closed-box) evaluations
+    system_id: Optional[str] = Field(None, description="External system identifier")
+    protocol: Optional[Literal["http", "script"]] = Field(
+        None, description="External transport protocol (active when test_subject_type='external')"
+    )
+    config: Optional[Dict[str, Any]] = Field(None, description="External system config")
+    abort_on_exec_failure: bool = Field(
+        True, description="Halt the run on PROCESS_FAILURE-tier external outcomes"
+    )
+    abort_on_process_error: bool = Field(
+        False, description="Halt the run on PROCESS_SUCCESS_WITH_ISSUE-tier external outcomes"
+    )
+    # Reserved forward-compat seam (ADR-10): only "gavel" is implemented in this MVP;
+    # omitting it or passing "gavel" are equivalent and preserve current behavior exactly.
+    adapter: Optional[str] = Field("gavel", description="Wire-format adapter identifier")
+
+    @model_validator(mode="after")
+    def validate_protocol_config(self) -> "TestSubject":
+        """Validate protocol-specific `config` sub-shape for external test subjects."""
+        if self.protocol == "http":
+            if self.config is not None and "command" in self.config:
+                raise ValueError(
+                    "TestSubject.config for protocol='http' must not include 'command' "
+                    "(that is a 'script' protocol field) - expected keys like "
+                    "endpoint/method/headers/auth/trace_header"
+                )
+        elif self.protocol == "script":
+            if self.config is not None and "endpoint" in self.config:
+                raise ValueError(
+                    "TestSubject.config for protocol='script' must not include 'endpoint' "
+                    "(that is an 'http' protocol field) - expected keys like "
+                    "command/args/working_dir/timeout/request_filename/response_filename"
+                )
+        return self
 
 
 class GEvalConfig(BaseModel):
@@ -275,7 +309,7 @@ class EvalConfig(BaseModel):
     eval_type: str = Field(..., description="Evaluation type (oneshot, conversational, autotune)")
     eval_name: str = Field(..., description="Evaluation name")
     description: Optional[str] = Field(None, description="Evaluation description")
-    test_subject_type: str = Field(..., description="Test subject type (local or remote)")
+    test_subject_type: str = Field(..., description="Test subject type (local or external)")
     test_subjects: List[TestSubject] = Field(..., description="Test subjects")
     variants: List[str] = Field(..., description="Variants to test")
     scenarios: ScenariosConfig = Field(..., description="Scenarios configuration")
@@ -292,6 +326,26 @@ class EvalConfig(BaseModel):
     tuning: Optional[TuningConfig] = Field(
         None, description="Autotune optimization configuration (required when workflow_type='autotune')"
     )
+
+    @model_validator(mode="after")
+    def validate_test_subject_type(self) -> "EvalConfig":
+        """Accept 'local'/'external', and normalize the deprecated 'in-situ' alias.
+
+        'in-situ' validates (for one minor version, per the migration plan) but is
+        normalized internally to 'external' with a single WARNING-tier deprecation log.
+        """
+        if self.test_subject_type == "in-situ":
+            logger.warning(
+                "test_subject_type 'in-situ' is deprecated and has been normalized to "
+                "'external' - update eval_config.json to use 'external' directly"
+            )
+            self.test_subject_type = "external"
+        elif self.test_subject_type not in ("local", "external"):
+            raise ValueError(
+                f"test_subject_type must be one of 'local', 'external' (or the deprecated "
+                f"alias 'in-situ') - got '{self.test_subject_type}'"
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_conversational_config(self) -> "EvalConfig":
