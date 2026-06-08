@@ -220,6 +220,27 @@ Configured once per eval; applies to every `deepeval.geval` judge in the run.
 | `turn_generator.max_tokens` | int | 500 | Max tokens per generated turn |
 | `elaboration.enabled` | bool | false | Enable turn elaboration |
 
+### `tuning` (required when `workflow_type: "autotune"`)
+
+All numeric score fields are on the **0.0–1.0 scale** (GEval scores, which
+DeepEval reports on a 0–10 scale, are normalized by dividing by 10 before
+comparison; deterministic `classifier`/`regression` scores already pass
+through unchanged on 0.0–1.0).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `max_rounds` | int | — (required, ≥ 1) | Hard upper bound on optimization iterations |
+| `convergence_threshold` | float | 0.02 | Stop if `\|current_score - previous_score\| < threshold` (0.0–1.0) |
+| `target_score` | float \| null | null | Stop early once `avg_score` reaches this value (0.0–1.0); omit/null to disable |
+| `degradation_tolerance` | float | 0.05 | Stop if `avg_score` drops by more than this amount round-over-round (0.0–1.0) |
+| `tuning_agent_model` | string | — (required) | Model ID — must match a key under `_models` in `agents.json`; this is the meta-optimizer LLM, independent of the variant(s) being tuned |
+| `tuning_agent_temperature` | float | 0.7 | Temperature for the meta-optimizer's rewrite calls (0.0–2.0) |
+
+Convergence is checked in priority order each round: `max_rounds_reached` →
+`target_score_achieved` → `minimal_improvement` → `performance_degraded`. The
+first criterion that matches stops the run and is recorded as
+`convergence_reason` in `run_summary.json` and the HTML report.
+
 ---
 
 ## `agents.json`
@@ -277,6 +298,32 @@ Updated prompt text.
 - `"latest"` resolves to the highest numbered version at runtime
 - `{{input}}` is the standard variable for scenario `input` field injection
 - Prompts are TOML triple-quoted strings — avoid unescaped triple quotes in content
+
+### `runs/<run_id>/prompts.toml` (autotune runtime, not a config file)
+
+Autotune writes its own per-run `prompts.toml` inside `runs/<run_id>/` —
+distinct from the eval's permanent `config/prompts/{name}.toml`. `v1` is
+seeded from the eval's current prompt at run start; each subsequent version is
+appended by `TuneStep` after a judged iteration:
+
+```toml
+[v1]
+prompt = "Original seed prompt text..."
+
+[v2]
+prompt = "LLM-rewritten prompt text..."
+iteration = 1
+avg_score = 0.742
+```
+
+| Field | Present on | Description |
+|---|---|---|
+| `prompt` | all versions | The full prompt text used for that iteration |
+| `iteration` | `v2+` | The 1-based iteration number that produced this version |
+| `avg_score` | `v2+` | The judged score (0.0–1.0, normalized) that triggered this rewrite |
+
+This file is what you copy from when promoting a winning version — see the
+autotune skill section (§13, Stage 6) for the promotion steps.
 
 ---
 

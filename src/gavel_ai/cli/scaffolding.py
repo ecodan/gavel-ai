@@ -467,6 +467,86 @@ User message: {{input}}
         f.write(prompt_template)
 
 
+def generate_autotune_templates(eval_root: Path, eval_name: str) -> None:
+    """
+    Generate the scaffold for an autotune evaluation.
+
+    Writes eval_config.json (``workflow_type="autotune"`` with a documented
+    ``tuning`` block), agents.json, config/prompts/<eval_name>.toml (v1
+    placeholder), and an empty data/scenarios.json. The Builder fills in
+    scenarios and adjusts the ``tuning`` block before running
+    ``gavel autotune run``.
+    """
+    create_directory_structure(eval_root, eval_name)
+    generate_agents_config(eval_root, eval_name)
+
+    eval_config: Dict[str, Any] = {
+        "workflow_type": "autotune",
+        "eval_type": "autotune",
+        "test_subject_type": "local",
+        "eval_name": eval_name,
+        "description": "Autotune evaluation scaffolded by gavel autotune create",
+        "test_subjects": [
+            {
+                "prompt_name": eval_name,
+                "judges": [
+                    {
+                        "name": "quality",
+                        "type": "deepeval.geval",
+                        "config": {
+                            "model": "gpt-5-mini",
+                            "criteria": "Evaluate the quality and accuracy of the response",
+                            "evaluation_steps": [
+                                "Check if the response is accurate",
+                                "Verify completeness of answer",
+                                "Assess clarity and usefulness",
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
+        "variants": ["claude_haiku"],
+        "scenarios": {
+            "source": "file.local",
+            "name": "scenarios.json",
+            "field_mapping": {"expected_output": "expected"},
+        },
+        "execution": {"max_concurrent": 10},
+        "tuning": {
+            "max_rounds": 5,
+            "convergence_threshold": 0.02,
+            "target_score": None,
+            "degradation_tolerance": 0.05,
+            "tuning_agent_model": "claude-haiku",
+            "tuning_agent_temperature": 0.7,
+        },
+    }
+
+    output_file = eval_root / eval_name / "config" / "eval_config.json"
+    with open(output_file, "w") as f:
+        json.dump(eval_config, f, indent=2)
+
+    prompt_template = """v1 = '''
+You are a helpful AI assistant.
+
+User question: {{input}}
+
+Provide a short, clear, accurate answer.
+'''
+"""
+
+    prompt_file = eval_root / eval_name / "config" / "prompts" / f"{eval_name}.toml"
+    with open(prompt_file, "w") as f:
+        f.write(prompt_template)
+
+    scenarios_file = eval_root / eval_name / "data" / "scenarios.json"
+    with open(scenarios_file, "w") as f:
+        json.dump([], f, indent=2)
+
+    _generate_quality_judge_toml(eval_root, eval_name)
+
+
 def generate_all_templates(
     eval_root: Path, eval_name: str, eval_type: str, template: str = "default"
 ) -> None:
