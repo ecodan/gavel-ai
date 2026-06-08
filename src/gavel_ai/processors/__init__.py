@@ -12,11 +12,13 @@ from gavel_ai.processors.base import InputProcessor
 from gavel_ai.processors.external_http_processor import ExternalHttpProcessor
 from gavel_ai.processors.prompt_processor import PromptInputProcessor
 from gavel_ai.processors.scenario_processor import ScenarioProcessor
+from gavel_ai.processors.script_processor import ScriptInputProcessor
 
 # Export public API
 __all__ = [
     "InputProcessor",
     "PromptInputProcessor",
     "ExternalHttpProcessor",
+    "ScriptInputProcessor",
     "ScenarioProcessor",
 ]

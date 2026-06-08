@@ -32,10 +32,12 @@ from gavel_ai.models.runtime import (
     ProcessorResult,
     PromptInput,
     RemoteSystemInput,
+    ScriptSystemInput,
 )
 from gavel_ai.processors.base import InputProcessor
 from gavel_ai.processors.external_http_processor import ExternalHttpProcessor
 from gavel_ai.processors.prompt_processor import PromptInputProcessor
+from gavel_ai.processors.script_processor import ScriptInputProcessor
 
 
 def _make_output_record(
@@ -250,6 +252,39 @@ class ScenarioProcessorStep(Step):
                 f"Created {len(inputs)} RemoteSystemInput objects for external+http"
             )
 
+        elif (
+            eval_config.test_subject_type == "external"
+            and test_subject_config.protocol == "script"
+        ):
+            subject_config_s: Dict[str, Any] = test_subject_config.config or {}
+            command: List[Any] = subject_config_s.get("command")
+            if not command or not isinstance(command, list):
+                raise ConfigError(
+                    "TestSubject.config.command is required and must be a list for protocol='script' - "
+                    "Add command to test_subjects[0].config in eval_config.json"
+                )
+            request_filename: str = str(subject_config_s.get("request_filename", "request.json"))
+            response_filename: str = str(subject_config_s.get("response_filename", "response.json"))
+            for scenario in scenarios:
+                request_payload: Dict[str, Any] = {
+                    "scenario_id": scenario.id,
+                    "input": scenario.input,
+                }
+                if scenario.metadata:
+                    request_payload["metadata"] = scenario.metadata
+                inputs.append(
+                    ScriptSystemInput(
+                        id=scenario.id,
+                        command=[str(c) for c in command],
+                        request_payload=request_payload,
+                        request_filename=request_filename,
+                        response_filename=response_filename,
+                    )
+                )
+            self.logger.info(
+                f"Created {len(inputs)} ScriptSystemInput objects for external+script"
+            )
+
         models = agents_config.get("_models", {})
         all_records: List[OutputRecord] = []
         first_test_subject: str = ""
@@ -290,6 +325,11 @@ class ScenarioProcessorStep(Step):
                 and test_subject_config.protocol == "http"
             ):
                 processor_type = "external_http"
+            elif (
+                eval_config.test_subject_type == "external"
+                and test_subject_config.protocol == "script"
+            ):
+                processor_type = "external_script"
             else:
                 processor_type = "external_http"
 
@@ -322,10 +362,17 @@ class ScenarioProcessorStep(Step):
                     trace_header=subject_cfg.get("trace_header", "X-Gavel-Trace-Id"),
                     adapter=test_subject_config.adapter or "gavel",
                 )
+            elif processor_type == "external_script":
+                processor = ScriptInputProcessor(
+                    config=processor_config,
+                    abort_on_exec_failure=test_subject_config.abort_on_exec_failure,
+                    abort_on_process_error=test_subject_config.abort_on_process_error,
+                    adapter=test_subject_config.adapter or "gavel",
+                )
             else:
                 raise ConfigError(
                     f"Unknown processor_type '{processor_type}' - "
-                    f"Use 'prompt_input' or 'external_http'"
+                    f"Use 'prompt_input', 'external_http', or 'external_script'"
                 )
 
             def _spool_result(input_item: Input, result: ProcessorResult) -> None:
