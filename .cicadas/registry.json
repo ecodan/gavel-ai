@@ -6,12 +6,6 @@
       "owner": "unknown",
       "signals": [],
       "created_at": "2026-06-03T04:02:40.709698+00:00"
-    },
-    "feat-autotune": {
-      "intent": "Automated iterative prompt optimization using an LLM-as-meta-optimizer (TuningAgent) that runs execute\u2192judge\u2192improve loops until convergence, plus an agent skill extension for guided end-to-end autotune setup",
-      "owner": "unknown",
-      "signals": [],
-      "created_at": "2026-06-06T02:30:40.593861+00:00"
     }
   },
   "branches": {
@@ -28,46 +22,6 @@
       "owner": "unknown",
       "created_at": "2026-06-03T04:02:49.195853+00:00",
       "initiative": "eval-run-error-policy"
-    },
-    "feat/autotune-foundations": {
-      "intent": "Foundations for autotune: data models (TuningConfig, IterationMetadata, AutotuneRunSummary), CompositeStep base, IterationEvalContext/IterationRunContext, TuningAgent, bundled meta-prompt template",
-      "modules": [
-        "src/gavel_ai/core/steps/base.py",
-        "src/gavel_ai/core/contexts.py",
-        "src/gavel_ai/core/autotune/tuning_agent.py",
-        "src/gavel_ai/models/config.py"
-      ],
-      "owner": "unknown",
-      "created_at": "2026-06-07T15:21:58.843604+00:00",
-      "worktree_path": "/Users/dan/dev/code/projects/python/gavel-ai-feat-autotune-foundations",
-      "initiative": "feat-autotune"
-    },
-    "feat/autotune-engine": {
-      "intent": "Engine: iteration loop (TuneStep, AutotuneIterationStep with 4-criteria convergence), AutotuneWorkflow orchestration with resume support, and AutotuneReporter + HTML report template for the autotune feature",
-      "modules": [
-        "src/gavel_ai/reporters/templates/autotune.html",
-        "src/gavel_ai/core/workflows/autotune.py",
-        "src/gavel_ai/reporters/autotune_reporter.py",
-        "src/gavel_ai/core/steps/tune_step.py",
-        "src/gavel_ai/core/steps/autotune_iteration_step.py"
-      ],
-      "owner": "unknown",
-      "created_at": "2026-06-07T21:12:19.029551+00:00",
-      "initiative": "feat-autotune"
-    },
-    "feat/autotune-surface": {
-      "intent": "CLI commands (gavel autotune create/run), eval scaffolding templates, integration tests, and 7-stage gavel-skill autotune documentation section \u2014 the user-facing shell that makes autotune accessible",
-      "modules": [
-        "cli/commands/autotune.py",
-        "skill/gavel-skill/SKILL.md",
-        "skill/gavel-skill/references/cli-reference.md",
-        "cli/scaffolding.py",
-        "tests/integration/test_autotune_workflow.py",
-        "skill/gavel-skill/references/config-schema.md"
-      ],
-      "owner": "unknown",
-      "created_at": "2026-06-08T00:05:23.821048+00:00",
-      "initiative": "feat-autotune"
     }
   }
 }
