@@ -22,7 +22,7 @@ index:
   p1: "## Partition 1: Foundations"
   p2: "## Partition 2: Engine"
   p3: "## Partition 3: Surface"
-next_section: "## Partition 3: Surface — Autotune scaffolding (id: 300)"
+next_section: "## Initiative Completion (id: 400)"
 ---
 
 # Tasks: feat-autotune
