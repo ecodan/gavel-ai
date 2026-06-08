@@ -473,9 +473,10 @@ def generate_autotune_templates(eval_root: Path, eval_name: str) -> None:
 
     Writes eval_config.json (``workflow_type="autotune"`` with a documented
     ``tuning`` block), agents.json, config/prompts/<eval_name>.toml (v1
-    placeholder), and an empty data/scenarios.json. The Builder fills in
-    scenarios and adjusts the ``tuning`` block before running
-    ``gavel autotune run``.
+    placeholder), and data/scenarios.json pre-populated with sample
+    scenarios (mirroring ``generate_scenarios_json``) so ``gavel autotune
+    run`` works immediately. The Builder swaps in real scenarios and
+    adjusts the ``tuning`` block for their use case.
     """
     create_directory_structure(eval_root, eval_name)
     generate_agents_config(eval_root, eval_name)
@@ -540,9 +541,24 @@ Provide a short, clear, accurate answer.
     with open(prompt_file, "w") as f:
         f.write(prompt_template)
 
+    scenarios_data = [
+        {
+            "scenario_id": "1",
+            "input": "What is the capital of France?",
+            "expected": "Paris",
+            "metadata": {"category": "geography", "difficulty": "easy"},
+        },
+        {
+            "scenario_id": "2",
+            "input": "Explain quantum computing in simple terms",
+            "expected": "A clear, accessible explanation of quantum computing covering qubits, superposition, and how it differs from classical computing.",
+            "metadata": {"category": "technology", "difficulty": "medium"},
+        },
+    ]
+
     scenarios_file = eval_root / eval_name / "data" / "scenarios.json"
     with open(scenarios_file, "w") as f:
-        json.dump([], f, indent=2)
+        json.dump(scenarios_data, f, indent=2)
 
     _generate_quality_judge_toml(eval_root, eval_name)
 

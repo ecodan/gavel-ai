@@ -58,12 +58,16 @@ class TestAutotuneCreateCommand:
         assert "v1" in prompts
         assert "{{input}}" in prompts["v1"]
 
-    def test_scenarios_json_is_empty_array(self, tmp_path: Path) -> None:
+    def test_scenarios_json_has_sample_scenarios(self, tmp_path: Path) -> None:
         eval_name = "test_autotune_eval"
         runner.invoke(app, ["autotune", "create", "--eval", eval_name, "--eval-root", str(tmp_path)])
 
         scenarios = json.loads((tmp_path / eval_name / "data" / "scenarios.json").read_text())
-        assert scenarios == []
+        assert len(scenarios) >= 1
+        for scenario in scenarios:
+            assert "scenario_id" in scenario
+            assert "input" in scenario
+            assert "expected" in scenario
 
     def test_create_fails_if_directory_exists(self, tmp_path: Path) -> None:
         eval_name = "test_autotune_eval"
