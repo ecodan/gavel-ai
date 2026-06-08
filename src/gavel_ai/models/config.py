@@ -123,7 +123,7 @@ class TestSubject(BaseModel):
 
     prompt_name: Optional[str] = Field(None, description="Prompt template name")
     judges: List[JudgeConfig] = Field(..., description="Judges for this test subject")
-    # For external (closed-box) evaluations
+    # For external evaluations (test_subject_type='external')
     system_id: Optional[str] = Field(None, description="External system identifier")
     protocol: Optional[Literal["http", "script"]] = Field(
         None, description="External transport protocol (active when test_subject_type='external')"

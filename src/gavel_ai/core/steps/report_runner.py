@@ -164,7 +164,7 @@ class ReportRunnerStep(Step):
                 "processor_type": (
                     "prompt_input"
                     if eval_config.test_subject_type == "local"
-                    else "closedbox_input"
+                    else "external_http"
                 ),
                 "status": status,
                 "completed_count": len(processor_results) - failed_count,
