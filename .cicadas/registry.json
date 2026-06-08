@@ -8,5 +8,30 @@
       "created_at": "2026-06-08T17:41:52.042335+00:00"
     }
   },
-  "branches": {}
+  "branches": {
+    "feat/external-runner-foundation": {
+      "intent": "Land foundation types/primitives: TestSubject.protocol/abort flags/adapter, in-situ\u2192external alias, ScriptSystemInput/ExternalIssue/ExternalResponseEnvelope, classify_external_outcome, and gavel-skill config-schema.md correction",
+      "modules": [
+        "src/gavel_ai/models/runtime.py",
+        "src/gavel_ai/core/issue_classifier.py",
+        "src/gavel_ai/skill/gavel-skill/references/config-schema.md",
+        "src/gavel_ai/models/config.py"
+      ],
+      "owner": "unknown",
+      "created_at": "2026-06-08T17:44:33.745521+00:00",
+      "worktree_path": "/Users/dan/dev/code/projects/python/gavel-ai-feat-external-runner-foundation",
+      "initiative": "external-runner"
+    },
+    "feat/external-http-rename": {
+      "intent": "Complete HTTP path, rename ClosedBoxInputProcessor\u2192ExternalHttpProcessor, wire classify_external_outcome",
+      "modules": [
+        "core/steps/report_runner.py",
+        "processors/external_http_processor.py",
+        "core/steps/scenario_processor.py"
+      ],
+      "owner": "unknown",
+      "created_at": "2026-06-08T21:24:17.433678+00:00",
+      "initiative": "external-runner"
+    }
+  }
 }

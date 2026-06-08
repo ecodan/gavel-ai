@@ -2,9 +2,9 @@
 Scenario processor step for OneShot workflow.
 
 Responsibilities:
-- Instantiate processor (PromptInputProcessor or ClosedBoxInputProcessor)
+- Instantiate processor (PromptInputProcessor or ExternalHttpProcessor)
 - Load prompt templates and render them with scenario variables
-- Convert scenarios to PromptInput[] with rendered prompts
+- Convert scenarios to PromptInput[] (local) or RemoteSystemInput[] (external+http)
 - Execute via Executor with parallelism/error handling
 - Store processor_results in context
 
@@ -26,18 +26,21 @@ from gavel_ai.models.config import ErrorPolicy
 from gavel_ai.models.agents import ModelDefinition
 from gavel_ai.models.config import AsyncConfig
 from gavel_ai.models.runtime import (
+    Input,
     OutputRecord,
     ProcessorConfig,
     ProcessorResult,
     PromptInput,
+    RemoteSystemInput,
 )
-from gavel_ai.processors.closedbox_processor import ClosedBoxInputProcessor
+from gavel_ai.processors.base import InputProcessor
+from gavel_ai.processors.external_http_processor import ExternalHttpProcessor
 from gavel_ai.processors.prompt_processor import PromptInputProcessor
 
 
 def _make_output_record(
     proc_result: ProcessorResult,
-    input_item: PromptInput,
+    input_item: Input,
     test_subject: str,
     variant_id: str,
 ) -> OutputRecord:
@@ -172,7 +175,7 @@ class ScenarioProcessorStep(Step):
         # Load and validate prompt template for local (prompt-based) evals only
         template_text: str = ""
         prompt_ref: str = ""
-        inputs: List[PromptInput] = []
+        inputs: List[Input] = []
 
         if eval_config.test_subject_type == "local":
             prompt_name = test_subject_config.prompt_name or "unknown"
@@ -215,6 +218,38 @@ class ScenarioProcessorStep(Step):
 
             self.logger.info(f"Created {len(inputs)} PromptInput objects with rendered templates")
 
+        elif (
+            eval_config.test_subject_type == "external"
+            and test_subject_config.protocol == "http"
+        ):
+            subject_config: Dict[str, Any] = test_subject_config.config or {}
+            endpoint = subject_config.get("endpoint")
+            if not endpoint:
+                raise ConfigError(
+                    "TestSubject.config.endpoint is required for protocol='http' - "
+                    "Add endpoint to test_subjects[0].config in eval_config.json"
+                )
+            method: str = str(subject_config.get("method", "POST"))
+            base_headers: Dict[str, str] = dict(subject_config.get("headers") or {})
+            auth: Any = subject_config.get("auth")
+            for scenario in scenarios:
+                body: Dict[str, Any] = {"scenario_id": scenario.id, "input": scenario.input}
+                if scenario.metadata:
+                    body["metadata"] = scenario.metadata
+                inputs.append(
+                    RemoteSystemInput(
+                        id=scenario.id,
+                        endpoint=endpoint,
+                        method=method,
+                        headers=base_headers,
+                        body=body,
+                        auth=auth,
+                    )
+                )
+            self.logger.info(
+                f"Created {len(inputs)} RemoteSystemInput objects for external+http"
+            )
+
         models = agents_config.get("_models", {})
         all_records: List[OutputRecord] = []
         first_test_subject: str = ""
@@ -224,7 +259,11 @@ class ScenarioProcessorStep(Step):
             # Resolve model definition for this variant
             if variant in models:
                 model_data = models[variant]
-                test_subject: str = test_subject_config.prompt_name or "unknown"
+                test_subject: str = (
+                    test_subject_config.system_id
+                    if eval_config.test_subject_type == "external"
+                    else test_subject_config.prompt_name
+                ) or "unknown"
             elif variant in agents_config:
                 agent = agents_config[variant]
                 model_id = agent.get("model_id")
@@ -243,10 +282,16 @@ class ScenarioProcessorStep(Step):
             if not first_test_subject:
                 first_test_subject = test_subject
 
-            # Determine processor type based on test_subject_type
-            processor_type: str = (
-                "prompt_input" if eval_config.test_subject_type == "local" else "closedbox_input"
-            )
+            # Determine processor type based on test_subject_type and protocol
+            if eval_config.test_subject_type == "local":
+                processor_type: str = "prompt_input"
+            elif (
+                eval_config.test_subject_type == "external"
+                and test_subject_config.protocol == "http"
+            ):
+                processor_type = "external_http"
+            else:
+                processor_type = "external_http"
 
             self.logger.info(
                 f"Executing variant '{variant}' ({processor_type}) "
@@ -262,24 +307,32 @@ class ScenarioProcessorStep(Step):
             )
 
             # Instantiate appropriate processor
+            processor: InputProcessor
             if processor_type == "prompt_input":
                 processor = PromptInputProcessor(
                     config=processor_config,
                     model_def=model_def,
                 )
-            elif processor_type == "closedbox_input":
-                processor = ClosedBoxInputProcessor(
+            elif processor_type == "external_http":
+                subject_cfg = test_subject_config.config or {}
+                processor = ExternalHttpProcessor(
                     config=processor_config,
-                    model_def=model_def,
+                    abort_on_exec_failure=test_subject_config.abort_on_exec_failure,
+                    abort_on_process_error=test_subject_config.abort_on_process_error,
+                    trace_header=subject_cfg.get("trace_header", "X-Gavel-Trace-Id"),
+                    adapter=test_subject_config.adapter or "gavel",
                 )
             else:
                 raise ConfigError(
                     f"Unknown processor_type '{processor_type}' - "
-                    f"Use 'prompt_input' or 'closedbox_input'"
+                    f"Use 'prompt_input' or 'external_http'"
                 )
 
-            def _spool_result(input_item: PromptInput, result: ProcessorResult) -> None:
+            def _spool_result(input_item: Input, result: ProcessorResult) -> None:
                 """Convert result to OutputRecord, stream to disk, accumulate in list.
+
+                For external runner results, uses the pre-computed metadata["external_tier"]
+                rather than re-deriving the tier via classify_message.
 
                 Raises RunPolicyError immediately when the error policy requires halting.
                 """
@@ -288,7 +341,7 @@ class ScenarioProcessorStep(Step):
                 all_records.append(record)
 
                 if result.error is not None:
-                    tier = classify_message(result.error)
+                    tier = result.metadata.get("external_tier") or classify_message(result.error)
                     log_msg = f"scenario {input_item.id} failed [{tier}]: {result.error}"
                     self.logger.error(log_msg)
                     context.run_logger.error(log_msg)

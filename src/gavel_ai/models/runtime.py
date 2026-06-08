@@ -63,7 +63,7 @@ class RemoteSystemInput(Input):
     Represents an HTTP request to an external API with endpoint, method,
     headers, body, and optional authentication details.
 
-    Typically created by ScenarioProcessorStep for closed-box API calls.
+    Typically created by ScenarioProcessorStep for external HTTP API calls.
     """
 
     model_config = ConfigDict(extra="ignore")
