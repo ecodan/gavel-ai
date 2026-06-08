@@ -2,6 +2,9 @@
 
 This document describes all configuration file schemas used by gavel-ai evaluations.
 
+For the payload schemas exchanged between gavel-ai and external systems under test or judges
+(HTTP and script transports), see [schema-external-runner.md](schema-external-runner.md).
+
 ---
 
 ## eval_config.json

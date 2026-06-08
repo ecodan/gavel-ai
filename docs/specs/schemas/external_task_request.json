@@ -1,0 +1,61 @@
+{
+  "description": "Request payload for external task execution \u2014 used by both the HTTP transport (POST body) and the script transport (written to request.json in the temp dir).",
+  "properties": {
+    "scenario_id": {
+      "description": "Scenario identifier from scenarios.json",
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "scenario_input": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      ],
+      "description": "Raw scenario input (string or structured object)",
+      "title": "Scenario Input"
+    },
+    "rendered_prompt": {
+      "description": "Fully rendered prompt text ready for the system-under-test (max 32 KB)",
+      "title": "Rendered Prompt",
+      "type": "string"
+    },
+    "custom_config": {
+      "additionalProperties": true,
+      "description": "TestSubject.config pass-through for system-under-test configuration",
+      "title": "Custom Config",
+      "type": "object"
+    },
+    "trace_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Run-level trace identifier for correlation with telemetry.jsonl",
+      "title": "Trace Id"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "description": "Additional per-invocation metadata",
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "scenario_id",
+    "scenario_input",
+    "rendered_prompt"
+  ],
+  "title": "ExternalTaskRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
