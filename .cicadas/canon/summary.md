@@ -6,7 +6,7 @@
 ## Purpose
 
 Provider-agnostic LLM evaluation framework for local/production benchmarking using CLI workflows.
-Supports two evaluation modes: **OneShot** (single-turn prompt→response) and **Conversational** (multi-turn, multi-variant).
+Supports three evaluation modes: **OneShot** (single-turn prompt→response), **Conversational** (multi-turn, multi-variant), and **Autotune** (iterative LLM-driven prompt optimization: execute→judge→rewrite loop until convergence).
 
 ## Architecture
 
@@ -15,11 +15,11 @@ Supports two evaluation modes: **OneShot** (single-turn prompt→response) and *
 - **Error Policy**: `EvalConfig.error_policy` (`ErrorPolicy` model: `exit_on_error=True`, `exit_on_warning=False`) controls fail-fast behaviour. `core/issue_classifier.py::classify(exc)` maps to `ERROR`/`WARNING`/`OK`. `RunPolicyError` is raised immediately when threshold exceeded; never re-wrapped by `safe_execute`.
 - **OTel Instrumentation**: Native OpenTelemetry spans for all execution and judge steps.
 - **Local-First**: Filesystem-based artifacts for git-friendly history and reproducibility.
-- **Step-based Workflows**: `OneShotWorkflow` and conversational flows compose discrete `Step` objects (Validator, Processor, JudgeRunner, ReportRunner).
+- **Step-based Workflows**: `OneShotWorkflow` and conversational flows compose discrete `Step` objects (Validator, Processor, JudgeRunner, ReportRunner). `AutotuneWorkflow` adds `CompositeStep` (owns ordered `child_steps`, runs each via `safe_execute()` for uniform error handling/tracking/spans) and loops `AutotuneIterationStep` (ScenarioProcessor→JudgeRunner→convergence-check→TuneStep) per round via per-iteration `IterationRunContext`/`IterationEvalContext` wrappers — the latter overrides `get_prompt()` to read the current `vN` from `runs/<id>/prompts.toml` instead of the eval's permanent `config/prompts/`.
 
 ## Modules
 
-- `cli`: Presentation and command orchestration. Root `gavel init` command writes `.gavel/config.json`; all eval commands emit a soft warning if config absent. `oneshot` subcommand has `create/run/judge/report/list/milestone`. `cli/common.py` provides `resolve_eval_root(str|None) → Path` (4-tier: CLI flag → `GAVEL_EVAL_ROOT` env → `.gavel/config.json` → `.gavel/evaluations`) and `run_async()`. Run errors displayed as Rich panel (human-readable + log path) — full stack trace stays in `run.log`.
+- `cli`: Presentation and command orchestration. Root `gavel init` command writes `.gavel/config.json`; all eval commands emit a soft warning if config absent. `oneshot` subcommand has `create/run/judge/report/list/milestone`; `autotune` has `create/run` (`--eval NAME`, mirrors `oneshot create`'s option-based pattern; `run` supports `--run RUN_ID` to resume). `cli/common.py` provides `resolve_eval_root(str|None) → Path` (4-tier: CLI flag → `GAVEL_EVAL_ROOT` env → `.gavel/config.json` → `.gavel/evaluations`) and `run_async()`. Run errors displayed as Rich panel (human-readable + log path) — full stack trace stays in `run.log`.
 - `core`: Shared abstractions, models, step base classes, retry logic, exceptions.
   - `core/execution/retry_logic.py`: Async exponential-backoff retry helper.
   - `core/steps/conversational_processor.py`: Multi-turn, multi-variant conversation execution with `max_turns` and `max_duration_ms` enforcement.
@@ -51,3 +51,6 @@ Supports two evaluation modes: **OneShot** (single-turn prompt→response) and *
 - **Test markers**: All tests tagged `@pytest.mark.unit` or `@pytest.mark.integration`. Run with `pytest -m unit` / `pytest -m integration`.
 - **Eval root (Annotated pattern)**: All CLI command functions use `eval_root: Annotated[Optional[str], typer.Option("--eval-root", envvar="GAVEL_EVAL_ROOT", ...)] = None`. The `= None` default is required so direct Python calls (unit tests) receive `None`, not Typer's `OptionInfo` object.
 - **Packaging**: `pyproject.toml` uses `[tool.setuptools.packages.find] where = ["src"]` and `[tool.setuptools.package-data] gavel_ai = ["reporters/templates/*"]` for correct `pip install` / `uv add` behavior from external projects.
+- **Autotune scoring**: All `avg_score`/`convergence_threshold`/`target_score`/`degradation_tolerance` values are normalized to **0.0–1.0** — DeepEval GEval's raw 0–10 scores are divided by 10 before averaging; deterministic classifier/regression scores (already 0/1) pass through unchanged. Convergence checked in order: `max_rounds_reached` → `target_score_achieved` → `minimal_improvement` → `performance_degraded`.
+- **Autotune prompt versions**: live only in run-local `runs/<id>/prompts.toml` (`v1` seeded from `config/prompts/<name>.toml`, `v2+` appended by `TuneStep`) — the eval's permanent prompt file is never modified during a run (immutability/no-race invariant). Promoting a winning version is a manual copy-paste step the report instructs.
+- **Autotune scaffold convention**: `gavel autotune create` (like `oneshot create`/`conv create`) registers a *different-provider* judge model than the test-subject model to avoid self-evaluation bias — freshly scaffolded evals need both providers' API keys configured, or the judge `model` field edited to match whatever single provider you have a key for.

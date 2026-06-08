@@ -4,7 +4,7 @@
 
 ## What This Is
 
-Gavel-AI is a Python-based CLI evaluation engine that follows a clean architecture pattern. It orchestrates the flow from configuration loading and scenario execution via LLM providers to automated judging and HTML/Markdown reporting.
+Gavel-AI is a Python-based CLI evaluation engine that follows a clean architecture pattern. It orchestrates the flow from configuration loading and scenario execution via LLM providers to automated judging and HTML/Markdown reporting. Beyond one-shot scoring, it also supports **autotune** — an automated, iterative prompt-optimization workflow that rewrites and re-judges a prompt against a scenario set until it converges.
 
 ---
 
@@ -58,7 +58,8 @@ Gavel-AI uses a **Layered Service Architecture** centered around the **RunContex
 | **Judge** | Evaluates LLM output against a scenario (LLM-based via DeepEval, or deterministic via `DeterministicMetric`). | `src/gavel_ai/judges/` |
 | **RunContext** | Manages the lifecycle of a single evaluation run and its artifacts. | `src/gavel_ai/storage/run_context.py` |
 | **ProviderFactory** | Creates Pydantic-AI agents based on model definitions. | `src/gavel_ai/providers/factory.py` |
-| **Reporter** | Renders Jinja2 HTML/Markdown reports. `OneShotReporter._build_context()` enriches the Jinja2 context with execution time, input source, subject names, scenario count, and collapse thresholds. The OneShot template renders split LLM/deterministic judge sections, per-subject sub-headings, table-layout scenario detail with collapsible inputs and truncatable responses. | `src/gavel_ai/reporters/`, `src/gavel_ai/reporters/templates/oneshot.html` |
+| **Reporter** | Renders Jinja2 HTML/Markdown reports. `OneShotReporter._build_context()` enriches the Jinja2 context with execution time, input source, subject names, scenario count, and collapse thresholds. The OneShot template renders split LLM/deterministic judge sections, per-subject sub-headings, table-layout scenario detail with collapsible inputs and truncatable responses. `AutotuneReporter` extends `Jinja2Reporter` and renders `templates/autotune.html` (Score Progression table, Per-Judge Detail, Best Prompt Version, Run Summary — see Autotune Workflow below). | `src/gavel_ai/reporters/`, `src/gavel_ai/reporters/templates/oneshot.html`, `src/gavel_ai/reporters/templates/autotune.html` |
+| **TuningAgent** | LLM-as-meta-optimizer; rewrites the prompt under test based on the prior iteration's scores and judge reasoning. Uses `ProviderFactory.create_agent()` directly — no separate LLM abstraction. | `src/gavel_ai/core/autotune/tuning_agent.py` |
 
 ### Data Flow
 
@@ -71,6 +72,38 @@ CLI → Config Discovery → [Executor] → [Processor] → LLM Provider → [Ju
 - **Immutability of Raw Results:** The `results_raw.jsonl` file is never modified after execution to ensure benchmarks are stable and reproducible.
 - **Provider Agnosticism:** All LLM calls must go through the `ProviderFactory` and Pydantic-AI to prevent vendor lock-in.
 - **OTel-First Observability:** Every significant execution step must emit an OpenTelemetry span rather than relying solely on traditional logging.
+
+---
+
+## Autotune Workflow
+
+`AutotuneWorkflow` (`core/workflows/autotune.py`) runs an execute → judge → rewrite loop until convergence, orchestrated as a `CompositeStep` pipeline:
+
+```
+PrepareStep (seed runs/<id>/prompts.toml v1 from config/prompts/<name>.toml)
+  → ValidatorStep
+  → AutotuneIterationStep (loops up to tuning.max_rounds)
+        ScenarioProcessorStep → JudgeRunnerStep → [convergence check] → TuneStep
+  → AutotuneReportingStep (AutotuneReporter renders templates/autotune.html)
+```
+
+### Key Architecture Decisions (ADRs — see `.cicadas/active/feat-autotune/tech-design.md` while active; archived afterward)
+
+- **`CompositeStep` base class** (`core/steps/base.py`): owns an ordered `child_steps` list and `run_children()`, which calls each child through `safe_execute()` so inner steps get the same error-policy handling, `.workflow_status` tracking, and OTel spans as top-level steps. `AutotuneIterationStep` subclasses it, calling `run_children()` once per iteration with an `IterationRunContext`.
+- **`IterationRunContext` + `IterationEvalContext`** (`core/contexts.py`): lightweight per-iteration wrappers — `IterationRunContext` redirects `results_raw`/`evaluation_results`/`run_dir` to `iterations/iteration_N/` while sharing the outer run's `eval_ctx`/`run_logger`/`run_id`; `IterationEvalContext` wraps `LocalFileSystemEvalContext` and overrides `get_prompt()` to read the current iteration's version (`vN`) from `runs/<id>/prompts.toml`, falling back to the base eval context for `v1`. Without this override, every iteration would silently re-run the original `v1` prompt — the loop would never see TuneStep's rewrites. All other `EvalContext` methods delegate unchanged via `__getattr__`.
+- **`TuningAgent` uses `ProviderFactory` directly** (`core/autotune/tuning_agent.py`): same factory `PromptInputProcessor` uses, one async call per iteration — no second LLM abstraction introduced.
+- **Prompt versions live in `runs/<id>/prompts.toml`, not `config/prompts/`**: keeps the eval directory immutable/read-only during runs (multiple concurrent autotune runs against the same eval don't race); `v1` is seeded by `PrepareStep` from the eval's permanent prompt, `v2+` are appended by `TuneStep`. Promoting a winning version to permanent is a manual Builder step (copy the text into `config/prompts/<name>.toml` as a new version).
+- **Convergence check fires before `TuneStep`** on the iteration that triggers it — avoids a wasted TuningAgent rewrite call for a prompt version that will never be used.
+- **`AutotuneReporter(Jinja2Reporter)`**: overrides `_build_context()` and renders `templates/autotune.html` with vanilla-JS score progression (no chart library dependency), matching the `OneShotReporter` subclass pattern.
+
+### Convergence
+
+Checked in priority order each round — first match wins and is recorded as `convergence_reason`:
+`max_rounds_reached` → `target_score_achieved` → `minimal_improvement` (`|current − previous| < convergence_threshold`) → `performance_degraded` (`avg_score` drop exceeds `degradation_tolerance`).
+
+### Score normalization (critical convention)
+
+All `avg_score` / convergence-threshold values are normalized to a **0.0–1.0 scale**. DeepEval GEval judges return raw scores on a 0–10 scale; `AutotuneIterationStep` divides these by 10.0 before averaging. Deterministic `classifier`/`regression` judges already produce 0/1 scores and pass through unchanged. `convergence_threshold`, `target_score`, and `degradation_tolerance` in `TuningConfig` are all on this same 0.0–1.0 scale — do not confuse with the raw 1–10 `JudgeResult.score` used elsewhere.
 
 ---
 
@@ -127,6 +160,45 @@ class DeterministicRunResult(BaseModel):
 
 Key invariant: deterministic results flow through `context.deterministic_metrics` → `RunData.deterministic_metrics` → `ReportData.deterministic_results`. They are **never written to `results_raw.jsonl` or `results_judged.jsonl`**.
 
+### TuningConfig / IterationMetadata / AutotuneRunSummary (autotune)
+
+```python
+class TuningConfig(BaseModel):
+    """EvalConfig.tuning — required when workflow_type == 'autotune'."""
+    max_rounds: int                              # required, >= 1
+    convergence_threshold: float = 0.02          # |current - previous| < threshold (0.0-1.0)
+    target_score: Optional[float] = None         # stop early once avg_score reaches this (0.0-1.0)
+    degradation_tolerance: float = 0.05          # stop if avg_score drops by more than this
+    tuning_agent_model: str                      # required; key in agents.json._models
+    tuning_agent_temperature: float = 0.7
+
+class IterationMetadata(BaseModel):
+    """Persisted to iterations/iteration_N/metadata.json."""
+    iteration: int
+    prompt_version: str                          # "v1", "v2", ...
+    score: float                                  # mean normalized score (0.0-1.0)
+    improvement: float                            # current_score - previous_score
+    judge_scores: Dict[str, float]                # per-judge mean score breakdown
+    converged: bool
+    convergence_reason: Optional[str]             # one of the four convergence criteria, or null
+
+class AutotuneRunSummary(BaseModel):
+    """Persisted to runs/<id>/run_summary.json; consumed by AutotuneReporter."""
+    eval_name: str
+    run_id: str
+    total_iterations: int
+    best_iteration: int
+    best_score: float
+    final_score: float
+    converged: bool
+    convergence_reason: Optional[str]
+    iterations: List[IterationMetadata]
+```
+
+`EvalConfig` gained `workflow_type: Literal["oneshot", "conversational", "autotune"]` and `tuning: Optional[TuningConfig] = None` (additive, non-breaking). `StepPhase` gained `AUTOTUNE_ITERATION` and `TUNING`.
+
+`runs/<id>/prompts.toml` (run-local, not the eval's permanent `config/prompts/`): `[v1]` seeded from the eval's prompt at `PrepareStep`; `[v2]`, `[v3]`, ... appended by `TuneStep` with `prompt`, `iteration`, and `avg_score` (normalized 0.0-1.0) fields.
+
 ---
 
 ## API & Interface Surface
@@ -137,7 +209,7 @@ Key invariant: deterministic results flow through `context.deterministic_metrics
 gavel init [--eval-root DIR] [--force]
 gavel oneshot <create|run|judge|report|list|milestone>
 gavel conv <create|generate>
-gavel autotune <run|report>
+gavel autotune <create|run>
 ```
 
 `gavel init` initializes the project by writing `.gavel/config.json` with the chosen eval root. Idempotent; `--force` overwrites. All eval-touching commands emit a soft yellow warning to stderr if `.gavel/config.json` is absent (suppress-able by running `gavel init` first).
@@ -145,6 +217,10 @@ gavel autotune <run|report>
 `gavel oneshot create` accepts:
 - `--type local|in-situ` — eval type; in-situ skips prompt generation
 - `--template default|classification|regression` — scaffold template; classification/regression wire deterministic judges
+
+`gavel autotune create --eval NAME [--eval-root DIR] [--force]` scaffolds an autotune eval directory: `eval_config.json` (`workflow_type: "autotune"` + a `tuning` block), `agents.json` (registers a test-subject model and, by convention, a separate-provider judge model — see Common Mistakes), `config/prompts/<name>.toml` (v1 seed prompt), and `data/scenarios.json` pre-populated with working sample scenarios (mirrors the `oneshot create` scaffold convention so `gavel autotune run` works immediately without edits). Uses `--eval` (not a positional eval-name arg) to match the rest of the CLI's option-based pattern.
+
+`gavel autotune run --eval NAME [--run RUN_ID] [--eval-root DIR]` executes the optimization loop; `--run` resumes a previously interrupted run by ID (continuing from the last completed iteration recorded in `.workflow_status`).
 
 ### External Dependencies
 
@@ -185,6 +261,7 @@ gavel autotune <run|report>
 - **Packaging (library use):** `pyproject.toml` declares `[tool.setuptools.packages.find] where = ["src"]` and `[tool.setuptools.package-data] gavel_ai = ["reporters/templates/*"]` so `pip install gavel-ai` or `uv add gavel-ai` from an external project picks up all modules and Jinja2 templates.
 - **DeterministicMetric routing:** `JudgeRunnerStep` partitions judges by checking the class registered in `JudgeRegistry`. Types `"classifier"` and `"regression"` route to the deterministic inline loop (synchronous, no `JudgeExecutor`). All other types route to `JudgeExecutor` (LLM path). Results stored in `context.deterministic_metrics: Dict[str, DeterministicRunResult]`.
 - **Score averaging exclusion:** `OneShotReporter` skips judge scores for `(scenario_id, variant_id)` pairs where `OutputRecord.error` is not None. HTML template shows `(N skipped)` annotation per variant/judge when exclusions occurred.
+- **Scaffold convention — cross-provider judge:** `gavel oneshot create`/`conv create`/`autotune create` all register a *different*-provider model for the LLM judge than the test-subject model (e.g., test subject on `claude-haiku` / Anthropic, judge on `gpt-5-mini` / OpenAI) to avoid same-model self-evaluation bias. This means a freshly scaffolded eval needs **both** `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` set (real values, not the `{{VAR}}` placeholders) before `run` succeeds — if you only have one provider's key, edit the judge's `"model"` field in `eval_config.json` to point at a model your configured provider supports (and prune the unused `_models` entry from `agents.json`).
 
 ---
 
