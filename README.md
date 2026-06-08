@@ -5,7 +5,7 @@ Open-source, provider-agnostic AI evaluation framework for testing LLM applicati
 ## Features
 
 - **Provider Agnostic:** Works with Claude, GPT, Gemini, Ollama via Pydantic-AI
-- **Multiple Workflows:** OneShot, Conversational (v2+), Autotune (v3+)
+- **Multiple Workflows:** OneShot, Conversational, Autotune (automated iterative prompt optimization)
 - **Built-in Judges:** 11 DeepEval judge types (GEval, toxicity, conversational, faithfulness, and more) + deterministic GT-comparison metrics
 - **Local First:** All data stays on your machine
 - **OpenTelemetry:** Native observability instrumentation

@@ -187,6 +187,7 @@ gavel oneshot list --eval my_eval
 - **Custom judges:** Create GEval judges in `config/judges/`
 - **Re-judge results:** `gavel oneshot judge --run <run-id>`
 - **Export results:** `gavel export --run <run-id> --format zip`
+- **Optimize a prompt automatically:** `gavel autotune create --eval my_eval` then `gavel autotune run --eval my_eval` — iteratively rewrites and re-judges your prompt until it converges. See `docs/specs/schema-configs.md#tuningconfig` and `schema-outputs.md#autotune-run-artifacts` for the `tuning` config block and run artifacts.
 
 ## Common Issues
 

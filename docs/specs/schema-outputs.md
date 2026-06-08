@@ -161,3 +161,94 @@ Append-only JSONL file recording step completions. Each line is a JSON object:
 | `completed_at` | `string` | ISO 8601 timestamp of completion |
 
 Steps are written in execution order. A run is complete when all five phases appear.
+
+For autotune runs, `step` additionally includes `"autotune_iteration"` and `"tuning"`
+(`StepPhase.AUTOTUNE_ITERATION` / `StepPhase.TUNING`).
+
+---
+
+## Autotune Run Artifacts
+
+Produced by `AutotuneWorkflow` (`workflow_type = "autotune"`) in addition to the standard
+run artifacts above. Each run executes an iterative execute → judge → rewrite loop; every
+iteration gets its own subdirectory plus a top-level prompt-version ledger and run summary.
+
+```
+runs/{run_id}/
+├── prompts.toml                # Run-local prompt version ledger (v1, v2, v3, ...)
+├── run_summary.json            # AutotuneRunSummary — overall run result
+├── report.html                 # AutotuneReporter output (Score Progression, Per-Judge
+│                               #   Detail, Best Prompt Version, Run Summary sections)
+└── iterations/
+    └── iteration_{N}/
+        ├── output_raw.jsonl    # OutputRecord per scenario for this iteration
+        ├── output_judged.jsonl # JudgedRecord per scenario × judge for this iteration
+        └── metadata.json       # IterationMetadata — this iteration's scored result
+```
+
+### prompts.toml
+
+Run-local prompt version ledger — **not** the eval's permanent `config/prompts/{name}.toml`.
+`v1` is seeded from the eval's current prompt by the `PrepareStep` at run start; each
+subsequent version is appended by `TuneStep` after a judged iteration. The eval's permanent
+prompt file is never modified during a run (keeps the eval directory immutable/race-free
+across concurrent runs).
+
+```toml
+[metadata]
+name = "my_prompt"
+run_id = "run-20260607-173100"
+
+[v1]
+prompt = "Original seed prompt text with {{variable}}..."
+
+[v2]
+prompt = "LLM-rewritten prompt text with {{variable}}..."
+iteration = 1
+avg_score = 0.742
+```
+
+| Field | Present on | Type | Description |
+|-------|-----------|------|-------------|
+| `prompt` | all versions | `string` | Full prompt text used for that iteration (`{{var}}` syntax) |
+| `iteration` | `v2+` | `integer` | 1-based iteration number that produced this version |
+| `avg_score` | `v2+` | `float` | Judged score (0.0–1.0, normalized) that triggered this rewrite |
+
+To promote a winning version permanently, copy its `prompt` text into
+`config/prompts/{name}.toml` as a new version — this is a manual Builder step (the HTML
+report shows the exact source path and a ready-to-copy `pre` block).
+
+### iterations/iteration_{N}/metadata.json
+
+One `IterationMetadata` object per completed iteration.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `iteration` | `integer` | 1-based iteration number |
+| `prompt_version` | `string` | Prompt version used this iteration, e.g. `"v1"`, `"v2"` |
+| `score` | `float` | Mean normalized score across all scenarios and LLM judges (0.0–1.0) |
+| `improvement` | `float` | `current_score - previous_score` (`0.0` for iteration 1) |
+| `judge_scores` | `object` | `{judge_name: mean_score}` per-judge breakdown (drives the report's Per-Judge Detail section) |
+| `converged` | `boolean` | Whether this iteration triggered convergence |
+| `convergence_reason` | `string \| null` | One of `"max_rounds_reached"`, `"target_score_achieved"`, `"minimal_improvement"`, `"performance_degraded"`, or `null` |
+
+**Score normalization:** DeepEval GEval judges return raw scores on a 0–10 scale; these are
+divided by 10.0 before being averaged into `score`/`judge_scores`. Deterministic
+`classifier`/`regression` judges already produce 0/1 scores and pass through unchanged.
+
+### run_summary.json
+
+Single `AutotuneRunSummary` JSON object — the overall result of the autotune run, consumed
+by `AutotuneReporter` to render `report.html`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `eval_name` | `string` | Evaluation name |
+| `run_id` | `string` | Run identifier |
+| `total_iterations` | `integer` | Number of iterations executed |
+| `best_iteration` | `integer` | 1-based number of the highest-scoring iteration |
+| `best_score` | `float` | Score of the best iteration (0.0–1.0, normalized) |
+| `final_score` | `float` | Score of the last completed iteration (0.0–1.0, normalized) |
+| `converged` | `boolean` | Whether the run converged before exhausting `max_rounds` |
+| `convergence_reason` | `string \| null` | Same enum as `IterationMetadata.convergence_reason` |
+| `iterations` | `IterationMetadata[]` | Full per-iteration history, in order |

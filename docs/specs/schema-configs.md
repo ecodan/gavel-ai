@@ -10,8 +10,8 @@ Root evaluation configuration. Located at `config/eval_config.json` within the e
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `eval_type` | `string` | required | Evaluation type; must be `"oneshot"` |
-| `workflow_type` | `"oneshot" \| "conversational"` | `"oneshot"` | Evaluation workflow variant |
+| `eval_type` | `string` | required | Evaluation type; one of `"oneshot"`, `"conversational"`, `"autotune"` |
+| `workflow_type` | `"oneshot" \| "conversational" \| "autotune"` | `"oneshot"` | Evaluation workflow variant |
 | `eval_name` | `string` | required | Evaluation identifier (matches directory name) |
 | `description` | `string \| null` | `null` | Human-readable description |
 | `test_subject_type` | `"local" \| "in-situ"` | required | Whether the subject is a local prompt or remote endpoint |
@@ -21,6 +21,7 @@ Root evaluation configuration. Located at `config/eval_config.json` within the e
 | `execution` | `ExecutionConfig \| null` | `null` | Concurrency settings |
 | `async` | `AsyncConfig \| null` | `null` | Async worker pool settings |
 | `conversational` | `ConversationalConfig \| null` | `null` | Required when `workflow_type = "conversational"` |
+| `tuning` | `TuningConfig \| null` | `null` | Required when `workflow_type = "autotune"` — see below |
 
 ### TestSubject
 
@@ -84,6 +85,50 @@ Root evaluation configuration. Located at `config/eval_config.json` within the e
 | `model_id` | `string` | required | Model ID from `agents.json` for turn generation |
 | `temperature` | `float` | `0.0` | Sampling temperature (0 = deterministic) |
 | `max_tokens` | `integer` | `500` | Max tokens per generated turn |
+
+### TuningConfig
+
+Required when `eval_config.json.workflow_type = "autotune"`. Drives the `AutotuneWorkflow`'s
+execute → judge → rewrite loop, which re-runs the prompt against all scenarios each round,
+has the `TuningAgent` rewrite the prompt based on judged scores and reasoning, and repeats
+until one of the convergence criteria below fires.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_rounds` | `integer` | required, `>= 1` | Hard upper bound on optimization iterations |
+| `convergence_threshold` | `float` | `0.02` | Stop if `\|current_score - previous_score\| < threshold` (0.0–1.0 scale) |
+| `target_score` | `float \| null` | `null` | Stop early once `avg_score` reaches this value (0.0–1.0 scale); omit/null to disable |
+| `degradation_tolerance` | `float` | `0.05` | Stop if `avg_score` drops by more than this amount round-over-round (0.0–1.0 scale) |
+| `tuning_agent_model` | `string` | required | Model ID from `agents.json._models` — the meta-optimizer LLM that rewrites the prompt; independent of the variant(s) under test |
+| `tuning_agent_temperature` | `float` | `0.7` | Sampling temperature for the meta-optimizer's rewrite calls (0.0–2.0) |
+
+**Score scale**: All `avg_score` values compared against `convergence_threshold`, `target_score`,
+and `degradation_tolerance` are normalized to **0.0–1.0**. DeepEval GEval judges return raw
+scores on a 0–10 scale; these are divided by 10.0 before averaging. Deterministic
+`classifier`/`regression` judges already produce 0/1 scores and pass through unchanged.
+
+**Convergence priority order** — checked each round after judging completes; the first
+criterion to match stops the run and is recorded as `convergence_reason`:
+
+1. `max_rounds_reached`
+2. `target_score_achieved`
+3. `minimal_improvement`
+4. `performance_degraded`
+
+When convergence fires, the `TuneStep` rewrite for that round is skipped (no wasted LLM call
+for a prompt version that will never be used).
+
+**Example**:
+```json
+"tuning": {
+  "max_rounds": 5,
+  "convergence_threshold": 0.02,
+  "target_score": 0.9,
+  "degradation_tolerance": 0.05,
+  "tuning_agent_model": "claude-haiku",
+  "tuning_agent_temperature": 0.7
+}
+```
 
 ---
 
