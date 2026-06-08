@@ -2,6 +2,9 @@
 
 This document describes all output artifact schemas produced by a gavel-ai evaluation run.
 
+For the request/response payload schemas exchanged with external systems under test or judges
+(HTTP and script transports), see [schema-external-runner.md](schema-external-runner.md).
+
 Run artifacts are stored under `.gavel/evaluations/{eval_name}/runs/{run_id}/`.
 
 ---

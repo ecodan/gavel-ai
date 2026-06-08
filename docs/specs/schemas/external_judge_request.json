@@ -1,0 +1,66 @@
+{
+  "description": "Request payload for external judge execution \u2014 used by both the HTTP transport (POST body) and the script transport (written to request.json in the temp dir).",
+  "properties": {
+    "scenario_id": {
+      "description": "Scenario identifier from scenarios.json",
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "processor_output": {
+      "description": "Raw processor output to be judged (max 32 KB)",
+      "title": "Processor Output",
+      "type": "string"
+    },
+    "criteria": {
+      "description": "Rendered judge criteria / scoring rubric",
+      "title": "Criteria",
+      "type": "string"
+    },
+    "expected_behavior": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Expected behavior from the scenario (optional reference for judge)",
+      "title": "Expected Behavior"
+    },
+    "custom_config": {
+      "additionalProperties": true,
+      "description": "JudgeConfig.config pass-through for judge configuration",
+      "title": "Custom Config",
+      "type": "object"
+    },
+    "trace_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Run-level trace identifier for correlation with telemetry.jsonl",
+      "title": "Trace Id"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "description": "Additional per-invocation metadata",
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "scenario_id",
+    "processor_output",
+    "criteria"
+  ],
+  "title": "ExternalJudgeRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

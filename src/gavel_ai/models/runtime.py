@@ -130,6 +130,77 @@ class ExternalResponseEnvelope(BaseModel):
     trace_id: Optional[str] = Field(None, description="Echo of the inbound trace_id, for correlation/debugging on the system-under-test side")
 
 
+class ExternalTaskRequest(BaseModel):
+    """Request payload sent to an external system under test (both HTTP and script transports).
+
+    Represents the inbound document the system-under-test receives for each scenario invocation.
+    The delivery mechanism differs per transport (HTTP POST body vs. temp-dir request.json file),
+    but the payload shape is identical — the same Pydantic model is used for both transports.
+
+    Per FR-6.2: includes scenario data, custom config, rendered prompt content, and trace_id.
+
+    Bounds: rendered_prompt is capped at 32 KB before transmission; callers must truncate
+    before constructing this model if the rendered prompt exceeds that limit.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    scenario_id: str = Field(..., description="Scenario identifier from scenarios.json")
+    scenario_input: Union[str, Dict[str, Any]] = Field(
+        ..., description="Raw scenario input (string or structured object)"
+    )
+    rendered_prompt: str = Field(
+        ...,
+        description="Fully rendered prompt text ready for the system-under-test (max 32 KB)",
+    )
+    custom_config: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="TestSubject.config pass-through for system-under-test configuration",
+    )
+    trace_id: Optional[str] = Field(
+        None, description="Run-level trace identifier for correlation with telemetry.jsonl"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional per-invocation metadata"
+    )
+
+
+class ExternalJudgeRequest(BaseModel):
+    """Request payload sent to an external judge (both HTTP and script transports).
+
+    Represents the inbound document the external judge receives for each scoring invocation.
+    Like ExternalTaskRequest, the same model is used for both HTTP and script transports —
+    only the delivery mechanism differs.
+
+    Per FR-6.2: includes scenario data, judge criteria/prompt content, and trace_id.
+
+    Bounds: processor_output is capped at 32 KB before transmission; callers must truncate
+    before constructing this model if the processor output exceeds that limit.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    scenario_id: str = Field(..., description="Scenario identifier from scenarios.json")
+    processor_output: str = Field(
+        ...,
+        description="Raw processor output to be judged (max 32 KB)",
+    )
+    criteria: str = Field(..., description="Rendered judge criteria / scoring rubric")
+    expected_behavior: Optional[str] = Field(
+        None, description="Expected behavior from the scenario (optional reference for judge)"
+    )
+    custom_config: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="JudgeConfig.config pass-through for judge configuration",
+    )
+    trace_id: Optional[str] = Field(
+        None, description="Run-level trace identifier for correlation with telemetry.jsonl"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional per-invocation metadata"
+    )
+
+
 class ConversationalInput(Input):
     """
     Input for conversational/multi-turn processors.
