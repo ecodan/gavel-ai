@@ -54,6 +54,49 @@ class JudgeConfig(BaseModel):
         ),
     )
 
+    # External delegation fields (FR-7.1) — mirrors TestSubject's external transport shape.
+    # When protocol is set the judge routes scoring to an external system rather than an LLM.
+    protocol: Optional[Literal["http", "script"]] = Field(
+        None,
+        description="External transport protocol for delegated judging (http or script)",
+    )
+    system_id: Optional[str] = Field(
+        None,
+        description="External judge system identifier (used as judge_id in JudgedRecord)",
+    )
+    abort_on_exec_failure: bool = Field(
+        True,
+        description="Halt the run on PROCESS_FAILURE-tier outcomes from external judge",
+    )
+    abort_on_process_error: bool = Field(
+        False,
+        description="Halt the run on PROCESS_SUCCESS_WITH_ISSUE-tier outcomes from external judge",
+    )
+    # Reserved forward-compat seam (ADR-10): only "gavel" is implemented in this MVP.
+    adapter: Optional[str] = Field(
+        "gavel",
+        description="Wire-format adapter identifier for external judge transport",
+    )
+
+    @model_validator(mode="after")
+    def validate_external_judge_protocol_config(self) -> "JudgeConfig":
+        """Validate protocol-specific config sub-shape for external judge configs."""
+        if self.protocol == "http":
+            if self.config is not None and "command" in self.config:
+                raise ValueError(
+                    "JudgeConfig.config for protocol='http' must not include 'command' "
+                    "(that is a 'script' protocol field) - expected keys like "
+                    "endpoint/method/headers/auth/trace_header"
+                )
+        elif self.protocol == "script":
+            if self.config is not None and "endpoint" in self.config:
+                raise ValueError(
+                    "JudgeConfig.config for protocol='script' must not include 'endpoint' "
+                    "(that is an 'http' protocol field) - expected keys like "
+                    "command/args/working_dir/timeout/request_filename/response_filename"
+                )
+        return self
+
 
 class ScenarioFieldMapping(BaseModel):
     """
