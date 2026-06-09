@@ -130,4 +130,4 @@ next_section: "## Partition: feat/external-script-processor"
 
 ## Initiative Boundary
 
-- [ ] Open PR: initiative/external-runner -> master and await merge approval before continuing <!-- id: 71 -->
+- [x] Open PR: initiative/external-runner -> master and await merge approval before continuing <!-- id: 71 --> <!-- PR: https://github.com/ecodan/gavel-ai/pull/7 -->
