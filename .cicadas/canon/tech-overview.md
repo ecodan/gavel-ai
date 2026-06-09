@@ -35,6 +35,7 @@ gavel-ai/
 │   ├── reporters/         # Jinja2 rendering and reporting templates
 │   ├── storage/           # Persistence layer (RunContext, filesystem)
 │   ├── providers/         # LLM provider factory and abstraction layer
+│   ├── scaffolds/         # Standalone helpers for external SUT authors (no core imports)
 │   └── telemetry/         # OpenTelemetry setup and instrumentation
 ├── tests/                 # unit and integration tests
 ├── docs/                  # Human-readable documentation
@@ -60,6 +61,9 @@ Gavel-AI uses a **Layered Service Architecture** centered around the **RunContex
 | **ProviderFactory** | Creates Pydantic-AI agents based on model definitions. | `src/gavel_ai/providers/factory.py` |
 | **Reporter** | Renders Jinja2 HTML/Markdown reports. `OneShotReporter._build_context()` enriches the Jinja2 context with execution time, input source, subject names, scenario count, and collapse thresholds. The OneShot template renders split LLM/deterministic judge sections, per-subject sub-headings, table-layout scenario detail with collapsible inputs and truncatable responses. `AutotuneReporter` extends `Jinja2Reporter` and renders `templates/autotune.html` (Score Progression table, Per-Judge Detail, Best Prompt Version, Run Summary — see Autotune Workflow below). | `src/gavel_ai/reporters/`, `src/gavel_ai/reporters/templates/oneshot.html`, `src/gavel_ai/reporters/templates/autotune.html` |
 | **TuningAgent** | LLM-as-meta-optimizer; rewrites the prompt under test based on the prior iteration's scores and judge reasoning. Uses `ProviderFactory.create_agent()` directly — no separate LLM abstraction. | `src/gavel_ai/core/autotune/tuning_agent.py` |
+| **ExternalHttpProcessor** | Sends `ExternalTaskRequest` payloads to HTTP endpoints via `httpx`; classifies HTTP 4xx/5xx and envelope-level issues into `ExternalOutcome` tiers; injects `X-Gavel-Trace-Id` header. | `src/gavel_ai/processors/external_http_processor.py` |
+| **ScriptInputProcessor** | Launches subprocess scripts via `asyncio`; writes request document to a temp dir, reads response document after exit; enforces path confinement; classifies non-zero exit codes and envelope errors. | `src/gavel_ai/processors/script_processor.py` |
+| **Scaffolds** | `_BaseSystemUnderTest` (abstract base), `RemoteSystemUnderTest` (HTTP), `ScriptSystemUnderTest` (subprocess + `main()` entry point); `_materialize.py` for SHA-256-headed template generation. Intentionally isolated from `gavel_ai.core.*`. | `src/gavel_ai/scaffolds/` |
 
 ### Data Flow
 
@@ -262,6 +266,67 @@ gavel autotune <create|run>
 - **DeterministicMetric routing:** `JudgeRunnerStep` partitions judges by checking the class registered in `JudgeRegistry`. Types `"classifier"` and `"regression"` route to the deterministic inline loop (synchronous, no `JudgeExecutor`). All other types route to `JudgeExecutor` (LLM path). Results stored in `context.deterministic_metrics: Dict[str, DeterministicRunResult]`.
 - **Score averaging exclusion:** `OneShotReporter` skips judge scores for `(scenario_id, variant_id)` pairs where `OutputRecord.error` is not None. HTML template shows `(N skipped)` annotation per variant/judge when exclusions occurred.
 - **Scaffold convention — cross-provider judge:** `gavel oneshot create`/`conv create`/`autotune create` all register a *different*-provider model for the LLM judge than the test-subject model (e.g., test subject on `claude-haiku` / Anthropic, judge on `gpt-5-mini` / OpenAI) to avoid same-model self-evaluation bias. This means a freshly scaffolded eval needs **both** `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` set (real values, not the `{{VAR}}` placeholders) before `run` succeeds — if you only have one provider's key, edit the judge's `"model"` field in `eval_config.json` to point at a model your configured provider supports (and prune the unused `_models` entry from `agents.json`).
+
+---
+
+## External Runner
+
+### Overview
+
+`test_subject_type: "external"` delegates scenario execution (and optionally judging) to a process outside gavel's own runtime. Two transports are supported, selected by `TestSubject.protocol` (or `JudgeConfig.protocol` for external judges):
+
+| Transport | Trigger | Wire mechanism |
+|-----------|---------|----------------|
+| `"http"` | `ExternalHttpProcessor` | HTTP POST via `httpx`; request body is an `ExternalTaskRequest` JSON payload; response is an `ExternalResponseEnvelope` JSON body |
+| `"script"` | `ScriptInputProcessor` | `asyncio` subprocess; request written to `{tmpdir}/{request_filename}` (default `request.json`) before launch; response read from `{tmpdir}/{response_filename}` (default `response.json`) after exit |
+
+Both transports share the same `ExternalTaskRequest` / `ExternalJudgeRequest` request models and the `ExternalResponseEnvelope` response model.
+
+### Two-Tier Failure Model (ADR-3)
+
+| Tier | `ExternalOutcome` enum | Meaning | Default halt behaviour |
+|------|------------------------|---------|------------------------|
+| Tier 1 | `PROCESS_FAILURE` | Transport-level failure: HTTP 4xx/5xx, connection error, timeout, non-zero subprocess exit, missing/invalid response document | Halt (`abort_on_exec_failure=True`) |
+| Tier 2 | `PROCESS_SUCCESS_WITH_ISSUE` | Transport succeeded; response envelope carries `issue` with `status: "ok"` | Continue (`abort_on_process_error=False`) |
+
+`classify_external_outcome(outcome, abort_on_exec_failure, abort_on_process_error, adapter)` maps outcome + policy flags to an issue tier string (`"ERROR"` / `"WARNING"`) which is stored in `ProcessorResult.metadata["external_tier"]`. The pipeline's `error_policy.should_halt(tier)` controls the actual halt decision — processors never raise for classified outcomes.
+
+### Response Envelope
+
+```python
+ExternalResponseEnvelope:
+    status: "ok" | "error"
+    result: Optional[Dict[str, Any]]        # task output or judge score/reasoning
+    metadata: Dict[str, Any]                # timing_ms, turns, custom fields
+    issue: Optional[ExternalIssue]          # present on Tier-2 or status=error
+    trace_id: Optional[str]                 # echo of inbound trace_id
+
+ExternalIssue:
+    code: str                               # stable documented code
+    level: "error" | "warning"
+    message: str
+```
+
+### Judge Delegation
+
+`JudgeRunnerStep._execute_external_judge()` is invoked when `JudgeConfig.protocol` is set. It constructs an `ExternalJudgeRequest` (scenario_id, processor_output, rendered criteria, expected_behavior, custom_config, trace_id) and routes to `ExternalHttpProcessor` or `ScriptInputProcessor`. `JudgeConfig.system_id` is written as `judge_id` on the resulting `JudgedRecord`.
+
+### Scaffolds Package
+
+`gavel_ai.scaffolds` provides base classes for external system authors to build compliant SUT integrations. The package is intentionally isolated (no `gavel_ai.core.*` imports) so it can be installed in a separate service environment.
+
+- `_BaseSystemUnderTest.process(raw_dict)`: full parse-validate → `handle()` → assemble lifecycle; emits structured log line with `trace_id` per invocation; wraps `handle()` exceptions into `status: "error"` envelopes automatically.
+- Subclasses implement only `handle(request: ExternalTaskRequest) -> dict | ExternalIssue`.
+- `ScriptSystemUnderTest.main()`: reads `request.json` from `argv[1]`, calls `process()`, writes `response.json` to `argv[2]` — entry point for subprocess scripts.
+- `_materialize.py`: writes scaffold template files with a SHA-256 header so gavel can detect user modifications before overwriting.
+
+### ADR-10 Adapter Seam
+
+All external processors and `JudgeConfig` accept an `adapter` field (default: `"gavel"`). Only `"gavel"` is implemented in the current MVP; the field reserves a forward-compat path for plugging in custom protocol translators without schema changes.
+
+### Schema Reference
+
+`docs/specs/schema-external-runner.md` documents all external runner config fields, request/response schemas, and the two-tier failure model in detail.
 
 ---
 

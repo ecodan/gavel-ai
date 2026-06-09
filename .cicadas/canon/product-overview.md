@@ -51,6 +51,7 @@ Measuring the quality of LLM outputs is notoriously difficult due to non-determi
 | Local-First Storage | Filesystem-based artifact storage for human-readable run history. | Shipped |
 | OpenTelemetry | Native instrumentation for distributed tracing and performance metrics. | Shipped |
 | Autotune v3 | Automated optimization of prompts and model parameters. | Beta |
+| External Runner | Delegate task execution and judging to systems outside gavel's process via `test_subject_type: "external"` with `protocol: "http"` (HTTP endpoint) or `protocol: "script"` (subprocess). Two-tier failure model with configurable abort-on-failure flags. Scaffold base classes (`RemoteSystemUnderTest`, `ScriptSystemUnderTest`) for building compliant external systems. | Shipped |
 
 ## Out of Scope (Intentional)
 
