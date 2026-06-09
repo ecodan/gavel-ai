@@ -46,6 +46,7 @@ where = ["src"]
 gavel_ai = [
     "reporters/templates/*",
     "processors/autotune_template/*",
+    "scaffolds/templates/*",
     "skill/gavel-skill/SKILL.md",
     "skill/gavel-skill/references/*",
     "skill/gavel-skill/scripts/*",
