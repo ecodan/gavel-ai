@@ -253,3 +253,39 @@ Usage: gavel autotune run [OPTIONS]
 │    --help                   Show this message and exit.                      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
+
+## External test subject execution (`test_subject_type: "external"`)
+
+The `external`/`http`|`script` execution path (introduced by the external-runner
+initiative) does **not** add new CLI flags to `gavel oneshot run`, `judge`, or
+`report`. All existing commands work unchanged for external evals:
+
+```bash
+# Run an external eval exactly as you would a local eval:
+gavel oneshot run --eval <name>
+
+# Judge and report work identically:
+gavel oneshot judge --run <run-id>
+gavel oneshot report --run <run-id>
+```
+
+The difference is entirely in `eval_config.json` — setting `test_subject_type:
+"external"`, `protocol: "http"|"script"`, and the protocol-specific `config`
+block. See `references/config-schema.md` for the full field reference.
+
+**CLI output for external runs**
+
+External runs produce the same CLI output as local runs, with additional
+per-invocation log entries in `run.log`. Each entry names the protocol
+(`http`/`script`), the target (endpoint URL or script command), the outcome tier
+(`process_failure` or `process_success_with_issue`), and the invocation's
+`trace_id`. On a halting failure, the Rich panel printed to stderr names the
+tier, the cause, the `trace_id`, and the path to `run.log` — consistent with
+the existing error-display convention (human-readable cause + log pointer, never
+a raw stack trace).
+
+**`gavel oneshot create --type`**
+
+The `--type` flag currently documents `local` and `in-situ`. `in-situ` is a
+deprecated alias for `external` — configs using `test_subject_type: "in-situ"`
+are accepted but emit a deprecation warning; update to `"external"`.
