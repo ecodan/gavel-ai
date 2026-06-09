@@ -33,6 +33,8 @@ async def test_conversational_export_integration(temp_eval_dir):
     mock_eval_config.execution = MagicMock()
     mock_eval_config.execution.max_concurrent = 1
     mock_eval_config.test_subjects = []
+    mock_eval_config.scenarios = MagicMock()
+    mock_eval_config.scenarios.name = "scenarios.json"
 
     mock_model_def = {
         "model_provider": "mock",

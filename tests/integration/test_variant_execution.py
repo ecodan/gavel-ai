@@ -167,6 +167,10 @@ class TestVariantExecutionIntegration:
         variants_processed = {r.variant_id for r in run_ctx.conversation_results}
         assert variants_processed == {"variant-1", "variant-2"}
 
+        # Verify completed flag from in-memory results (not serialized to JSONL)
+        for result in run_ctx.conversation_results:
+            assert result.completed is True
+
         # 2. Verify Determinism Check Passed
         # (Should be empty list if no violations)
         assert run_ctx.determinism_violations == []
@@ -197,9 +201,9 @@ class TestVariantExecutionIntegration:
         conv_records = [json.loads(line) for line in conv_lines]
         for record in conv_records:
             assert record["scenario_id"] == "s1"
-            assert record["completed"] is True
             # Check conversation structure
-            turns = record["conversation_transcript"]["turns"]
+            # Note: to_jsonl_entry() serializes turns under "conversation" (not "conversation_transcript")
+            turns = record["conversation"]
             # Turn 1 (User), Turn 1 (Assist)
             # Logic: Turn 2 "Book Paris" had should_continue=False, so it was NOT added
             assert len(turns) == 2
