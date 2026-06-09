@@ -118,10 +118,12 @@ class TestConversationTimeoutError:
                 mock_call.return_value = MagicMock(output="AI response", metadata={})
                 
                 with patch("time.time") as mock_time:
-                    # Logic needs enough timestamps to pass through loop initialization and checks
-                    # 1000.0: start_time
-                    # 50000.0: first loop check (exceeds 30000ms)
-                    mock_time.side_effect = [1000.0, 1000.1, 1040.0, 50000.0, 50100.0, 50200.0]
+                    # Timestamps consumed in order:
+                    # 1000.0: start_time (line 318)
+                    # 50000.0: first timeout check after 1st assistant turn (line 532)
+                    #          elapsed = (50000.0 - 1000.0) * 1000 = 49000000ms > 30000ms → timeout
+                    # 50100.0: duration_ms finalization (line 609)
+                    mock_time.side_effect = [1000.0, 50000.0, 50100.0, 50200.0]
                     await step.execute(run_ctx)
                 
         results = run_ctx.conversation_results[0]
