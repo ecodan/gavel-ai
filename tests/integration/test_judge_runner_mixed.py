@@ -90,9 +90,9 @@ def _make_eval_dir(tmp_path: Path, eval_name: str = "mixed-judge-eval") -> Path:
 
     # Scenarios: expected label stored in input dict so _resolve_actual finds it
     scenarios = [
-        {"id": "s1", "input": {"question": "q1", "expected": "pos"}, "expected_behavior": ""},
-        {"id": "s2", "input": {"question": "q2", "expected": "pos"}, "expected_behavior": ""},
-        {"id": "s3", "input": {"question": "q3", "expected": "neg"}, "expected_behavior": ""},
+        {"id": "s1", "input": {"question": "q1", "expected": "pos"}, "expected_behavior": "The label should be pos."},
+        {"id": "s2", "input": {"question": "q2", "expected": "pos"}, "expected_behavior": "The label should be pos."},
+        {"id": "s3", "input": {"question": "q3", "expected": "neg"}, "expected_behavior": "The label should be neg."},
     ]
     (data_dir / "scenarios.json").write_text(json.dumps(scenarios))
 
