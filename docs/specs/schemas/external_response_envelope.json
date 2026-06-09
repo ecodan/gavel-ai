@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "ExternalIssue": {
+      "description": "Structured error/warning envelope shared by both transports' response schemas (FR-6.3).",
+      "properties": {
+        "code": {
+          "description": "Stable, documented issue code",
+          "title": "Code",
+          "type": "string"
+        },
+        "level": {
+          "description": "Issue severity",
+          "enum": [
+            "error",
+            "warning"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "message": {
+          "description": "Human-readable description",
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "level",
+        "message"
+      ],
+      "title": "ExternalIssue",
+      "type": "object"
+    }
+  },
+  "description": "Response payload for all external execution shapes \u2014 used by both transports (HTTP response body / script response.json) for both task and judge responses.",
+  "properties": {
+    "status": {
+      "description": "Top-level outcome status",
+      "enum": [
+        "ok",
+        "error"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "result": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Scenario result content (task output or judge score/reasoning)",
+      "title": "Result"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "description": "timing_ms, turns, custom fields",
+      "title": "Metadata",
+      "type": "object"
+    },
+    "issue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExternalIssue"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Present when status carries an error/warning"
+    },
+    "trace_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Echo of the inbound trace_id, for correlation/debugging on the system-under-test side",
+      "title": "Trace Id"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "ExternalResponseEnvelope",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

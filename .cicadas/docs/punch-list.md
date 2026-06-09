@@ -1,27 +1,27 @@
 # Gavel-AI Parity Punch-List
 
-> Comparison reference: LoomEval (ref/tfr). Gaps identified by reviewing README, AGENTS.md, README-JUDGES.md vs. gavel-ai canon and source tree.
+> Comparison reference: Target Platform (ref/tfr). Gaps identified by reviewing README, AGENTS.md, README-JUDGES.md vs. gavel-ai canon and source tree.
 
 ---
 
 ## Summary of Key Differences
 
-| Area | LoomEval | Gavel-AI | Gap |
-|------|----------|----------|-----|
-| Deterministic judges | ClassifierMetric + RegressionMetric | ✅ ClassifierMetric + RegressionMetric | Done |
-| Built-in DeepEval judges | Toxicity, ConversationCompleteness, TurnRelevancy | ✅ All 4 types added | Done |
-| Conversational judge | ConversationalGEval | ✅ Added to JUDGE_TYPE_MAP | Done |
-| External judge configs | TOML + Markdown files | ✅ markdown_path + TOML loading | Done |
-| Closed-box CLI | Full `closed-box` command group | Processor exists, no CLI | **Missing** |
+| Area | Target Platform | Gavel-AI | Gap                    |
+|------|----------|----------|------------------------|
+| Deterministic judges | ClassifierMetric + RegressionMetric | ✅ ClassifierMetric + RegressionMetric | Done                   |
+| Built-in DeepEval judges | Toxicity, ConversationCompleteness, TurnRelevancy | ✅ All 4 types added | Done                   |
+| Conversational judge | ConversationalGEval | ✅ Added to JUDGE_TYPE_MAP | Done                   |
+| External judge configs | TOML + Markdown files | ✅ markdown_path + TOML loading | Done                   |
+| Closed-box CLI | Full `closed-box` command group | Processor exists, no CLI | **Missing**            |
 | Score scale | 0.0–1.0 | 1–10 integer | Diverged (intentional) |
-| User simulation | 8 named personality types | Free-form tone string | **Missing** |
-| Autotune maturity | Full (per-iteration artifacts, convergence) | Beta | **Partial** |
-| Migration command | `loomeval migrate` | None | **Missing** |
-| Conv granular steps | `conv generate` / `conv evaluate` | Partial (`generate` only; no `evaluate`/`report`) | **Partial** |
-| Scaffolding templates | `--template classification/regression` | ✅ Both templates implemented | Done |
-| Schema docs | `schema-configs.md` + `schema-outputs.md` | ✅ Both docs authored | Done |
-| Config snapshot | Full (includes prompts copy) | ✅ Prompts + snapshot_metadata.json | Done |
-| Report: det. judge table | Separate table, prediction\|actual | ✅ Separate section in HTML report | Done |
+| User simulation | 8 named personality types | Free-form tone string | **Missing**            |
+| Autotune maturity | Full (per-iteration artifacts, convergence) | Beta | Done                   |
+| Migration command | `<name> migrate` | None | **Missing**            |
+| Conv granular steps | `conv generate` / `conv evaluate` | Partial (`generate` only; no `evaluate`/`report`) | **Partial**            |
+| Scaffolding templates | `--template classification/regression` | ✅ Both templates implemented | Done                   |
+| Schema docs | `schema-configs.md` + `schema-outputs.md` | ✅ Both docs authored | Done                   |
+| Config snapshot | Full (includes prompts copy) | ✅ Prompts + snapshot_metadata.json | Done                   |
+| Report: det. judge table | Separate table, prediction\|actual | ✅ Separate section in HTML report | Done                   |
 
 ---
 
@@ -35,7 +35,7 @@ Items ordered by impact. Each item is self-contained and scoped to what is neede
 
 **Status**: Complete — `src/gavel_ai/judges/deterministic_metric.py` implements `ClassifierMetric` and `RegressionMetric`; both registered in `JudgeRegistry`.
 
-**Gap (original)**: LoomEval provides zero-LLM-call judges for structured output evaluation using scikit-learn metrics. Gavel-AI has no equivalent.
+**Gap (original)**: Target Platform provides zero-LLM-call judges for structured output evaluation using scikit-learn metrics. Gavel-AI has no equivalent.
 
 **What to build**:
 - `DeterministicJudge` base class in `judges/deterministic_judge.py`
@@ -72,7 +72,7 @@ Items ordered by impact. Each item is self-contained and scoped to what is neede
   - `"deepeval.conversation_completeness"` → `ConversationCompletenessMetric`
   - `"deepeval.conversational_geval"` → `ConversationalGEval`
   - `"deepeval.turn_relevancy"` → `TurnRelevancyMetric`
-- Update default conversational eval scaffold to include `conversation_completeness` + `conversational_geval` judges (matching LoomEval's defaults).
+- Update default conversational eval scaffold to include `conversation_completeness` + `conversational_geval` judges (matching Target Platform's defaults).
 - Document thresholds in CLI help text: Toxicity/Hallucination: 0.85–0.95; AnswerRelevancy/Faithfulness: 0.65–0.80; ConversationCompleteness: 0.70–0.85.
 
 ---
@@ -81,7 +81,7 @@ Items ordered by impact. Each item is self-contained and scoped to what is neede
 
 **Status**: Complete — `markdown_path` field on `JudgeConfig`; `_load_markdown_judge_config` helper in `judge_runner.py`; TOML `config` reference resolution also wired.
 
-**Gap (original)**: LoomEval supports loading judge definitions from `config/judges/*.toml` and `config/judges/*.md` files. Gavel-AI only supported inline JSON judge config.
+**Gap (original)**: Target Platform supports loading judge definitions from `config/judges/*.toml` and `config/judges/*.md` files. Gavel-AI only supported inline JSON judge config.
 
 **What to build**:
 - Support `"config"` field on a judge entry that references a TOML file at `config/judges/{name}.toml`. Fields: `criteria`, `evaluation_steps`, `threshold`.
@@ -118,7 +118,7 @@ threshold = 0.7
 
 ### 5. Autotune: Promote from Beta to Full
 
-**Gap**: Autotune is labeled "beta" in the canon product overview. LoomEval's autotune is fully featured with per-iteration artifacts, a dedicated `create` command, constraint enforcement, and convergence options.
+**Gap**: Autotune is labeled "beta" in the canon product overview. Target Platform's autotune is fully featured with per-iteration artifacts, a dedicated `create` command, constraint enforcement, and convergence options.
 
 **What to build**:
 - `autotune create` command (currently missing — only `run` and `report` exist).
@@ -133,7 +133,7 @@ threshold = 0.7
 
 ### 6. Named User Personality Profiles for Conversational Eval
 
-**Gap**: LoomEval has 8 named personality types (collaborative, resistant, confused, impatient, detail-oriented, creative, skeptical, goal-driven) with a `personality_distribution: "balanced"` config. Gavel-AI has a free-form `tone` string field, which is weaker and not enumerable.
+**Gap**: Target Platform has 8 named personality types (collaborative, resistant, confused, impatient, detail-oriented, creative, skeptical, goal-driven) with a `personality_distribution: "balanced"` config. Gavel-AI has a free-form `tone` string field, which is weaker and not enumerable.
 
 **What to build**:
 - `PersonalityType` enum in `models/conversation.py`: `collaborative`, `resistant`, `confused`, `impatient`, `detail_oriented`, `creative`, `skeptical`, `goal_driven`.
@@ -146,7 +146,7 @@ threshold = 0.7
 
 ### 7. Granular Conversational CLI Steps
 
-**Gap**: LoomEval exposes `conv generate` (scenarios), `conv generate --run` (conversations), `conv evaluate`, and `conv report` as separately invocable commands. Gavel-AI bundles everything in `conv run`. This prevents resumability and step-by-step control.
+**Gap**: Target Platform exposes `conv generate` (scenarios), `conv generate --run` (conversations), `conv evaluate`, and `conv report` as separately invocable commands. Gavel-AI bundles everything in `conv run`. This prevents resumability and step-by-step control.
 
 **What to build**:
 - `gavel conv generate [--eval] [--num-scenarios N]` — generate scenarios only.
@@ -186,7 +186,7 @@ threshold = 0.7
 
 ### 10. Migration Command
 
-**Gap**: LoomEval provides `loomeval migrate [--eval] [--dry-run]` to upgrade old eval configs to the current schema. As gavel-ai evolves, configs from early users will go stale. No migration path exists today.
+**Gap**: Target Platform provides `<name> migrate [--eval] [--dry-run]` to upgrade old eval configs to the current schema. As gavel-ai evolves, configs from early users will go stale. No migration path exists today.
 
 **What to build**:
 - `gavel migrate [--eval <name>] [--dry-run]` command.
@@ -216,7 +216,7 @@ threshold = 0.7
 
 ## OneShot Parity Breakdown
 
-Detailed work items to bring `gavel oneshot` to full feature parity with LoomEval's oneshot workflow. Items ordered by dependency — earlier items unblock later ones.
+Detailed work items to bring `gavel oneshot` to full feature parity with Target Platform's oneshot workflow. Items ordered by dependency — earlier items unblock later ones.
 
 ---
 
@@ -408,9 +408,3 @@ Judge config:
 At evaluation time, `{{expected_category}}` is replaced with `"billing"` before the LLM judge call.
 
 ---
-
-## Out of Scope (Intentional Differences)
-
-- **AI Gateway integration**: LoomEval is built for Atlassian's internal AI Gateway (SLAUTH/Lanyard auth). Gavel-AI is provider-agnostic via Pydantic-AI. No parity needed here.
-- **Score scale**: LoomEval uses 0.0–1.0; Gavel-AI uses 1–10 integers. This is a design choice to improve human readability of judge output. No change recommended unless a specific reason to align emerges.
-- **`loomeval sxs` legacy commands**: Gavel-AI never had an `sxs` prefix; no migration path needed for this alias.

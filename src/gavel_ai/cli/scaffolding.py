@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from gavel_ai.core.exceptions import ConfigError
+from gavel_ai.scaffolds._materialize import _materialize
 
 
 def generate_agents_config(eval_root: Path, eval_name: str) -> None:
@@ -563,6 +564,94 @@ Provide a short, clear, accurate answer.
     _generate_quality_judge_toml(eval_root, eval_name)
 
 
+def _generate_external_templates(eval_root: Path, eval_name: str, protocol: str = "http") -> None:
+    """Generate eval_config.json and scenarios.json for an external SUT evaluation.
+
+    Args:
+        eval_root: Root directory for evaluations.
+        eval_name: Name of the evaluation.
+        protocol: External transport protocol — "http" or "script".
+    """
+    eval_config: Dict[str, Any] = {
+        "eval_type": "oneshot",
+        "test_subject_type": "external",
+        "eval_name": eval_name,
+        "description": "External SUT evaluation scaffolded by gavel oneshot create",
+        "test_subjects": [
+            {
+                "system_id": "my-external-system",
+                "protocol": protocol,
+                "config": {
+                    "endpoint": "http://localhost:8080/evaluate"
+                    if protocol == "http"
+                    else "",
+                    "command": ["python", f"scripts/sut_scaffold.py"]
+                    if protocol == "script"
+                    else [],
+                },
+                "judges": [
+                    {
+                        "name": "quality",
+                        "type": "deepeval.geval",
+                        "config": {
+                            "model": "gpt-5-mini",
+                            "criteria": "Evaluate the quality and accuracy of the response",
+                            "evaluation_steps": [
+                                "Check if the response is accurate",
+                                "Verify completeness of answer",
+                                "Assess clarity and usefulness",
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
+        "variants": ["claude_haiku"],
+        "scenarios": {
+            "source": "file.local",
+            "name": "scenarios.json",
+            "field_mapping": {"expected_output": "expected"},
+        },
+        "execution": {"max_concurrent": 10},
+        "async": {
+            "num_workers": 8,
+            "arrival_rate_per_sec": 20.0,
+            "exec_rate_per_min": 100,
+            "max_retries": 3,
+            "task_timeout_seconds": 300,
+            "stuck_timeout_seconds": 600,
+            "emit_progress_interval_sec": 10,
+        },
+    }
+
+    output_file = eval_root / eval_name / "config" / "eval_config.json"
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_file, "w") as f:
+        json.dump(eval_config, f, indent=2)
+
+    # Scenarios
+    scenarios_data = [
+        {
+            "scenario_id": "1",
+            "input": "What is the capital of France?",
+            "expected": "Paris",
+            "metadata": {"category": "geography", "difficulty": "easy"},
+        },
+        {
+            "scenario_id": "2",
+            "input": "Explain quantum computing in simple terms",
+            "expected": "A clear, accessible explanation.",
+            "metadata": {"category": "technology", "difficulty": "medium"},
+        },
+    ]
+
+    scenarios_file = eval_root / eval_name / "data" / "scenarios.json"
+    scenarios_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(scenarios_file, "w") as f:
+        json.dump(scenarios_data, f, indent=2)
+
+
 def generate_all_templates(
     eval_root: Path, eval_name: str, eval_type: str, template: str = "default"
 ) -> None:
@@ -572,13 +661,14 @@ def generate_all_templates(
     Args:
         eval_root: Root directory for evaluations.
         eval_name: Name of the evaluation.
-        eval_type: Evaluation type: "local" or "in-situ".
+        eval_type: Evaluation type: "local", "in-situ", or "external".
         template: Scaffold template: "default", "classification", "regression", or "conversational".
             - ``default``: General-purpose LLM judge scaffold.
             - ``classification``: Classifier metrics with sentiment example scenarios.
             - ``regression``: Regression metric with arithmetic example scenarios.
             - ``conversational``: Multi-turn eval with conversation_completeness and conversational_geval.
             Note: ``--type in-situ`` skips prompt generation and uses remote endpoint structure.
+            Note: ``--type external`` generates an external SUT scaffold (HTTP or script transport).
 
     Raises:
         ConfigError: If template name is not recognized.
@@ -586,7 +676,13 @@ def generate_all_templates(
     create_directory_structure(eval_root, eval_name)
     generate_agents_config(eval_root, eval_name)
 
-    if template == "classification":
+    if eval_type == "external":
+        # External SUT eval — use HTTP as the default protocol for the template.
+        _generate_external_templates(eval_root, eval_name, protocol="http")
+        # Materialize the HTTP scaffold into eval_dir/scripts/
+        eval_dir = eval_root / eval_name
+        _materialize(eval_dir, protocol="http", name="sut")
+    elif template == "classification":
         _generate_classification_templates(eval_root, eval_name, eval_type)
     elif template == "regression":
         _generate_regression_templates(eval_root, eval_name, eval_type)

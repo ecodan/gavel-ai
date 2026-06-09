@@ -70,6 +70,103 @@ Stage 6 — Choose and configure judges
 Stage 7 — Run end-to-end (run → judge → report)
 ```
 
+#### External test subject path (`test_subject_type: "external"`)
+
+If the user wants to evaluate a real external system — "point this eval at our HTTP
+service" or "run our scorer as a script" — follow this extended path alongside the
+stages above.
+
+**Identify the protocol first.**
+
+Ask the user one question: "Does your system expose an HTTP endpoint, or do you need
+Gavel to invoke a local script or CLI tool?"
+
+- HTTP endpoint → `protocol: "http"` (see below)
+- Script / CLI tool → `protocol: "script"` (see below)
+
+Then set `test_subject_type: "external"` and omit `prompt_name` (it is not used for
+external subjects).
+
+**`protocol: "http"` — HTTP endpoint configuration**
+
+Walk the user through the following fields in `eval_config.json` under
+`test_subjects[0]`:
+
+```json
+{
+  "test_subject_type": "external",
+  "system_id": "my-service",
+  "protocol": "http",
+  "config": {
+    "endpoint": "https://your-service.internal/eval",
+    "method": "POST",
+    "headers": { "Content-Type": "application/json" },
+    "auth": { "bearer_token": "{{AUTH_TOKEN}}" },
+    "trace_header": "X-Gavel-Trace-Id"
+  },
+  "abort_on_exec_failure": true,
+  "abort_on_process_error": false
+}
+```
+
+Questions to ask:
+1. "What is the endpoint URL?" → `config.endpoint`
+2. "Does the endpoint require authentication? (bearer token, API key, or none?)" → `config.auth`
+3. "Should the run stop immediately if the service is unreachable or returns an error
+   status?" — this is `abort_on_exec_failure`. Default is `true` (stop on first
+   transport failure). Set `false` to log the failure and continue.
+4. "Should the run stop if the service runs fine but flags a problem with its own
+   output?" — this is `abort_on_process_error`. Default is `false` (continue and
+   record the issue). Set `true` to fail-fast on any application-level issue the
+   service reports.
+
+Show the user the resulting config block before running. Read `references/config-schema.md`
+for the full `protocol: "http"` field reference.
+
+**`protocol: "script"` — script/subprocess configuration**
+
+Walk the user through these fields:
+
+```json
+{
+  "test_subject_type": "external",
+  "system_id": "my-scorer",
+  "protocol": "script",
+  "config": {
+    "command": ["python", "run_scorer.py"],
+    "args": [],
+    "working_dir": "./scripts",
+    "timeout": 30
+  },
+  "abort_on_exec_failure": true,
+  "abort_on_process_error": false
+}
+```
+
+Questions to ask:
+1. "What command launches the script?" → `config.command` (must be an argument list, not a
+   shell string — e.g. `["python", "run_scorer.py"]`, not `"python run_scorer.py"`)
+2. "Is there a specific working directory or timeout?" → `config.working_dir`, `config.timeout`
+3. Same abort-flag questions as HTTP above.
+
+Also explain what will happen physically at run time (so the user isn't surprised by log
+lines later): "For each scenario, Gavel will create a temporary directory, write a JSON
+request document, launch your script, wait for it to write a response document, read the
+response, and clean up the temp directory automatically. You'll see per-invocation log
+lines naming the script and a `trace_id` you can use to correlate with your script's own
+logs."
+
+Read `references/config-schema.md` for the full `protocol: "script"` field reference,
+including `request_filename`/`response_filename` defaults (`request.json`/`response.json`).
+
+**Config validation at run-start**
+
+When the user runs `gavel oneshot run --eval <name>`, Gavel validates the config before
+making any external calls. A misconfigured field produces a fail-fast error naming the
+offending field and the expected shape. Relay this back in plain language and offer to fix
+it. For configs that still use the old `"in-situ"` value, Gavel will emit a deprecation
+warning — tell the user to update `test_subject_type` to `"external"` to clear it.
+
 ---
 
 ### 3. Stage 1 — Initialize the project
@@ -311,6 +408,72 @@ Trace failures to:
 | `MissingTestCaseParamsError` | Judge needs a field (`context`, `retrieval_context`) not in the scenario | Add the required field |
 | All scores are 0 or 1 | `strict_mode: true` on geval judge | Remove `strict_mode` or confirm it's intentional |
 | Deterministic results missing | `classifier`/`regression` judge result isn't in `results_judged.jsonl` | Expected — these appear only in the HTML report, not JSONL |
+
+#### Debugging `external` test subject failures (two-tier model)
+
+When an eval uses `test_subject_type: "external"`, failures split into **two distinct
+tiers**. The tier is named explicitly in the Rich panel and `run.log` — relay it to the
+user verbatim; do **not** soften or restate it with vaguer language.
+
+**Tier 1 — Process failure**
+
+The external system did not complete. The panel and `run.log` will say:
+
+> `process failure: <cause>`
+
+Examples of causes: "endpoint returned 503", "script exited with code 1",
+"script timed out after 30s", "response document missing at `<path>`".
+
+When you see this:
+1. Name the tier explicitly: **"This is a process failure — the external system did not
+   complete."**
+2. Find the `trace_id` in the panel or `run.log` — e.g. `trace_id: abc-123`. Always
+   include this when relaying the issue so the user can pivot into `telemetry.jsonl` or
+   their service's own logs.
+3. Identify the cause:
+   - HTTP: non-2xx status or network/timeout → check endpoint URL, auth, and network
+     connectivity; inspect `run.log` for the HTTP status code.
+   - Script crash (non-zero exit code): inspect the bounded `stderr` in `run.log` for
+     the script's own error output.
+   - Script timeout: the script was terminated because it exceeded `config.timeout`; the
+     temp directory is still cleaned up.
+   - Missing/malformed response document: the script ran but did not write a valid
+     `response.json` at the expected path — refer the script author to
+     `docs/specs/schema-external-runner.md` for the required response shape.
+4. Ask if the user wants to adjust `abort_on_exec_failure` (default `true`) to continue
+   past failures and collect all results before diagnosing.
+
+**Tier 2 — Process success with internal issue**
+
+The external system ran and completed, but flagged a problem with its own output (e.g.
+`status: "error"` or a non-empty `issue` in the response envelope). The panel and
+`run.log` will say:
+
+> `process success with issue: <cause>`
+
+When you see this:
+1. Name the tier explicitly: **"The external system ran fine — it completed and flagged
+   its own output as having an issue."** This is distinct from a crash.
+2. Include the `trace_id` when relaying the issue.
+3. The record still flows into `results_raw.jsonl` with the issue attached in `metadata`
+   and `error` — the run continues unless `abort_on_process_error` was set to `true`.
+4. For warning-level issues (e.g. "low confidence in this output"): clarify to the user
+   that **"the script ran fine and flagged a low-confidence result; the run kept going
+   because `abort_on_process_error` is off."**
+5. To halt on these issues, the user can set `abort_on_process_error: true` in the eval
+   config.
+
+**Relaying tier information — key rules**
+
+- Always name the tier: *process failure* or *process success with issue*.
+- Always include the `trace_id` — this is the correlator the user needs to pivot into
+  `telemetry.jsonl`, `run.log`, or the external system's own logs.
+- Translate internal vocabulary to operator vocabulary: use "endpoint", "script",
+  "request", "response", "exit code", "timeout" — not internal type names like
+  `RemoteSystemInput` or `ProcessorResult`.
+- Never soften "process failure" to "it didn't work" or "an error occurred" — the
+  distinction between the two tiers is the actionable signal.
+- Never print a stack trace to the user. Point at `run.log` for full detail.
 
 ---
 

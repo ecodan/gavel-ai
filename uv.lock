@@ -1195,6 +1195,8 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "jsonschema" },
+    { name = "mypy" },
     { name = "pytest-cov" },
 ]
 
@@ -1224,7 +1226,11 @@ requires-dist = [
 provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest-cov", specifier = ">=7.0.0" }]
+dev = [
+    { name = "jsonschema", specifier = ">=4.25.1" },
+    { name = "mypy", specifier = ">=1.19.1" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+]
 
 [[package]]
 name = "genai-prices"

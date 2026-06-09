@@ -2,6 +2,9 @@
 
 This document describes all output artifact schemas produced by a gavel-ai evaluation run.
 
+For the request/response payload schemas exchanged with external systems under test or judges
+(HTTP and script transports), see [schema-external-runner.md](schema-external-runner.md).
+
 Run artifacts are stored under `.gavel/evaluations/{eval_name}/runs/{run_id}/`.
 
 ---
@@ -52,6 +55,14 @@ One JSON record per line. Each record is an `OutputRecord` — the raw processor
 | `error` | `string \| null` | Error message if execution failed; `null` on success |
 | `metadata` | `object` | Additional metadata (e.g., `turn_number` for conversational runs) |
 | `timestamp` | `string` | ISO 8601 timestamp of execution |
+
+**`metadata` keys for externally-executed records** (`test_subject_type: "external"`):
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `trace_id` | `string` | The Gavel run ID forwarded as an HTTP header to the external system. Resolvable to a span in `telemetry.jsonl` for the same `run_id` (FR-4.3, ADR-2). **Absent on in-process (`local`) records.** |
+| `external_outcome` | `string` | Transport-observed outcome: `"process_failure"` or `"process_success_with_issue"`. Present only when `error` is non-null. |
+| `external_tier` | `string` | Pre-computed `IssueTier` (`"ERROR"` or `"WARNING"`) derived by `classify_external_outcome` from `external_outcome` and the `abort_on_*` flags. Used by the pipeline's `should_halt` path without re-deriving the tier. |
 
 **Join key:** `(test_subject, variant_id, scenario_id)`
 

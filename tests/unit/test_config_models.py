@@ -220,18 +220,18 @@ class TestTestSubject:
         )
         assert len(subject.judges) == 2
 
-    def test_test_subject_with_remote_config(self):
-        """TestSubject can include remote system configuration."""
+    def test_test_subject_with_external_config(self):
+        """TestSubject can include external system configuration."""
         subject = TestSubject(
-            system_id="remote-system-1",
-            protocol="acp",
+            system_id="external-system-1",
+            protocol="http",
             config={"url": "https://api.example.com", "timeout": 30},
             judges=[
                 JudgeConfig(name="similarity", type="deepeval.similarity"),
             ],
         )
-        assert subject.system_id == "remote-system-1"
-        assert subject.protocol == "acp"
+        assert subject.system_id == "external-system-1"
+        assert subject.protocol == "http"
         assert subject.config["url"] == "https://api.example.com"
 
     def test_test_subject_extra_ignore(self):

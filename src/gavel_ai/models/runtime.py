@@ -15,7 +15,7 @@ Defines Pydantic models for:
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from gavel_ai.models.config import JudgeConfig  # noqa: F401
 
@@ -63,7 +63,7 @@ class RemoteSystemInput(Input):
     Represents an HTTP request to an external API with endpoint, method,
     headers, body, and optional authentication details.
 
-    Typically created by ScenarioProcessorStep for closed-box API calls.
+    Typically created by ScenarioProcessorStep for external HTTP API calls.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -74,6 +74,130 @@ class RemoteSystemInput(Input):
     body: Dict[str, Any] = Field(default_factory=dict, description="Request body")
     auth: Optional[Dict[str, str]] = Field(
         None, description="Authentication config (e.g., bearer_token, api_key)"
+    )
+
+
+class ScriptSystemInput(Input):
+    """Input for script/process-based external execution.
+
+    Represents a single script invocation: the command to launch and the
+    fully-specified request payload to write to the request document before
+    launch. Mirrors RemoteSystemInput's role for the http transport.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    command: List[str] = Field(..., description="Argument-list command (no shell interpolation)")
+    working_dir: Optional[str] = Field(None, description="Working directory override")
+    request_payload: Dict[str, Any] = Field(..., description="Fully-specified request document content")
+    request_filename: str = Field("request.json", description="Request document filename within the temp dir")
+    response_filename: str = Field("response.json", description="Response document filename within the temp dir")
+
+    @field_validator("command", mode="before")
+    @classmethod
+    def _reject_bare_str(cls, value: Any) -> Any:
+        """Reject a bare str (which would otherwise coerce into a list of characters)."""
+        if isinstance(value, str):
+            raise ValueError("command must be an argument list (List[str]), not a bare string")
+        return value
+
+
+class ExternalIssue(BaseModel):
+    """Structured error/warning envelope shared by both transports' response schemas (FR-6.3)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    code: str = Field(..., description="Stable, documented issue code")
+    level: Literal["error", "warning"] = Field(..., description="Issue severity")
+    message: str = Field(..., description="Human-readable description")
+
+
+class ExternalResponseEnvelope(BaseModel):
+    """Top-level shape of every task/judge response payload, both transports (FR-6.3).
+
+    `status: "ok"` with `issue` present => process success with internal issue (ADR-3 PROCESS_SUCCESS_WITH_ISSUE).
+    `status: "error"` => process failure (ADR-3 PROCESS_FAILURE) — typically only reachable
+    on the script transport where the process completed but self-reported failure
+    (HTTP process failures are signaled by status code, not this envelope).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    status: Literal["ok", "error"] = Field(..., description="Top-level outcome status")
+    result: Optional[Dict[str, Any]] = Field(None, description="Scenario result content (task output or judge score/reasoning)")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="timing_ms, turns, custom fields")
+    issue: Optional[ExternalIssue] = Field(None, description="Present when status carries an error/warning")
+    trace_id: Optional[str] = Field(None, description="Echo of the inbound trace_id, for correlation/debugging on the system-under-test side")
+
+
+class ExternalTaskRequest(BaseModel):
+    """Request payload sent to an external system under test (both HTTP and script transports).
+
+    Represents the inbound document the system-under-test receives for each scenario invocation.
+    The delivery mechanism differs per transport (HTTP POST body vs. temp-dir request.json file),
+    but the payload shape is identical — the same Pydantic model is used for both transports.
+
+    Per FR-6.2: includes scenario data, custom config, rendered prompt content, and trace_id.
+
+    Bounds: rendered_prompt is capped at 32 KB before transmission; callers must truncate
+    before constructing this model if the rendered prompt exceeds that limit.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    scenario_id: str = Field(..., description="Scenario identifier from scenarios.json")
+    scenario_input: Union[str, Dict[str, Any]] = Field(
+        ..., description="Raw scenario input (string or structured object)"
+    )
+    rendered_prompt: str = Field(
+        ...,
+        description="Fully rendered prompt text ready for the system-under-test (max 32 KB)",
+    )
+    custom_config: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="TestSubject.config pass-through for system-under-test configuration",
+    )
+    trace_id: Optional[str] = Field(
+        None, description="Run-level trace identifier for correlation with telemetry.jsonl"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional per-invocation metadata"
+    )
+
+
+class ExternalJudgeRequest(BaseModel):
+    """Request payload sent to an external judge (both HTTP and script transports).
+
+    Represents the inbound document the external judge receives for each scoring invocation.
+    Like ExternalTaskRequest, the same model is used for both HTTP and script transports —
+    only the delivery mechanism differs.
+
+    Per FR-6.2: includes scenario data, judge criteria/prompt content, and trace_id.
+
+    Bounds: processor_output is capped at 32 KB before transmission; callers must truncate
+    before constructing this model if the processor output exceeds that limit.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    scenario_id: str = Field(..., description="Scenario identifier from scenarios.json")
+    processor_output: str = Field(
+        ...,
+        description="Raw processor output to be judged (max 32 KB)",
+    )
+    criteria: str = Field(..., description="Rendered judge criteria / scoring rubric")
+    expected_behavior: Optional[str] = Field(
+        None, description="Expected behavior from the scenario (optional reference for judge)"
+    )
+    custom_config: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="JudgeConfig.config pass-through for judge configuration",
+    )
+    trace_id: Optional[str] = Field(
+        None, description="Run-level trace identifier for correlation with telemetry.jsonl"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional per-invocation metadata"
     )
 
 
@@ -343,6 +467,9 @@ class JudgedRecord(BaseModel):
     reasoning: Optional[str] = Field(None, description="Judge's explanation (null if error)")
     error: Optional[str] = Field(None, description="Error message if judging failed")
     timestamp: str = Field(..., description="ISO 8601 timestamp of evaluation")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata (e.g. trace_id for externally-delegated judging)"
+    )
 
 
 class Turn(BaseModel):

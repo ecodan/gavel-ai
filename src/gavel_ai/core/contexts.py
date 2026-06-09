@@ -106,6 +106,8 @@ class RunContext(ABC):
     """
 
     last_step_error: Optional[Exception] = None
+    # Set by JudgeRunnerStep when external-protocol judges are configured
+    external_judged_records: List[JudgedRecord]
 
     @property
     @abstractmethod
@@ -463,6 +465,7 @@ class LocalRunContext(RunContext):
         # Typed step-result attributes — set by pipeline steps, consumed by downstream steps
         self.processor_results: Optional[List[OutputRecord]] = None
         self.evaluation_results: Optional[List[Dict[str, Any]]] = None
+        self.external_judged_records: List[JudgedRecord] = []
         self.test_subject: Optional[str] = None
         self.model_variant: Optional[str] = None
 
@@ -784,6 +787,7 @@ class IterationRunContext:
     processor_results: List[OutputRecord] = field(default_factory=list)
     evaluation_results: Optional[List[Dict[str, Any]]] = None
     evaluation_results_data: List[JudgedRecord] = field(default_factory=list)
+    external_judged_records: List[JudgedRecord] = field(default_factory=list)
     deterministic_metrics: Dict[str, Any] = field(default_factory=dict)
     test_subject: Optional[str] = None
     model_variant: Optional[str] = None
