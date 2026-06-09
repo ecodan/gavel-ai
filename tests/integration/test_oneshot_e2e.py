@@ -32,6 +32,8 @@ class DummyExactMatchJudge(Judge):
 @pytest.fixture
 def mock_llm():
     """Mock the LLM provider call to avoid network requests during integration."""
+    # Save registry state before adding test-specific entries
+    saved_registry: dict = dict(JudgeRegistry._registry)
     JudgeRegistry.register("exact_match", DummyExactMatchJudge)
 
     with patch("gavel_ai.providers.factory.ProviderFactory.call_agent", new_callable=AsyncMock) as mock_agent:
@@ -41,14 +43,16 @@ def mock_llm():
         )
         yield mock_agent
 
-    JudgeRegistry.clear()
+    # Restore registry to its pre-fixture state instead of clearing everything
+    JudgeRegistry._registry.clear()
+    JudgeRegistry._registry.update(saved_registry)
 
 
 def test_oneshot_full_lifecycle(monkeypatch, tmp_path, mock_llm, capsys):
     # Setup temporary eval root
     eval_root = tmp_path / ".gavel" / "evaluations"
     eval_root.mkdir(parents=True)
-    monkeypatch.setattr(oneshot, "DEFAULT_EVAL_ROOT", eval_root)
+    monkeypatch.setattr("gavel_ai.cli.commands.oneshot.resolve_eval_root", lambda _: eval_root)
 
     with capsys.disabled():
         # Phase 1: Create scaffold

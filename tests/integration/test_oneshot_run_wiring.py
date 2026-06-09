@@ -162,9 +162,9 @@ class TestEvalContextIntegration:
 
         ctx = LocalFileSystemEvalContext(eval_name, eval_root)
 
-        # Scenarios are read via iterator, empty if file doesn't exist
-        scenarios = ctx.scenarios.read()
-        assert scenarios == []
+        # scenarios.read() resolves the path via eval_config, which raises when eval_config.json is missing
+        with pytest.raises(FileNotFoundError, match="config/eval_config.json"):
+            ctx.scenarios.read()
 
     def test_eval_context_prompt_version_not_found(self, tmp_path: Path) -> None:
         """Test error when prompt version doesn't exist."""
