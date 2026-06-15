@@ -164,8 +164,9 @@ They are **never** written to `results_raw.jsonl` or `results_judged.jsonl`.
 | `threshold` | float | `0.7` | Pass/fail cutoff (0.0–1.0 raw DeepEval scale) |
 | `strict_mode` | bool | `false` | Return binary 0/1 score instead of continuous. Normalizes to score 1 or 10. |
 | `expected_output_template` | string | — | Jinja2 template rendered with `scenario.input` fields + `scenario.metadata` |
+| `evaluation_params` | string[] | `["input", "actual_output", "expected_output"]` | Which `LLMTestCase` fields to send to the judge LLM. Valid values: `input`, `actual_output`, `expected_output`, `context`, `retrieval_context`. Omit `input` to avoid re-sending large scenario inputs (e.g. full page HTML) when criteria only compares output to golden. |
 
-`evaluation_params` is always `[INPUT, ACTUAL_OUTPUT, EXPECTED_OUTPUT]`. Values are resolved from `scenarios.field_mapping` or `scenario.expected_behavior` — see `scenarios.field_mapping` above.
+Retained `evaluation_params` values are resolved from `scenarios.field_mapping` or `scenario.expected_behavior` — see `scenarios.field_mapping` above.
 
 ### `scenarios`
 

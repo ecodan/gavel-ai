@@ -215,6 +215,14 @@ class GEvalConfig(BaseModel):
         False,
         description="Return binary 0/1 score instead of continuous. Score normalizes to 1 or 10.",
     )
+    evaluation_params: Optional[List[str]] = Field(
+        None,
+        description=(
+            "Which LLMTestCase fields to send to the judge LLM. Valid values: "
+            "input, actual_output, expected_output, context, retrieval_context. "
+            "Defaults to all of [input, actual_output, expected_output]."
+        ),
+    )
 
 
 class TurnGeneratorConfig(BaseModel):

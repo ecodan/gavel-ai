@@ -253,15 +253,36 @@ class DeepEvalJudge(Judge):
                         "Evaluate the clarity and accuracy",
                     ],
                 )
-                # evaluation_params is always all three — the scenarios section
-                # field_mapping (injected into config by JudgeRunnerStep) controls
-                # where each value comes from.  JudgeRunnerStep validates upfront that
-                # every scenario can resolve expected_output before any judge runs.
-                evaluation_params = [
-                    LLMTestCaseParams.INPUT,
-                    LLMTestCaseParams.ACTUAL_OUTPUT,
-                    LLMTestCaseParams.EXPECTED_OUTPUT,
-                ]
+                # evaluation_params defaults to all three (input, actual_output,
+                # expected_output) but can be restricted via the judge's
+                # "evaluation_params" config — e.g. to omit "input" when the
+                # scenario input is large (full page HTML, etc.) and not needed
+                # by the criteria. The scenarios section field_mapping (injected
+                # into config by JudgeRunnerStep) controls where each retained
+                # value comes from. JudgeRunnerStep validates upfront that every
+                # scenario can resolve expected_output before any judge runs.
+                param_name_map = {
+                    "input": LLMTestCaseParams.INPUT,
+                    "actual_output": LLMTestCaseParams.ACTUAL_OUTPUT,
+                    "expected_output": LLMTestCaseParams.EXPECTED_OUTPUT,
+                    "context": LLMTestCaseParams.CONTEXT,
+                    "retrieval_context": LLMTestCaseParams.RETRIEVAL_CONTEXT,
+                }
+                requested_params = metric_config.get("evaluation_params")
+                if requested_params:
+                    try:
+                        evaluation_params = [param_name_map[p] for p in requested_params]
+                    except KeyError as e:
+                        raise JudgeError(
+                            f"GEval judge '{judge_id}' has invalid evaluation_params entry "
+                            f"{e} - valid options are: {', '.join(param_name_map.keys())}"
+                        )
+                else:
+                    evaluation_params = [
+                        LLMTestCaseParams.INPUT,
+                        LLMTestCaseParams.ACTUAL_OUTPUT,
+                        LLMTestCaseParams.EXPECTED_OUTPUT,
+                    ]
                 # Use threshold from config dict, then fall back to top-level threshold
                 threshold = metric_config.get("threshold") or self.config.threshold or 0.5
 

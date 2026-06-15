@@ -66,6 +66,16 @@ score instead of a continuous float. After normalization this becomes score 1 or
 Use for format/schema compliance checks where you want a hard pass/fail rather than a
 gradient score.
 
+**`evaluation_params`** (list of strings, default `["input", "actual_output", "expected_output"]`)
+— controls which `LLMTestCase` fields are sent to the judge LLM. Valid values: `input`,
+`actual_output`, `expected_output`, `context`, `retrieval_context`. Omit `input` when your
+criteria only compares `actual_output` against `expected_output` and the scenario `input`
+is large (e.g. full page HTML, long documents) — this avoids re-sending that payload to
+the judge on every call, which can dominate eval cost. Example:
+```json
+"evaluation_params": ["actual_output", "expected_output"]
+```
+
 **`expected_output` resolution** — in priority order:
 1. `field_mapping.expected_output` in the `scenarios` config section (dot-notation path)
 2. `expected_output_template` in the judge config (Jinja2, rendered with scenario fields)

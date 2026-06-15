@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.2.1
+
+- **Feature**: `deepeval.geval` judge config now supports `evaluation_params` — a list restricting which `LLMTestCase` fields (`input`, `actual_output`, `expected_output`, `context`, `retrieval_context`) are sent to the judge LLM. Defaults to all of `input`, `actual_output`, `expected_output` (previous behaviour). Useful for omitting large `input` payloads (e.g. full page HTML) from judge calls when criteria only compares output to golden, reducing judge token cost. Invalid entries raise `JudgeError` with the list of valid options.
+
 ## 0.2.0
 
 - **Feature**: Three-tier issue classifier (`ERROR` / `WARNING` / `OK`) and `error_policy` on `EvalConfig`. Set `error_policy.exit_on_error: false` to let scenarios with LLM 4xx/5xx errors be recorded and skipped rather than aborting the run; set `exit_on_warning: true` for fail-fast on schema/config validation issues. Defaults preserve existing behaviour (`exit_on_error: true`, `exit_on_warning: false`). `RunPolicyError` is raised immediately on threshold breach (fail-fast, not batched). New module `core/issue_classifier.py` with `classify(exc)` and `classify_message(msg)`.
