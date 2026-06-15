@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.2.2
+
+- **Fix**: `gavel --version` now reads the installed package version via `importlib.metadata` instead of a hardcoded string, so it no longer drifts from `pyproject.toml`.
+
 ## 0.2.1
 
 - **Feature**: `deepeval.geval` judge config now supports `evaluation_params` — a list restricting which `LLMTestCase` fields (`input`, `actual_output`, `expected_output`, `context`, `retrieval_context`) are sent to the judge LLM. Defaults to all of `input`, `actual_output`, `expected_output` (previous behaviour). Useful for omitting large `input` payloads (e.g. full page HTML) from judge calls when criteria only compares output to golden, reducing judge token cost. Invalid entries raise `JudgeError` with the list of valid options.

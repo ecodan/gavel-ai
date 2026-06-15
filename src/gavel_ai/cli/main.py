@@ -1,6 +1,7 @@
 """Main Typer CLI application for Gavel-AI."""
 
 import json
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import List, Optional
 
@@ -27,7 +28,11 @@ app = typer.Typer(
 def version_callback(value: bool) -> None:
     """Show version and exit."""
     if value:
-        typer.echo("gavel-ai version 0.2.0")
+        try:
+            pkg_version = version("gavel-ai")
+        except PackageNotFoundError:
+            pkg_version = "unknown"
+        typer.echo(f"gavel-ai version {pkg_version}")
         raise typer.Exit()
 
 
