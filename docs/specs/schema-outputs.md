@@ -78,14 +78,14 @@ One JSON record per line. Each record is a `JudgedRecord` — one judge evaluati
 | `variant_id` | `string` | Model/agent variant ID |
 | `scenario_id` | `string` | Scenario identifier |
 | `judge_id` | `string` | Judge name from eval_config.json |
-| `score` | `integer` | Score on 1–10 scale (normalized from raw 0.0–1.0) |
+| `score` | `float` | Score on 0.0–1.0 scale (judge's native scale, clamped) |
 | `reasoning` | `string \| null` | Judge's explanation; `null` if evaluation errored |
 | `error` | `string \| null` | Error message if judging failed; `null` on success |
 | `timestamp` | `string` | ISO 8601 timestamp of evaluation |
 
 **Join key:** `(test_subject, variant_id, scenario_id)` joins to `results_raw.jsonl`.
 
-**Score normalization:** DeepEval raw scores (0.0–1.0) are normalized using `round(1 + raw * 9)`, mapping 0.0 → 1 and 1.0 → 10.
+**Score normalization:** DeepEval's native 0.0–1.0 score is used directly, clamped to [0.0, 1.0]. External/custom judge scores are likewise clamped to [0.0, 1.0].
 
 ---
 
@@ -133,7 +133,7 @@ One JSON record per line. Each record is a `TelemetrySpan` — an OpenTelemetry-
 | `run_id` | Current run identifier |
 | `judge.id` | Judge name |
 | `judge.name` | DeepEval metric type |
-| `judge.score` | Normalized score (1–10) |
+| `judge.score` | Normalized score (0.0–1.0) |
 | `scenario.id` | Scenario identifier |
 
 ---
@@ -243,9 +243,9 @@ One `IterationMetadata` object per completed iteration.
 | `converged` | `boolean` | Whether this iteration triggered convergence |
 | `convergence_reason` | `string \| null` | One of `"max_rounds_reached"`, `"target_score_achieved"`, `"minimal_improvement"`, `"performance_degraded"`, or `null` |
 
-**Score normalization:** DeepEval GEval judges return raw scores on a 0–10 scale; these are
-divided by 10.0 before being averaged into `score`/`judge_scores`. Deterministic
-`classifier`/`regression` judges already produce 0/1 scores and pass through unchanged.
+**Score normalization:** All judges (DeepEval-backed and deterministic `classifier`/`regression`)
+natively produce scores on the 0.0–1.0 scale, so `score`/`judge_scores` are a plain average
+with no rescaling.
 
 ### run_summary.json
 

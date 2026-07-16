@@ -67,7 +67,7 @@ class DeepEvalJudge(Judge):
     Per Epic 4 Story 4.2: Supports DeepEval built-in judges (similarity, faithfulness,
     hallucination, answer_relevancy) and custom GEval judges.
 
-    All DeepEval scores are normalized to 1-10 scale for consistency.
+    All DeepEval scores are normalized to gavel's 0.0-1.0 scale for consistency.
     """
 
     # Map judge types to DeepEval metric classes
@@ -347,7 +347,7 @@ class DeepEvalJudge(Judge):
             subject_output: The output to evaluate
 
         Returns:
-            JudgeResult with score (1-10), reasoning, and evidence
+            JudgeResult with score (0.0-1.0), reasoning, and evidence
 
         Raises:
             JudgeError: On evaluation failures
@@ -403,7 +403,7 @@ class DeepEvalJudge(Judge):
                     f"(judge: '{judge_type}', error: {type(e).__name__}): {e}"
                 ) from e
 
-            # Extract score and normalize to 1-10
+            # Extract score and clamp to gavel's 0.0-1.0 scale
             raw_score = self.metric.score
             normalized_score = self._normalize_score(raw_score)
 
@@ -569,21 +569,17 @@ class DeepEvalJudge(Judge):
             return json.dumps(raw)
         return str(raw)
 
-    def _normalize_score(self, raw_score: float) -> int:
+    def _normalize_score(self, raw_score: float) -> float:
         """
-        Normalize DeepEval score (0.0-1.0) to 1-10 scale.
+        Clamp DeepEval's native score to gavel's 0.0-1.0 scale.
 
         Args:
             raw_score: DeepEval score (0.0-1.0)
 
         Returns:
-            Normalized score (1-10)
+            Score clamped to 0.0-1.0
         """
-        # DeepEval scores are typically 0.0-1.0
-        # Map to 1-10 scale: 0.0 -> 1, 1.0 -> 10
-        # Formula: 1 + (raw_score * 9)
-        normalized = int(round(1 + raw_score * 9))
-        return max(1, min(10, normalized))  # Clamp to 1-10
+        return max(0.0, min(1.0, float(raw_score)))
 
     def _extract_reasoning(self) -> str:
         """

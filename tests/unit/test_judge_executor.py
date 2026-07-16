@@ -97,7 +97,7 @@ class TestJudgeExecutorSingleExecution:
         assert result.processor_output == "The capital is Paris"
         assert len(result.judges) == 1
         assert result.judges[0].judge_id == "relevancy"
-        assert result.judges[0].score == 9  # 0.9 -> 9
+        assert result.judges[0].score == 0.9
         assert result.judges[0].reasoning == "Highly relevant"
         assert result.timestamp  # Should have timestamp
 
@@ -136,11 +136,11 @@ class TestJudgeExecutorSingleExecution:
 
         # First judge (relevancy)
         assert result.judges[0].judge_id == "relevancy"
-        assert result.judges[0].score == 9  # 0.85 -> 9
+        assert result.judges[0].score == 0.85
 
         # Second judge (faithfulness)
         assert result.judges[1].judge_id == "faithfulness"
-        assert result.judges[1].score == 8  # 0.75 -> 8
+        assert result.judges[1].score == 0.75
 
     @pytest.mark.asyncio
     async def test_execute_with_custom_subject_id(self, mock_deepeval_metrics):
@@ -244,7 +244,7 @@ class TestJudgeExecutorErrorHandling:
         # Should have only the second judge's result
         assert len(result.judges) == 1
         assert result.judges[0].judge_id == "faithfulness"
-        assert result.judges[0].score == 8
+        assert result.judges[0].score == 0.8
 
 
 class TestJudgeExecutorBatchExecution:

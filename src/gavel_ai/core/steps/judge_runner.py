@@ -306,7 +306,7 @@ async def _execute_external_judge(
         )
 
     # Parse score and reasoning from the response envelope result
-    score: int = 1
+    score: float = 0.0
     reasoning: Optional[str] = None
     result_metadata: Dict[str, Any] = {"trace_id": trace_id or ""}
 
@@ -321,7 +321,7 @@ async def _execute_external_judge(
                     result_dict = nested
                 raw_score = result_dict.get("score")
                 if raw_score is not None:
-                    score = max(1, min(10, int(raw_score)))
+                    score = max(0.0, min(1.0, float(raw_score)))
                 reasoning = result_dict.get("reasoning")
         except (json.JSONDecodeError, TypeError, ValueError):
             pass

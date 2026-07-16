@@ -16,7 +16,7 @@ class Judge(ABC):
     Abstract base class for judges.
 
     Per Epic 4 Story 4.1: All judges must implement the evaluate() method
-    and produce JudgeResult with score (1-10), reasoning, and evidence.
+    and produce JudgeResult with score (0.0-1.0), reasoning, and evidence.
 
     Judges evaluate processor outputs against scenarios and expected behavior,
     producing scored results that enable variant comparison.
@@ -42,7 +42,7 @@ class Judge(ABC):
             subject_output: The output from the processor/system being evaluated
 
         Returns:
-            JudgeResult with score (1-10), optional reasoning, and optional evidence
+            JudgeResult with score (0.0-1.0), optional reasoning, and optional evidence
 
         Raises:
             JudgeError: On evaluation failures

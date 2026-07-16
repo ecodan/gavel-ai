@@ -204,7 +204,7 @@
                                 <td>
                                     {% for judge in output.judge_results %}
                                     <div>
-                                        <strong>{{ judge.judge_id }}:</strong> {{ judge.score }}/10
+                                        <strong>{{ judge.judge_id }}:</strong> {{ "%.2f"|format(judge.score) }}
                                         {% if judge.reasoning %}
                                         <details>
                                             <summary>Reasoning</summary>

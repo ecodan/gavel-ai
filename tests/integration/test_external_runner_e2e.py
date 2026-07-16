@@ -382,7 +382,7 @@ class TestJudgeRunnerStepExternalScript:
         for record in run_ctx.external_judged_records:
             assert isinstance(record, JudgedRecord)
             assert record.judge_id == "ext-judge-v1"
-            assert record.score == 8
+            assert record.score == 0.8
             assert record.reasoning == "The output looks good based on the criteria."
             assert record.error is None
             assert record.timestamp != ""
@@ -409,7 +409,7 @@ class TestJudgeRunnerStepExternalScript:
         assert rec.variant_id == "claude-test"
         assert rec.scenario_id == "s1"
         assert rec.judge_id == "ext-judge-v1"
-        assert isinstance(rec.score, int) and 1 <= rec.score <= 10
+        assert isinstance(rec.score, float) and 0.0 <= rec.score <= 1.0
         assert rec.error is None
         assert isinstance(rec.timestamp, str) and rec.timestamp != ""
         assert isinstance(rec.metadata, dict)
@@ -485,7 +485,7 @@ class TestJudgeRunnerStepExternalScript:
             variant_id="claude-test",
             scenario_id="s1",
             judge_id="some-inprocess-judge",
-            score=7,
+            score=0.7,
             reasoning="in-process reasoning",
             error=None,
             timestamp=datetime.now(timezone.utc).isoformat(),

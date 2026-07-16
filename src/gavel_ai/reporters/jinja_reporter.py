@@ -171,7 +171,7 @@ class Jinja2Reporter(Reporter):
             return []
 
         # Aggregate scores by variant
-        variant_scores: Dict[str, List[int]] = {}
+        variant_scores: Dict[str, List[float]] = {}
 
         for result in results:
             variant_id = result.get("variant_id", "unknown")

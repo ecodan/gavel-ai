@@ -106,9 +106,8 @@ until one of the convergence criteria below fires.
 | `tuning_agent_temperature` | `float` | `0.7` | Sampling temperature for the meta-optimizer's rewrite calls (0.0–2.0) |
 
 **Score scale**: All `avg_score` values compared against `convergence_threshold`, `target_score`,
-and `degradation_tolerance` are normalized to **0.0–1.0**. DeepEval GEval judges return raw
-scores on a 0–10 scale; these are divided by 10.0 before averaging. Deterministic
-`classifier`/`regression` judges already produce 0/1 scores and pass through unchanged.
+and `degradation_tolerance` are on the **0.0–1.0** scale — the native scale of every judge type
+(DeepEval-backed and deterministic `classifier`/`regression` alike), so no rescaling occurs.
 
 **Convergence priority order** — checked each round after judging completes; the first
 criterion to match stops the run and is recorded as `convergence_reason`:
