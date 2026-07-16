@@ -1,5 +1,10 @@
 # Release Notes
 
+## 0.2.3
+
+- **Breaking**: Judge scores (`JudgeResult`, `JudgeEvaluation`, `JudgedRecord.score`) are now `float` on a **0.0-1.0 scale**, replacing the manufactured 1-10 integer scale. DeepEval and external/custom judge scores pass through natively (clamped to [0.0, 1.0]) instead of being remapped via `1 + raw*9`. Anything reading `results_judged.jsonl` or `judge.score` directly should expect 0.0-1.0 floats going forward.
+- **Fix**: Fixed a latent double-normalization bug in Autotune — `TuneStep._compute_avg_score()` had its own hardcoded `/10.0` independent of `core/autotune/scoring.py::normalize_score()`, which would have silently produced scores 10x too small once the underlying judge score became native 0.0-1.0.
+
 ## 0.2.2
 
 - **Fix**: `gavel --version` now reads the installed package version via `importlib.metadata` instead of a hardcoded string, so it no longer drifts from `pyproject.toml`.
