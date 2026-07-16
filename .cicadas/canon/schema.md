@@ -260,7 +260,7 @@ One JSON object per line. One row per scenario × variant execution. Judges embe
   "judges": [
     {
       "judge_id": "judge-name",
-      "score": 8,
+      "score": 0.8,
       "reasoning": "Explanation text",
       "evidence": "Supporting evidence (optional)"
     }
@@ -270,7 +270,7 @@ One JSON object per line. One row per scenario × variant execution. Judges embe
 
 **Notes:**
 - The `judges` array contains one entry per judge configured for this test subject.
-- `score` is 1–10 (normalized from judge-native scale).
+- `score` is 0.0–1.0 (the judge's native scale, clamped).
 - This is a combined format — processor output fields + embedded judge results.
 
 > **Spec divergence**: The BMAD `file-formats-specification.md` describes `results_judged.jsonl` as flat `JudgedRecord` rows (one row per judge, join required with `results_raw.jsonl`). The code instead writes a combined format with `judges: []` embedded in each row. The combined format is authoritative — it avoids join complexity in the reporter.
@@ -356,12 +356,12 @@ OpenTelemetry spans. One span per line in OTel JSON format.
 
 ## Score Normalization
 
-All judge scores are normalized to the **1–10 integer scale** regardless of the source judge's native scale.
+All judge scores are on the **0.0–1.0 float scale** — the native scale of every judge type, so no rescaling occurs at the `JudgeResult`/`JudgedRecord` level.
 
 | Source scale | Normalization formula |
 |---|---|
-| DeepEval (0.0–1.0 float) | `round(score * 10)`, clamped to [1, 10] |
-| Custom judges | Must return 1–10 directly |
+| DeepEval (0.0–1.0 float) | Passed through, clamped to [0.0, 1.0] |
+| Custom/external judges | Passed through, clamped to [0.0, 1.0] |
 
 ---
 
@@ -370,3 +370,4 @@ All judge scores are normalized to the **1–10 integer scale** regardless of th
 | Date | Change |
 |------|--------|
 | 2026-04-11 | Initial canon document. Documents actual code format, flags two spec divergences in `results_judged.jsonl` and `manifest.json` vs `run_metadata.json`. |
+| 2026-07-16 | Judge score scale changed from manufactured 1–10 integer to native 0.0–1.0 float (`normalize-judge-score-scale` tweak). |

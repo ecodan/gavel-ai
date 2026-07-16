@@ -107,7 +107,7 @@ Checked in priority order each round — first match wins and is recorded as `co
 
 ### Score normalization (critical convention)
 
-All `avg_score` / convergence-threshold values are normalized to a **0.0–1.0 scale**. DeepEval GEval judges return raw scores on a 0–10 scale; `AutotuneIterationStep` divides these by 10.0 before averaging. Deterministic `classifier`/`regression` judges already produce 0/1 scores and pass through unchanged. `convergence_threshold`, `target_score`, and `degradation_tolerance` in `TuningConfig` are all on this same 0.0–1.0 scale — do not confuse with the raw 1–10 `JudgeResult.score` used elsewhere.
+All `avg_score` / convergence-threshold values are on the **0.0–1.0 scale** — the native scale of every judge type (DeepEval-backed and deterministic `classifier`/`regression` alike), so `AutotuneIterationStep`/`normalize_score()` is a pass-through, not a rescale. `convergence_threshold`, `target_score`, and `degradation_tolerance` in `TuningConfig` are all on this same 0.0–1.0 scale as the underlying `JudgeResult.score`.
 
 ---
 
@@ -136,7 +136,7 @@ Key invariant: records are grouped by `variant_id` in `JudgeRunnerStep` and join
 
 ```python
 class JudgeResult(BaseModel):
-    score: int                        # 1-10 scaled score
+    score: float                      # 0.0-1.0 scaled score
     reasoning: str                    # LLM's explanation for the score
     evidence: str                     # Specific quotes or data supporting reasoning
 ```
