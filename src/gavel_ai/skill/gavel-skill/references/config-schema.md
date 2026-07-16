@@ -136,7 +136,7 @@ Controls how the run responds to ERROR and WARNING-tier issues. All fields are o
 | `name` | string | Yes | Unique judge name within this test subject |
 | `type` | string | Yes | Judge type identifier (e.g., `"deepeval.geval"`) |
 | `model` | string | No | Shorthand for `config.model` |
-| `threshold` | float | No | Pass/fail threshold (0.0–1.0 for deepeval, or 1–10 for score comparison). Defaults to `0.7`. |
+| `threshold` | float | No | Pass/fail threshold (0.0–1.0). Defaults to `0.7`. |
 | `criteria` | string | No | Top-level shorthand for `config.criteria` (geval) |
 | `evaluation_steps` | string[] | No | Top-level shorthand for `config.evaluation_steps` (geval) |
 | `config` | object | No | Judge-specific config (see below and `references/judges-reference.md`) |
@@ -162,7 +162,7 @@ They are **never** written to `results_raw.jsonl` or `results_judged.jsonl`.
 | `criteria` | string | — | One sentence describing what "good" looks like |
 | `evaluation_steps` | string[] | — | 3–6 concrete checks evaluated in order |
 | `threshold` | float | `0.7` | Pass/fail cutoff (0.0–1.0 raw DeepEval scale) |
-| `strict_mode` | bool | `false` | Return binary 0/1 score instead of continuous. Normalizes to score 1 or 10. |
+| `strict_mode` | bool | `false` | Return binary 0/1 score instead of continuous. Normalizes to score 0.0 or 1.0. |
 | `expected_output_template` | string | — | Jinja2 template rendered with `scenario.input` fields + `scenario.metadata` |
 | `evaluation_params` | string[] | `["input", "actual_output", "expected_output"]` | Which `LLMTestCase` fields to send to the judge LLM. Valid values: `input`, `actual_output`, `expected_output`, `context`, `retrieval_context`. Omit `input` to avoid re-sending large scenario inputs (e.g. full page HTML) when criteria only compares output to golden. |
 
@@ -246,10 +246,9 @@ Configured once per eval; applies to every `deepeval.geval` judge in the run.
 
 ### `tuning` (required when `workflow_type: "autotune"`)
 
-All numeric score fields are on the **0.0–1.0 scale** (GEval scores, which
-DeepEval reports on a 0–10 scale, are normalized by dividing by 10 before
-comparison; deterministic `classifier`/`regression` scores already pass
-through unchanged on 0.0–1.0).
+All numeric score fields are on the **0.0–1.0 scale** — the native scale of
+every judge type (GEval/DeepEval-backed and deterministic `classifier`/
+`regression` alike), so no rescaling occurs.
 
 | Field | Type | Default | Description |
 |---|---|---|---|

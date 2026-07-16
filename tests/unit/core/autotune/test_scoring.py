@@ -1,4 +1,4 @@
-"""Unit tests for normalize_score: maps mixed judge scales to 0.0-1.0."""
+"""Unit tests for normalize_score: all judge types are natively 0.0-1.0."""
 
 import pytest
 
@@ -12,10 +12,10 @@ class TestNormalizeScore:
         "judge_type",
         ["deepeval.geval", "deepeval.hallucination", "deepeval.answer_relevancy", "custom_llm_judge"],
     )
-    def test_llm_judge_scores_divided_by_ten(self, judge_type: str) -> None:
-        assert normalize_score(8, judge_type) == pytest.approx(0.8)
-        assert normalize_score(10, judge_type) == pytest.approx(1.0)
-        assert normalize_score(1, judge_type) == pytest.approx(0.1)
+    def test_llm_judge_scores_pass_through(self, judge_type: str) -> None:
+        assert normalize_score(0.8, judge_type) == pytest.approx(0.8)
+        assert normalize_score(1.0, judge_type) == pytest.approx(1.0)
+        assert normalize_score(0.1, judge_type) == pytest.approx(0.1)
 
     @pytest.mark.parametrize("judge_type", ["classifier", "regression"])
     def test_deterministic_judge_scores_pass_through(self, judge_type: str) -> None:

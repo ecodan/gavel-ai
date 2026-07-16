@@ -46,13 +46,13 @@ def sample_result():
         judges=[
             JudgeEvaluation(
                 judge_id="relevancy",
-                score=9,
+                score=0.9,
                 reasoning="Highly relevant and accurate",
                 evidence="Correct answer",
             ),
             JudgeEvaluation(
                 judge_id="faithfulness",
-                score=10,
+                score=1.0,
                 reasoning="Completely faithful",
                 evidence="No hallucinations",
             ),
@@ -174,9 +174,9 @@ class TestResultStorageLoading:
         result = loaded_results[0]
         assert len(result.judges) == 2
         assert result.judges[0].judge_id == "relevancy"
-        assert result.judges[0].score == 9
+        assert result.judges[0].score == 0.9
         assert result.judges[1].judge_id == "faithfulness"
-        assert result.judges[1].score == 10
+        assert result.judges[1].score == 1.0
 
     def test_load_preserves_metadata(self, temp_results_file, sample_result):
         """Test that loading preserves metadata."""

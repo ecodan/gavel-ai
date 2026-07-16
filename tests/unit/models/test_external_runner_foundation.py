@@ -326,7 +326,7 @@ class TestJudgedRecordMetadata:
             variant_id="variant-1",
             scenario_id="scenario-1",
             judge_id="judge-1",
-            score=8,
+            score=0.8,
             timestamp="2026-01-01T00:00:00Z",
         )
         base.update(overrides)

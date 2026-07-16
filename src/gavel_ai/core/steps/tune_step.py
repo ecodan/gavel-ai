@@ -100,17 +100,16 @@ class TuneStep(Step):
 
     @staticmethod
     def _compute_avg_score(judge_feedback: List[Dict[str, Any]]) -> float:
-        """Mean of judge_feedback scores normalized from the 1-10 LLM-judge scale to 0.0-1.0.
+        """Mean of judge_feedback scores, already on the native 0.0-1.0 LLM-judge scale.
 
         output_judged.jsonl (and thus context.evaluation_results) only ever contains
         LLM judge results — deterministic classifier/regression results are tracked
-        separately in context.deterministic_metrics — so a flat /10.0 normalization
-        is correct here.
+        separately in context.deterministic_metrics.
         """
         scores = [fb["score"] for fb in judge_feedback if isinstance(fb.get("score"), (int, float))]
         if not scores:
             return 0.0
-        return (sum(scores) / len(scores)) / 10.0
+        return sum(scores) / len(scores)
 
     async def _generate_with_retry(
         self,

@@ -1,6 +1,6 @@
 """Fixture script for external judge: reads request.json, writes a valid judge response.json.
 
-Returns score=8, reasoning="looks good", plus echoes back the inbound trace_id.
+Returns score=0.8, reasoning="looks good", plus echoes back the inbound trace_id.
 """
 
 import json
@@ -20,7 +20,7 @@ def main() -> None:
     response = {
         "status": "ok",
         "result": {
-            "score": 8,
+            "score": 0.8,
             "reasoning": "The output looks good based on the criteria.",
         },
         "metadata": {"total_latency_ms": 10},

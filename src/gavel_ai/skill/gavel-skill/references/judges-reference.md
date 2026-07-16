@@ -7,22 +7,21 @@
 
 ## Score Scale
 
-All judges normalize scores to a **1–10 integer scale**.
+All judges normalize scores to a **0.0–1.0 float scale**.
 
 | Score | Meaning |
 |---|---|
-| 9–10 | Excellent — meets or exceeds expectations |
-| 7–8 | Good — minor gaps but acceptable |
-| 5–6 | Marginal — noticeable issues, may pass depending on threshold |
-| 3–4 | Poor — significant failure to meet criteria |
-| 1–2 | Very poor — largely incorrect or missing |
+| 0.9–1.0 | Excellent — meets or exceeds expectations |
+| 0.7–0.8 | Good — minor gaps but acceptable |
+| 0.5–0.6 | Marginal — noticeable issues, may pass depending on threshold |
+| 0.3–0.4 | Poor — significant failure to meet criteria |
+| 0.0–0.2 | Very poor — largely incorrect or missing |
 
-DeepEval's native 0.0–1.0 float scores are normalized via:
-`normalized = round(1 + raw_score * 9)`, clamped to [1, 10].
+DeepEval's native 0.0–1.0 float scores are used directly, clamped to [0.0, 1.0].
 
-The pass/fail threshold in `eval_config.json` is also on the **1–10 scale**
-after normalization. A `threshold: 0.7` in the raw config corresponds roughly
-to a score of 7 after normalization.
+The pass/fail threshold in `eval_config.json` is also on the **0.0–1.0 scale**
+and is applied directly to the underlying judge's native score (e.g. a
+`threshold: 0.7` requires a raw DeepEval score of at least 0.7).
 
 ---
 

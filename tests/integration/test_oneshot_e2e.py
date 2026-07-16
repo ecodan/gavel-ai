@@ -26,7 +26,7 @@ class DummyExactMatchJudge(Judge):
         self.config = config
 
     async def evaluate(self, scenario, subject_output, **kwargs) -> JudgeResult:
-        return JudgeResult(judge_id="exact_match", metric_name="match", score=10.0, reasoning="fake match")
+        return JudgeResult(judge_id="exact_match", metric_name="match", score=1.0, reasoning="fake match")
 
 
 @pytest.fixture

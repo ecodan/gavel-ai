@@ -297,13 +297,13 @@ class JudgeResult(BaseModel):
     """
     Result model from judge evaluation.
 
-    Per Epic 4 Story 4.1: Contains score (1-10), reasoning, and evidence.
-    All judges must produce scores on a consistent 1-10 scale for comparability.
+    Per Epic 4 Story 4.1: Contains score (0.0-1.0), reasoning, and evidence.
+    All judges must produce scores on a consistent 0.0-1.0 scale for comparability.
     """
 
     model_config = ConfigDict(extra="ignore")
 
-    score: int = Field(..., ge=1, le=10, description="Score from 1-10")
+    score: float = Field(..., ge=0.0, le=1.0, description="Score from 0.0-1.0")
     reasoning: Optional[str] = Field(None, description="Optional explanation of the score")
     evidence: Optional[str] = Field(None, description="Optional evidence supporting the score")
 
@@ -319,7 +319,7 @@ class JudgeEvaluation(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     judge_id: str = Field(..., description="Judge identifier")
-    score: int = Field(..., ge=1, le=10, description="Score from 1-10")
+    score: float = Field(..., ge=0.0, le=1.0, description="Score from 0.0-1.0")
     reasoning: Optional[str] = Field(None, description="Explanation of the score")
     evidence: Optional[str] = Field(None, description="Evidence supporting the score")
 
@@ -463,7 +463,7 @@ class JudgedRecord(BaseModel):
     variant_id: str = Field(..., description="Model variant ID")
     scenario_id: str = Field(..., description="Scenario identifier")
     judge_id: str = Field(..., description="Judge name from eval config")
-    score: int = Field(..., ge=1, le=10, description="Score from 1-10 (normalized scale)")
+    score: float = Field(..., ge=0.0, le=1.0, description="Score from 0.0-1.0 (normalized scale)")
     reasoning: Optional[str] = Field(None, description="Judge's explanation (null if error)")
     error: Optional[str] = Field(None, description="Error message if judging failed")
     timestamp: str = Field(..., description="ISO 8601 timestamp of evaluation")

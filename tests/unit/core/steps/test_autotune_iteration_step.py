@@ -115,7 +115,7 @@ class TestScoreAggregationHelpers:
             "scenario_id": "s1",
             "variant_id": "model-a",
             "judges": [
-                {"judge_id": "similarity", "score": 8, "reasoning": "good"},
+                {"judge_id": "similarity", "score": 0.8, "reasoning": "good"},
                 {"judge_id": "accuracy", "score": 1, "reasoning": "pass"},
             ],
         },
@@ -123,7 +123,7 @@ class TestScoreAggregationHelpers:
             "scenario_id": "s2",
             "variant_id": "model-a",
             "judges": [
-                {"judge_id": "similarity", "score": 6, "reasoning": "ok"},
+                {"judge_id": "similarity", "score": 0.6, "reasoning": "ok"},
                 {"judge_id": "accuracy", "score": 0, "reasoning": "fail"},
             ],
         },
@@ -147,7 +147,7 @@ class TestScoreAggregationHelpers:
         }
 
     def test_compute_judge_scores_normalizes_per_judge_type(self) -> None:
-        # similarity (LLM, /10): mean(8, 6) = 7.0 -> 0.7
+        # similarity (LLM, native 0.0-1.0): mean(0.8, 0.6) = 0.7
         # accuracy (deterministic, pass-through): mean(1, 0) = 0.5
         scores = AutotuneIterationStep._compute_judge_scores(self._RESULTS, self._JUDGE_TYPES)
         assert scores == pytest.approx({"similarity": 0.7, "accuracy": 0.5})
@@ -168,7 +168,7 @@ class TestScoreAggregationHelpers:
             {
                 "scenario_id": "s1",
                 "variant_id": "model-a",
-                "judges": [{"judge_id": "mystery", "score": 5, "reasoning": None}],
+                "judges": [{"judge_id": "mystery", "score": 0.5, "reasoning": None}],
             }
         ]
         assert AutotuneIterationStep._compute_overall_score(results, {}) == pytest.approx(0.5)
@@ -242,8 +242,8 @@ def _make_processor_effect() -> OnExecute:
     return _effect
 
 
-def _make_judge_effect(scores_by_iteration: Dict[int, int]) -> OnExecute:
-    """scores_by_iteration maps iteration number (1-based call order) -> raw 1-10 score."""
+def _make_judge_effect(scores_by_iteration: Dict[int, float]) -> OnExecute:
+    """scores_by_iteration maps iteration number (1-based call order) -> raw 0.0-1.0 score."""
     state = {"call": 0}
 
     async def _effect(context: IterationRunContext) -> bool:
@@ -263,7 +263,7 @@ def _make_judge_effect(scores_by_iteration: Dict[int, int]) -> OnExecute:
 
 
 def _stub_child_steps(
-    monkeypatch: pytest.MonkeyPatch, *, judge_scores_by_call: Dict[int, int]
+    monkeypatch: pytest.MonkeyPatch, *, judge_scores_by_call: Dict[int, float]
 ) -> Dict[str, _StubStep]:
     processor = _StubStep(StepPhase.SCENARIO_PROCESSING, _make_processor_effect())
     judge = _StubStep(StepPhase.JUDGING, _make_judge_effect(judge_scores_by_call))
@@ -310,14 +310,13 @@ class TestAutotuneIterationStepExecute:
     async def test_loop_converges_on_minimal_improvement_and_skips_final_tune(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # iter 1: score 6/10 -> 0.6 (no previous score, not converged)
-        # iter 2: score 6.1 ~ rounds to 6 -> use 6 then 7 to get diff 0.1 first... see below
+        # iter 1: raw score 0.6 (no previous score, not converged)
+        # iter 2: raw score 0.6 again -> |0.6 - 0.6| = 0.0 < 0.05 => minimal_improvement
         eval_config = _make_eval_config(
             tuning=_make_tuning_config(max_rounds=5, convergence_threshold=0.05, degradation_tolerance=0.05)
         )
         context = _make_run_context(tmp_path, eval_config)
-        # raw scores 6 -> 0.6, then 6 again -> 0.6: |0.6 - 0.6| = 0.0 < 0.05 => minimal_improvement
-        stubs = _stub_child_steps(monkeypatch, judge_scores_by_call={1: 6, 2: 6})
+        stubs = _stub_child_steps(monkeypatch, judge_scores_by_call={1: 0.6, 2: 0.6})
 
         await AutotuneIterationStep(logging.getLogger("test")).execute(context)
 
@@ -373,8 +372,8 @@ class TestAutotuneIterationStepExecute:
             )
         )
         context = _make_run_context(tmp_path, eval_config)
-        # Large jump (3 -> 9) avoids minimal_improvement/performance_degraded triggering early
-        stubs = _stub_child_steps(monkeypatch, judge_scores_by_call={1: 3, 2: 9})
+        # Large jump (0.3 -> 0.9) avoids minimal_improvement/performance_degraded triggering early
+        stubs = _stub_child_steps(monkeypatch, judge_scores_by_call={1: 0.3, 2: 0.9})
 
         await AutotuneIterationStep(logging.getLogger("test")).execute(context)
 

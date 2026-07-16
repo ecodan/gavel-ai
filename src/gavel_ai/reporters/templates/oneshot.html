@@ -554,7 +554,7 @@
                                     {% for judge in variant.judgments %}
                                     <div class="judge-badge"
                                         onclick="toggleReasoning('reason-{{ scenario.scenario_id }}-{{ variant_id }}-{{ loop.index }}')">
-                                        {{ judge.judge_id }}: <span class="score-val">{{ judge.score }}</span>
+                                        {{ judge.judge_id }}: <span class="score-val">{{ "%.2f"|format(judge.score) }}</span>
                                     </div>
                                     <div class="judge-reasoning"
                                         id="reason-{{ scenario.scenario_id }}-{{ variant_id }}-{{ loop.index }}">

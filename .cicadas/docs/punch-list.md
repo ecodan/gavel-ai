@@ -13,9 +13,9 @@
 | Conversational judge | ConversationalGEval | ✅ Added to JUDGE_TYPE_MAP | Done                   |
 | External judge configs | TOML + Markdown files | ✅ markdown_path + TOML loading | Done                   |
 | Closed-box CLI | Full `closed-box` command group | Processor exists, no CLI | **Missing**            |
-| Score scale | 0.0–1.0 | 1–10 integer | Diverged (intentional) |
+| Score scale | 0.0–1.0 | ✅ 0.0–1.0 (was 1–10 integer) | Done                   |
 | User simulation | 8 named personality types | Free-form tone string | **Missing**            |
-| Autotune maturity | Full (per-iteration artifacts, convergence) | Beta | Done                   |
+| Autotune maturity | Full (per-iteration artifacts, convergence) | ✅ create/artifacts/smart-stopping done; constraint enforcement + `--verbose` still missing | **Partial**            |
 | Migration command | `<name> migrate` | None | **Missing**            |
 | Conv granular steps | `conv generate` / `conv evaluate` | Partial (`generate` only; no `evaluate`/`report`) | **Partial**            |
 | Scaffolding templates | `--template classification/regression` | ✅ Both templates implemented | Done                   |
@@ -118,16 +118,22 @@ threshold = 0.7
 
 ### 5. Autotune: Promote from Beta to Full
 
-**Gap**: Autotune is labeled "beta" in the canon product overview. Target Platform's autotune is fully featured with per-iteration artifacts, a dedicated `create` command, constraint enforcement, and convergence options.
+**Status (verified against source, 2026-07-15)**: Materially more mature than this item originally implied. Remaining gaps are narrower than the "Beta" label suggests.
 
-**What to build**:
-- `autotune create` command (currently missing — only `run` and `report` exist).
-- Per-iteration artifact directories: `runs/<timestamp>/iteration_{n}/` with raw and judged outputs.
-- `autotune_metadata.json` artifact capturing: prompt versions, per-iteration scores, convergence reason.
+| Sub-item | Verdict | Evidence |
+|---|---|---|
+| `autotune create` command | ✅ Done | `cli/commands/autotune.py:90` |
+| Per-iteration artifact dirs (raw + judged) | ✅ Done | `autotune_iteration_step.py:73-81` writes `iterations/iteration_{n}/output_raw.jsonl` + `output_judged.jsonl` |
+| `autotune_metadata.json` | **Partial** | Exists as per-iteration `metadata.json` + aggregate `run_summary.json`, not under that literal filename — cosmetic gap only |
+| Constraint enforcement (>1 model, >1 prompt, >3 judges, >25 scenarios) | **Missing** | No such checks in `validator.py` |
+| Smart stopping (target/max-rounds/convergence/degradation) | ✅ Done | `autotune_iteration_step.py:206-232`, all 4 conditions implemented |
+| `--verbose` flag | **Missing** | No such option on `autotune run` |
+| Remove "Beta" label | **Not done** | `product-overview.md` still says Beta — blocked on the two items above |
+
+**What's actually left to build**:
 - Constraint enforcement at validation time: warn if >1 model, >1 prompt, >3 judges, or >25 scenarios.
-- Smart stopping: target score hit, max rounds, convergence threshold (default: improvement < 0.05), score degradation.
 - `--verbose` flag for iteration-by-iteration progress output.
-- Remove "Beta" label from product overview after completion.
+- Remove "Beta" label from product overview once the above land (metadata filename mismatch is cosmetic and optional).
 
 ---
 

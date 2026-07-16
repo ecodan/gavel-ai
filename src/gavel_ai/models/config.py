@@ -213,7 +213,7 @@ class GEvalConfig(BaseModel):
     threshold: float = Field(0.7, ge=0.0, le=1.0, description="Pass/fail threshold")
     strict_mode: bool = Field(
         False,
-        description="Return binary 0/1 score instead of continuous. Score normalizes to 1 or 10.",
+        description="Return binary 0/1 score instead of continuous. Score normalizes to 0.0 or 1.0.",
     )
     evaluation_params: Optional[List[str]] = Field(
         None,

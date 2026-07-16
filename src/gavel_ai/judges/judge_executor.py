@@ -114,7 +114,7 @@ class JudgeExecutor:
                 judge_evaluations.append(evaluation)
 
                 logger.info(
-                    f"Judge '{judge.config.name}' scored {result.score}/10 for scenario '{scenario.id}'"
+                    f"Judge '{judge.config.name}' scored {result.score:.2f} for scenario '{scenario.id}'"
                 )
 
             except Exception as e:

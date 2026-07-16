@@ -146,7 +146,7 @@ def _fake_evaluation_result(scenario_id: str, variant_id: str) -> EvaluationResu
         judges=[
             JudgeEvaluation(
                 judge_id="quality",
-                score=8,
+                score=0.8,
                 reasoning="ok",
                 evidence=None,
             )

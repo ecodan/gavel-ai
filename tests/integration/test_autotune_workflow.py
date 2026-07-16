@@ -128,7 +128,7 @@ def _fake_evaluation_results(scenario_ids: List[str], variant_id: str = "claude-
             scenario_id=scenario_id,
             processor_output="A reasonable answer.",
             scenario_input="q",
-            judges=[JudgeEvaluation(judge_id="quality", score=8, reasoning="Looks correct", evidence=None)],
+            judges=[JudgeEvaluation(judge_id="quality", score=0.8, reasoning="Looks correct", evidence=None)],
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
         for scenario_id in scenario_ids

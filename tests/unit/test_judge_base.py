@@ -7,7 +7,7 @@ Unit tests for Judge base class and judge-related models.
 Tests Story 4.1 acceptance criteria:
 - Judge ABC with correct interface
 - JudgeConfig Pydantic model
-- JudgeResult Pydantic model with score (1-10), reasoning, evidence
+- JudgeResult Pydantic model with score (0.0-1.0), reasoning, evidence
 - Scenario model with expected behavior
 """
 
@@ -24,52 +24,52 @@ class TestJudgeResult:
     def test_judge_result_creation(self):
         """Test creating a valid JudgeResult."""
         result = JudgeResult(
-            score=8,
+            score=0.8,
             reasoning="Response is accurate and well-formatted",
             evidence="Matches expected output pattern",
         )
 
-        assert result.score == 8
+        assert result.score == 0.8
         assert result.reasoning == "Response is accurate and well-formatted"
         assert result.evidence == "Matches expected output pattern"
 
     def test_judge_result_score_range_valid(self):
-        """Test that scores 1-10 are valid."""
-        for score in range(1, 11):
+        """Test that scores 0.0-1.0 are valid."""
+        for score in (0.0, 0.25, 0.5, 0.75, 1.0):
             result = JudgeResult(score=score)
             assert result.score == score
 
     def test_judge_result_score_below_range_raises_error(self):
-        """Test that scores below 1 raise ValidationError."""
+        """Test that scores below 0.0 raise ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
-            JudgeResult(score=0)
+            JudgeResult(score=-0.1)
 
-        assert "greater than or equal to 1" in str(exc_info.value)
+        assert "greater than or equal to 0" in str(exc_info.value)
 
     def test_judge_result_score_above_range_raises_error(self):
-        """Test that scores above 10 raise ValidationError."""
+        """Test that scores above 1.0 raise ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
-            JudgeResult(score=11)
+            JudgeResult(score=1.1)
 
-        assert "less than or equal to 10" in str(exc_info.value)
+        assert "less than or equal to 1" in str(exc_info.value)
 
     def test_judge_result_optional_fields(self):
         """Test that reasoning and evidence are optional."""
-        result = JudgeResult(score=5)
+        result = JudgeResult(score=0.5)
 
-        assert result.score == 5
+        assert result.score == 0.5
         assert result.reasoning is None
         assert result.evidence is None
 
     def test_judge_result_extra_fields_ignored(self):
         """Test that extra fields are ignored (forward compatibility)."""
         result = JudgeResult(
-            score=7,
+            score=0.7,
             reasoning="Good response",
             unknown_field="should be ignored",
         )
 
-        assert result.score == 7
+        assert result.score == 0.7
         assert result.reasoning == "Good response"
         assert not hasattr(result, "unknown_field")
 
@@ -189,7 +189,7 @@ class TestJudgeBaseClass:
         class ConcreteJudge(Judge):
             async def evaluate(self, scenario: Scenario, subject_output: str) -> JudgeResult:
                 return JudgeResult(
-                    score=8,
+                    score=0.8,
                     reasoning="Test evaluation",
                     evidence=f"Scenario: {scenario.id}, Output: {subject_output}",
                 )
@@ -204,7 +204,7 @@ class TestJudgeBaseClass:
         result = await judge.evaluate(scenario, "test output")
 
         assert isinstance(result, JudgeResult)
-        assert result.score == 8
+        assert result.score == 0.8
         assert result.reasoning == "Test evaluation"
         assert "Scenario: test" in result.evidence
         assert "Output: test output" in result.evidence

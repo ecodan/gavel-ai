@@ -75,12 +75,12 @@ _JUDGE_FEEDBACK_RESULTS = [
     {
         "scenario_id": "s1",
         "variant_id": "model-a",
-        "judges": [{"judge_id": "similarity", "score": 8, "reasoning": "good match"}],
+        "judges": [{"judge_id": "similarity", "score": 0.8, "reasoning": "good match"}],
     },
     {
         "scenario_id": "s2",
         "variant_id": "model-a",
-        "judges": [{"judge_id": "similarity", "score": 6, "reasoning": "partial match"}],
+        "judges": [{"judge_id": "similarity", "score": 0.6, "reasoning": "partial match"}],
     },
 ]
 
@@ -126,7 +126,7 @@ class TestTuneStepExecute:
         assert set(prompts_data.keys()) == {"v1", "v2"}
         assert prompts_data["v2"]["prompt"] == "Improved: " + current_prompt
         assert prompts_data["v2"]["iteration"] == 1
-        # mean(8, 6) = 7.0 on 1-10 scale -> normalized to 0.7
+        # mean(0.8, 0.6) = 0.7 (native 0.0-1.0 scale, no rescaling)
         assert prompts_data["v2"]["avg_score"] == pytest.approx(0.7)
 
         agent.generate_improved_prompt.assert_awaited_once()
@@ -186,8 +186,8 @@ class TestAggregateJudgeFeedback:
     def test_flattens_per_judge_entries(self) -> None:
         feedback = TuneStep._aggregate_judge_feedback(_JUDGE_FEEDBACK_RESULTS)
         assert feedback == [
-            {"scenario_id": "s1", "judge_id": "similarity", "score": 8, "reasoning": "good match"},
-            {"scenario_id": "s2", "judge_id": "similarity", "score": 6, "reasoning": "partial match"},
+            {"scenario_id": "s1", "judge_id": "similarity", "score": 0.8, "reasoning": "good match"},
+            {"scenario_id": "s2", "judge_id": "similarity", "score": 0.6, "reasoning": "partial match"},
         ]
 
     def test_handles_empty_results(self) -> None:
@@ -195,8 +195,8 @@ class TestAggregateJudgeFeedback:
 
 
 class TestComputeAvgScore:
-    def test_normalizes_mean_from_ten_scale_to_unit_scale(self) -> None:
-        feedback = [{"score": 8}, {"score": 6}, {"score": 10}]
+    def test_computes_mean_of_native_scale_scores(self) -> None:
+        feedback = [{"score": 0.8}, {"score": 0.6}, {"score": 1.0}]
         assert TuneStep._compute_avg_score(feedback) == pytest.approx(0.8)
 
     def test_returns_zero_when_no_numeric_scores(self) -> None:

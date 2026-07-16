@@ -147,6 +147,13 @@
       "summary": "Merged Partition 1 (Foundations) into initiative/feat-autotune: TuningConfig/IterationMetadata/AutotuneRunSummary models, CompositeStep base, IterationEvalContext/IterationRunContext, TuningAgent, bundled meta-prompt template, full unit test coverage. Code review: PASS WITH NOTES (0 blocking, 2 advisory).",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-07-16T01:19:10.115488+00:00",
+      "branch": "tweak/normalize-judge-score-scale",
+      "summary": "Normalized judge scores to 0.0-1.0 float system-wide (JudgeResult, JudgeEvaluation, JudgedRecord), replacing the manufactured 1-10 integer scale. DeepEval and external judge scores pass through natively; fixed Autotune's normalize_score()/TuneStep._compute_avg_score() double-normalization risk; updated report templates, schema docs, and skill reference.",
+      "decisions": "",
+      "modules": []
     }
   ]
 }

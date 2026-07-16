@@ -163,7 +163,7 @@ class TestDeepEvalJudgeEvaluation:
 
         # Verify result
         assert isinstance(result, JudgeResult)
-        assert result.score == 10  # 0.95 -> 10
+        assert result.score == 0.95
         assert "Highly relevant" in result.reasoning
         assert "0.950" in result.evidence
 
@@ -185,7 +185,7 @@ class TestDeepEvalJudgeEvaluation:
 
         # Verify result
         assert isinstance(result, JudgeResult)
-        assert result.score == 6  # 0.55 -> 6
+        assert result.score == 0.55
         assert "Partially faithful" in result.reasoning
 
     @pytest.mark.asyncio
@@ -203,7 +203,7 @@ class TestDeepEvalJudgeEvaluation:
 
         # Verify result
         assert isinstance(result, JudgeResult)
-        assert result.score == 2  # 0.1 -> 2
+        assert result.score == 0.1
         assert "Not relevant" in result.reasoning
 
     @pytest.mark.asyncio
@@ -219,7 +219,7 @@ class TestDeepEvalJudgeEvaluation:
 
         # Verify result
         assert isinstance(result, JudgeResult)
-        assert result.score == 9  # 0.85 -> 9
+        assert result.score == 0.85
         assert "custom quality criteria" in result.reasoning
         assert "0.850" in result.evidence
 
@@ -254,38 +254,38 @@ class TestDeepEvalJudgeScoreNormalization:
     def test_score_normalization_boundary_values(
         self, mock_deepeval_metrics, answer_relevancy_config
     ):
-        """Test score normalization at boundaries."""
+        """Test score clamping at boundaries."""
         judge = DeepEvalJudge(answer_relevancy_config)
 
         # Test boundary values
-        assert judge._normalize_score(0.0) == 1
-        assert judge._normalize_score(1.0) == 10
-        assert judge._normalize_score(0.5) == 6
+        assert judge._normalize_score(0.0) == 0.0
+        assert judge._normalize_score(1.0) == 1.0
+        assert judge._normalize_score(0.5) == 0.5
 
     def test_score_normalization_range(self, mock_deepeval_metrics, answer_relevancy_config):
-        """Test score normalization across range."""
+        """Test score pass-through across range, clamped to [0.0, 1.0]."""
         judge = DeepEvalJudge(answer_relevancy_config)
 
-        # Test various scores
-        # Formula: round(1 + raw_score * 9)
         test_cases = [
-            (0.0, 1),  # round(1 + 0*9) = 1
-            (0.1, 2),  # round(1 + 0.9) = 2
-            (0.2, 3),  # round(1 + 1.8) = 3
-            (0.3, 4),  # round(1 + 2.7) = 4
-            (0.4, 5),  # round(1 + 3.6) = 5
-            (0.5, 6),  # round(1 + 4.5) = 6
-            (0.6, 6),  # round(1 + 5.4) = 6
-            (0.7, 7),  # round(1 + 6.3) = 7
-            (0.8, 8),  # round(1 + 7.2) = 8
-            (0.9, 9),  # round(1 + 8.1) = 9
-            (1.0, 10),  # round(1 + 9.0) = 10
+            (0.0, 0.0),
+            (0.1, 0.1),
+            (0.2, 0.2),
+            (0.3, 0.3),
+            (0.4, 0.4),
+            (0.5, 0.5),
+            (0.6, 0.6),
+            (0.7, 0.7),
+            (0.8, 0.8),
+            (0.9, 0.9),
+            (1.0, 1.0),
+            (-0.1, 0.0),  # clamped
+            (1.1, 1.0),  # clamped
         ]
 
         for raw_score, expected_normalized in test_cases:
             normalized = judge._normalize_score(raw_score)
             assert normalized == expected_normalized
-            assert 1 <= normalized <= 10
+            assert 0.0 <= normalized <= 1.0
 
 
 class TestGEvalExpectedOutputTemplate:
@@ -516,7 +516,7 @@ class TestRateLimitRetry:
 
             # Verify result is returned (metric.measure was eventually called)
             assert isinstance(result, JudgeResult)
-            assert result.score == 9  # 0.85 normalized
+            assert result.score == 0.85
 
             # Verify sleep was called twice (on first and second failure)
             assert mock_sleep.call_count == 2
