@@ -301,6 +301,12 @@ To switch the active variant, reorder `test_subjects` in the generated `eval_con
 **and** move the `judges` list to the new `test_subjects[0]` entry — see the note on judge
 pooling in [schema-configs.md](schema-configs.md#testsubject).
 
-`gavel oneshot analyze --run <run_id>` computes performance metrics (success/error counts,
-error rate, latency avg/p50/p95, throughput, token totals) from `results_raw.jsonl`. It is
-transport-agnostic — the same command works for prompt-based, script, and HTTP runs.
+`gavel oneshot analyze --run <run_id>` computes performance metrics (success/warning/error
+counts, error rate, latency avg/p50/p95, throughput, token totals) from `results_raw.jsonl`.
+It is transport-agnostic — the same command works for prompt-based, script, and HTTP runs.
+WARNING-tier outcomes (`PROCESS_SUCCESS_WITH_ISSUE`) are tracked separately from ERROR-tier
+failures and excluded from `error_rate`. Throughput is computed from each record's
+reconstructed execution window (`timestamp - timing_ms` to `timestamp`) rather than the raw
+spread of completion timestamps, since concurrent scenarios are spooled to
+`results_raw.jsonl` within milliseconds of each other regardless of how long each one
+actually took.

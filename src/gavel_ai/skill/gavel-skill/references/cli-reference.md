@@ -293,9 +293,17 @@ non-empty `judges` list on the inactive alternate causes it to double-judge
 every run.
 
 **Performance metrics**: `gavel oneshot analyze --run <run-id> [--eval <name>]`
-computes success/error counts, error rate, latency avg/p50/p95, throughput, and
-token totals from `results_raw.jsonl`. Works identically for local, script, and
-http runs (reads `OutputRecord` fields directly, not workflow-specific data).
+computes success/warning/error counts, error rate, latency avg/p50/p95,
+throughput, and token totals from `results_raw.jsonl`. Works identically for
+local, script, and http runs (reads `OutputRecord` fields directly, not
+workflow-specific data). WARNING-tier outcomes (`PROCESS_SUCCESS_WITH_ISSUE`,
+via `metadata["external_tier"]`) are counted separately from hard ERROR-tier
+failures and do not inflate `error_rate`. Throughput is derived from each
+record's reconstructed execution window (`timestamp - timing_ms` to
+`timestamp`), not the raw spread of completion timestamps — concurrent
+scenarios finish and get spooled to `results_raw.jsonl` within milliseconds of
+each other regardless of actual duration, so timestamp spread alone
+understates elapsed time by orders of magnitude.
 
 **CLI output for external runs**
 
