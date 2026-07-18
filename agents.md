@@ -65,6 +65,7 @@ gavel init --eval-root ./evals         # Or specify a custom root
 gavel oneshot create --eval my_eval    # Create evaluation
 gavel oneshot run --eval my_eval       # Run evaluation (--eval-root or GAVEL_EVAL_ROOT override)
 gavel oneshot judge --eval my_eval     # Run judges
+gavel oneshot analyze --run <run-id>   # Performance metrics (latency, error rate, throughput, tokens)
 gavel oneshot report --eval my_eval    # Generate reports
 ```
 

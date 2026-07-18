@@ -109,6 +109,16 @@ Controls how the run responds to ERROR and WARNING-tier issues. All fields are o
 | `config` | object | No | Additional subject config; shape depends on `protocol` (see below) |
 | `judges` | array | No | Judges applied to this subject's output |
 
+**Only `test_subjects[0]` executes.** The engine reads a single active subject
+for SUT execution — any additional entries are inert unless promoted to index 0.
+**But `judges` are pooled across *every* `test_subjects` entry**, not just index
+0 — `JudgeRunnerStep` sums `subject.judges` for the whole list. If you keep a
+second (inactive) subject around for reference or as an alternate transport,
+give it `judges: []`, or its judges will still execute — and double-judge —
+against every run. This is exactly what `gavel oneshot create --type external`
+scaffolds: an active `sut-script` subject with the real judges, and an inert
+`sut-http` placeholder with `judges: []`.
+
 #### `test_subjects[].config` for `protocol: "http"`
 
 | Field | Type | Required | Description |

@@ -37,6 +37,8 @@ Usage: gavel oneshot [OPTIONS] COMMAND [ARGS]...
 │ create      Create a new evaluation scaffold.                                │
 │ run         CLI entry point for OneShot evaluation workflow.                 │
 │ judge       Judge evaluation results using pipeline steps.                   │
+│ analyze     Compute performance metrics (latency, throughput, error rate,    │
+│             tokens) for a run.                                               │
 │ report      Generate evaluation report.                                      │
 │ list        List evaluation runs.                                            │
 │ milestone   Mark run as milestone.                                           │
@@ -52,7 +54,10 @@ Usage: gavel oneshot create [OPTIONS]
                                                                                 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
 │ *  --eval             TEXT  Evaluation name [required]                       │
-│    --type             TEXT  Evaluation type: local or in-situ                │
+│    --type             TEXT  Evaluation type: local, in-situ, or external.    │
+│                             'external' scaffolds a closed-box target driven  │
+│                             by an out-of-process system under test (script   │
+│                             and http transport variants both generated).     │
 │                             [default: local]                                 │
 │    --template         TEXT  Scaffold template: default, classification,      │
 │                             regression, conversational. Recommended judge    │
@@ -273,6 +278,25 @@ The difference is entirely in `eval_config.json` — setting `test_subject_type:
 "external"`, `protocol: "http"|"script"`, and the protocol-specific `config`
 block. See `references/config-schema.md` for the full field reference.
 
+**Scaffolding**: `gavel oneshot create --eval <name> --type external` scaffolds
+*both* transports side by side rather than picking one for you:
+- `scripts/sut_script_scaffold.py` (subclasses `ScriptSystemUnderTest`) — active,
+  `test_subjects[0]`, `system_id: "sut-script"`.
+- `scripts/sut_http_scaffold.py` (subclasses `RemoteSystemUnderTest`) — inert
+  placeholder, `system_id: "sut-http"`, `judges: []`.
+
+`create → run` works immediately with no manual editing. To switch which variant
+is active, reorder `test_subjects` in `eval_config.json` **and** move the
+`judges` list to the new `test_subjects[0]` entry — `JudgeRunnerStep` pools
+`judges` across every `test_subjects` entry (not just index 0), so leaving a
+non-empty `judges` list on the inactive alternate causes it to double-judge
+every run.
+
+**Performance metrics**: `gavel oneshot analyze --run <run-id> [--eval <name>]`
+computes success/error counts, error rate, latency avg/p50/p95, throughput, and
+token totals from `results_raw.jsonl`. Works identically for local, script, and
+http runs (reads `OutputRecord` fields directly, not workflow-specific data).
+
 **CLI output for external runs**
 
 External runs produce the same CLI output as local runs, with additional
@@ -286,6 +310,8 @@ a raw stack trace).
 
 **`gavel oneshot create --type`**
 
-The `--type` flag currently documents `local` and `in-situ`. `in-situ` is a
-deprecated alias for `external` — configs using `test_subject_type: "in-situ"`
-are accepted but emit a deprecation warning; update to `"external"`.
+The `--type` flag documents and validates `local`, `in-situ`, and `external`
+(unknown values now raise a clean `ValidationError` instead of passing through
+unvalidated). `in-situ` is a deprecated alias for `external` — configs using
+`test_subject_type: "in-situ"` are accepted but emit a deprecation warning;
+update to `"external"`.

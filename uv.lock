@@ -1163,7 +1163,7 @@ wheels = [
 
 [[package]]
 name = "gavel-ai"
-version = "0.2.3"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "deepeval" },

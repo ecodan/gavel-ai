@@ -117,7 +117,7 @@ pre-commit run --all-files  # Run all hooks
 Gavel follows a clean architecture pattern:
 
 - **Workflows:** OneShot, Conversational, Autotune
-- **Processors:** PromptInputProcessor, ClosedBoxInputProcessor, ScenarioProcessor
+- **Processors:** PromptInputProcessor (local), ExternalHttpProcessor and ScriptInputProcessor (closed-box/external SUT via `test_subject_type: "external"`, config-driven inside `oneshot`)
 - **Judges:** DeepEval judges + custom GEval
 - **Storage:** Filesystem-based (database/S3 future)
 - **Reporters:** Jinja2 templates (HTML, Markdown)

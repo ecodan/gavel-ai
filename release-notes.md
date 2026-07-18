@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.3.0
+
+- **Feature**: `gavel oneshot create --type external` now scaffolds *both* transport variants side by side instead of just HTTP: `scripts/sut_script_scaffold.py` (active, `test_subjects[0]`, `system_id: "sut-script"`) and `scripts/sut_http_scaffold.py` (inert placeholder, `system_id: "sut-http"`). Pick whichever fits your system by reordering `test_subjects` — no separate `closed-box` command group; closed-box remains a config-driven target inside `oneshot`. `--type` help text and validation now cover `local`/`in-situ`/`external` (previously undocumented and unvalidated).
+- **Feature**: `gavel oneshot analyze --run <run-id> [--eval <name>]` computes performance metrics from `results_raw.jsonl` — success/error counts, error rate, latency avg/p50/p95, throughput, and token totals. Transport-agnostic (works for prompt-based, script, and HTTP runs alike). Metrics computation lives in `core/run_metrics.py::compute_run_metrics()` as a pure function.
+- **Fix**: `ScenarioProcessorStep`'s outbound request payload for both `http` and `script` external transports never matched the `ExternalTaskRequest` schema the scaffold SDK (`gavel_ai.scaffolds`) validates against — required fields `scenario_input`/`rendered_prompt` were never populated, so every external SUT invocation failed schema validation at the SUT boundary regardless of transport. Fixed by building a schema-valid payload (`scenario_input`, `rendered_prompt` falling back to `str(scenario.input)`, `custom_config` passthrough) in both branches.
+- **Fix/Docs**: Documented and guarded against a judge-pooling gotcha — `JudgeRunnerStep` sums `judges` across *every* `test_subjects` entry, not just index 0 (only SUT execution reads index 0 exclusively). A non-empty `judges` list on an inactive/alternate subject silently double-runs (and double-bills) every judge; the new external scaffold sets `judges: []` on its inactive placeholder for this reason.
+
 ## 0.2.3
 
 - **Breaking**: Judge scores (`JudgeResult`, `JudgeEvaluation`, `JudgedRecord.score`) are now `float` on a **0.0-1.0 scale**, replacing the manufactured 1-10 integer scale. DeepEval and external/custom judge scores pass through natively (clamped to [0.0, 1.0]) instead of being remapped via `1 + raw*9`. Anything reading `results_judged.jsonl` or `judge.score` directly should expect 0.0-1.0 floats going forward.
