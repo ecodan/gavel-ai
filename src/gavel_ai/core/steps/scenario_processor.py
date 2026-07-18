@@ -235,7 +235,14 @@ class ScenarioProcessorStep(Step):
             base_headers: Dict[str, str] = dict(subject_config.get("headers") or {})
             auth: Any = subject_config.get("auth")
             for scenario in scenarios:
-                body: Dict[str, Any] = {"scenario_id": scenario.id, "input": scenario.input}
+                # Body must satisfy ExternalTaskRequest (scaffolds validate against it):
+                # scenario_input and rendered_prompt are required fields.
+                body: Dict[str, Any] = {
+                    "scenario_id": scenario.id,
+                    "scenario_input": scenario.input,
+                    "rendered_prompt": str(scenario.input),
+                    "custom_config": subject_config,
+                }
                 if scenario.metadata:
                     body["metadata"] = scenario.metadata
                 inputs.append(
@@ -266,9 +273,13 @@ class ScenarioProcessorStep(Step):
             request_filename: str = str(subject_config_s.get("request_filename", "request.json"))
             response_filename: str = str(subject_config_s.get("response_filename", "response.json"))
             for scenario in scenarios:
+                # request_payload must satisfy ExternalTaskRequest (scaffolds validate
+                # against it): scenario_input and rendered_prompt are required fields.
                 request_payload: Dict[str, Any] = {
                     "scenario_id": scenario.id,
-                    "input": scenario.input,
+                    "scenario_input": scenario.input,
+                    "rendered_prompt": str(scenario.input),
+                    "custom_config": subject_config_s,
                 }
                 if scenario.metadata:
                     request_payload["metadata"] = scenario.metadata

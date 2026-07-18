@@ -17,6 +17,7 @@ from gavel_ai.cli.common import resolve_eval_root, run_async
 from gavel_ai.cli.scaffolding import generate_all_templates
 from gavel_ai.core.contexts import LocalFileSystemEvalContext, LocalRunContext
 from gavel_ai.core.exceptions import ConfigError, ResourceNotFoundError, ValidationError
+from gavel_ai.core.run_metrics import RunMetrics, compute_run_metrics
 from gavel_ai.core.steps.judge_runner import JudgeRunnerStep
 from gavel_ai.core.steps.report_runner import ReportRunnerStep
 from gavel_ai.core.workflows.oneshot import OneShotWorkflow
@@ -101,12 +102,21 @@ def _print_run_summary(run_ctx: LocalRunContext, eval_ctx: LocalFileSystemEvalCo
 
 
 VALID_TEMPLATES = ("default", "classification", "regression", "conversational")
+VALID_TYPES = ("local", "in-situ", "external")
 
 
 @app.command()
 def create(
     eval: str = typer.Option(..., "--eval", help="Evaluation name"),
-    type: str = typer.Option("local", "--type", help="Evaluation type: local or in-situ"),
+    type: str = typer.Option(
+        "local",
+        "--type",
+        help=(
+            "Evaluation type: local, in-situ, or external. "
+            "'external' scaffolds a closed-box target driven by an out-of-process "
+            "system under test (script and http transport variants both generated)."
+        ),
+    ),
     template: str = typer.Option(
         "default",
         "--template",
@@ -131,6 +141,11 @@ def create(
         if template not in VALID_TEMPLATES:
             raise ValidationError(
                 f"Unknown template '{template}' - Available: {', '.join(VALID_TEMPLATES)}"
+            )
+
+        if type not in VALID_TYPES:
+            raise ValidationError(
+                f"Unknown evaluation type '{type}' - Available: {', '.join(VALID_TYPES)}"
             )
 
         eval_root_path: Path = resolve_eval_root(eval_root)
@@ -227,6 +242,67 @@ def judge(
         )
 
     except (ConfigError, ResourceNotFoundError) as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from None
+    except Exception as e:
+        typer.secho(f"Execution Error: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from None
+
+
+def _print_run_metrics(run_id: str, metrics: RunMetrics) -> None:
+    table = Table(title=f"Run metrics: {run_id}")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+
+    def _fmt(value: Optional[float], suffix: str = "") -> str:
+        return f"{value:.1f}{suffix}" if value is not None else "n/a"
+
+    table.add_row("Scenarios", str(metrics.scenario_count))
+    table.add_row("Success", str(metrics.success_count))
+    table.add_row("Errors", str(metrics.error_count))
+    table.add_row("Error rate", f"{metrics.error_rate * 100:.1f}%")
+    table.add_row("Latency avg", _fmt(metrics.latency_avg_ms, " ms"))
+    table.add_row("Latency p50", _fmt(metrics.latency_p50_ms, " ms"))
+    table.add_row("Latency p95", _fmt(metrics.latency_p95_ms, " ms"))
+    table.add_row("Throughput", _fmt(metrics.throughput_per_sec, " records/sec"))
+    table.add_row("Prompt tokens", str(metrics.tokens_prompt_total))
+    table.add_row("Completion tokens", str(metrics.tokens_completion_total))
+
+    console.print(table)
+
+
+@app.command()
+def analyze(
+    run_id: str = typer.Option(..., "--run", help="Run ID to analyze"),
+    eval_name: Optional[str] = typer.Option(None, "--eval", help="Evaluation name"),
+    eval_root: _EvalRootArg = None,
+) -> None:
+    """Compute performance metrics (latency, throughput, error rate, tokens) for a run.
+
+    Transport-agnostic — works for prompt-based, script, and http external SUT runs alike,
+    since all populate the same OutputRecord fields in results_raw.jsonl.
+    """
+    try:
+        resolved_root: Path = resolve_eval_root(eval_root)
+        real_eval_name, eval_dir = _get_eval_dir(eval_name, run_id, resolved_root)
+        eval_ctx = LocalFileSystemEvalContext(eval_name=real_eval_name, eval_root=resolved_root)
+        run_ctx = LocalRunContext(
+            eval_ctx=eval_ctx,
+            base_dir=eval_dir / "runs",
+            run_id=run_id,
+            snapshot=False,
+        )
+
+        records: List[OutputRecord] = list(run_ctx.results_raw.read())
+        if not records:
+            raise ResourceNotFoundError(
+                f"No results found for run '{run_id}'. Did it finish processing?"
+            )
+
+        metrics = compute_run_metrics(records)
+        _print_run_metrics(run_id, metrics)
+
+    except (ConfigError, ResourceNotFoundError, ValidationError) as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from None
     except Exception as e:

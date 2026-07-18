@@ -52,6 +52,20 @@ class MyScriptSystemUnderTest(ScriptSystemUnderTest):
         """
         # TODO: replace with your real SUT call
         output = f"SUT response for scenario {request.scenario_id}"
+
+        # Calling a remote API from this script instead of running local logic?
+        # Uncomment and adapt — the script transport works equally well as a
+        # thin wrapper around an HTTP call:
+        #
+        #   import requests
+        #   resp = requests.post(
+        #       request.custom_config.get("endpoint", "https://api.example.com/v1/chat"),
+        #       json={"prompt": request.rendered_prompt},
+        #       timeout=30,
+        #   )
+        #   resp.raise_for_status()
+        #   output = resp.json()["output"]
+
         return {"output": output}
 
 

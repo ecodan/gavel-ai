@@ -17,7 +17,7 @@ Root evaluation configuration. Located at `config/eval_config.json` within the e
 | `workflow_type` | `"oneshot" \| "conversational" \| "autotune"` | `"oneshot"` | Evaluation workflow variant |
 | `eval_name` | `string` | required | Evaluation identifier (matches directory name) |
 | `description` | `string \| null` | `null` | Human-readable description |
-| `test_subject_type` | `"local" \| "in-situ"` | required | Whether the subject is a local prompt or remote endpoint |
+| `test_subject_type` | `"local" \| "in-situ" \| "external"` | required | Whether the subject is a local prompt, remote endpoint, or an external (closed-box) system under test invoked via HTTP or subprocess — see [schema-external-runner.md](schema-external-runner.md) |
 | `test_subjects` | `TestSubject[]` | required | One or more test subjects (see below) |
 | `variants` | `string[]` | required | Agent/model variant IDs from `agents.json` |
 | `scenarios` | `ScenariosConfig` | required | Scenario data source configuration |
@@ -32,9 +32,20 @@ Root evaluation configuration. Located at `config/eval_config.json` within the e
 |-------|------|---------|-------------|
 | `prompt_name` | `string \| null` | `null` | Prompt template name (local subjects) |
 | `judges` | `JudgeConfig[]` | required | Judges applied to this subject's outputs |
-| `system_id` | `string \| null` | `null` | Remote system identifier (in-situ subjects) |
-| `protocol` | `string \| null` | `null` | Remote protocol: `"open_ai"`, `"acp"` |
-| `config` | `object \| null` | `null` | Remote system config (endpoint, model, etc.) |
+| `system_id` | `string \| null` | `null` | System identifier (in-situ or external subjects) |
+| `protocol` | `"http" \| "script" \| null` | `null` | External transport protocol (`test_subject_type: "external"` only) |
+| `config` | `object \| null` | `null` | Transport-specific config — `endpoint`/`method`/`headers`/`auth` for `protocol: "http"`; `command`/`request_filename`/`response_filename` for `protocol: "script"` |
+
+**Note on multiple `test_subjects` entries**: only `test_subjects[0]` is used for SUT
+execution (`ScenarioProcessorStep` reads index 0 exclusively) — additional entries are
+inert unless promoted to index 0. However, `judges` are pooled across **every**
+`test_subjects` entry (`JudgeRunnerStep` sums `subject.judges` for all subjects, not
+just index 0), so a non-empty `judges` list on an inactive entry still executes. Keep
+`judges: []` on any placeholder/alternate subject to avoid double-judging; when
+switching the active subject, move both its position and its `judges` list. This is
+exactly the pattern `gavel oneshot create --type external` scaffolds: a script-protocol
+subject at index 0 with the real judges, and an http-protocol placeholder at index 1
+with `judges: []`.
 
 ### ScenariosConfig
 

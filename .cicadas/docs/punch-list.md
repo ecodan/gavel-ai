@@ -12,7 +12,7 @@
 | Built-in DeepEval judges | Toxicity, ConversationCompleteness, TurnRelevancy | ✅ All 4 types added | Done                   |
 | Conversational judge | ConversationalGEval | ✅ Added to JUDGE_TYPE_MAP | Done                   |
 | External judge configs | TOML + Markdown files | ✅ markdown_path + TOML loading | Done                   |
-| Closed-box CLI | Full `closed-box` command group | Processor exists, no CLI | **Missing**            |
+| Closed-box CLI | Full `closed-box` command group | Config-driven inside `oneshot` (`--type external`, dual script/http scaffold, `oneshot analyze`) | Done            |
 | Score scale | 0.0–1.0 | ✅ 0.0–1.0 (was 1–10 integer) | Done                   |
 | User simulation | 8 named personality types | Free-form tone string | **Missing**            |
 | Autotune maturity | Full (per-iteration artifacts, convergence) | ✅ create/artifacts/smart-stopping done; constraint enforcement + `--verbose` still missing | **Partial**            |
@@ -104,15 +104,38 @@ threshold = 0.7
 
 ### 4. Closed-Box CLI Command Group
 
-**Gap**: `closedbox_processor.py` exists but there are no `gavel closed-box` CLI commands. Users cannot create, run, analyze, or report on closed-box evaluations from the CLI.
+**Status**: Done — via `tweak/external-sut-scaffold-analyze`, without a separate command group.
 
-**What to build**:
-- `src/gavel_ai/cli/commands/closedbox.py` with Typer app: `create`, `run`, `analyze`, `report`.
-- `create`: scaffold eval directory with remote `eval_config.json`, `agents.json`, `scenarios.json`.
-- `run`: invoke `ClosedBoxProcessor` via existing workflow infrastructure.
-- `analyze`: compute performance metrics (avg latency, throughput, error rate, token usage) from `results_raw.jsonl`.
-- `report`: generate HTML/Markdown from analyzed results.
-- Register `app.add_typer(closedbox.app, name="closed-box")` in `cli/main.py`.
+**Decision**: A closed-box (external SUT) evaluation is a *target*, not a *workflow* —
+`ScenarioProcessorStep` already dispatches on `eval_config.test_subject_type` +
+`test_subjects[0].protocol`, and `oneshot run`/`judge`/`report` work unchanged for
+external subjects. A `gavel closed-box` command group (this item's original shape)
+would have duplicated most of `oneshot` for no reason, so it was rejected in favor
+of keeping the target config-driven inside `oneshot`.
+
+**What was built**:
+- `gavel oneshot create --type external` now scaffolds **both** transport variants
+  side by side: `scripts/sut_script_scaffold.py` (active, `test_subjects[0]`,
+  `system_id: "sut-script"`) and `scripts/sut_http_scaffold.py` (inert placeholder,
+  `system_id: "sut-http"`) — the builder picks whichever works by reordering
+  `test_subjects` (and moving the `judges` list — see note below).
+- `--type` help text now documents `local`/`in-situ`/`external` and validates the value.
+- `gavel oneshot analyze --run <id>`: Rich table of success/error counts, error rate,
+  latency avg/p50/p95, throughput, and token totals from `results_raw.jsonl`
+  (`core/run_metrics.py::compute_run_metrics`, transport-agnostic — works for
+  prompt-based runs too).
+- **Bug fix** (discovered via the end-to-end script-execution test): the payload
+  `ScenarioProcessorStep` built for both external transports never matched the
+  `ExternalTaskRequest` schema the scaffold SDK validates against (missing required
+  `scenario_input`/`rendered_prompt`) — every external SUT run failed at the SUT
+  boundary regardless of scaffold. Fixed in both the `http` and `script` branches.
+- **Design note**: `JudgeRunnerStep` pools judges across *every* `test_subjects`
+  entry, not just index 0. The scaffold gives only the active subject a non-empty
+  `judges` list to avoid the inert alternate silently double-judging every run.
+
+**Deferred** (separate future initiative): first-class `turns` in
+`ExternalResponseEnvelope` for agentic run loops, and long-running/agentic timeout
+ergonomics.
 
 ---
 

@@ -161,6 +161,13 @@
       "summary": "Synthesized canon for normalize-judge-score-scale: invariants, schema, tech-overview, and summary docs updated to reflect the 0.0-1.0 float judge score scale.",
       "decisions": "",
       "modules": []
+    },
+    {
+      "timestamp": "2026-07-18T02:42:02.350951+00:00",
+      "branch": "tweak/external-sut-scaffold-analyze",
+      "summary": "Closed-box CLI: gavel oneshot create --type external scaffolds both script and http SUT variants (script active, http inert with judges=[] to avoid judge-pooling double-counting); added gavel oneshot analyze perf-metrics command; fixed a pre-existing bug where ScenarioProcessorStep's external payload never matched the ExternalTaskRequest schema the scaffold SDK validates against, so all external SUT runs previously failed at the SUT boundary.",
+      "decisions": "",
+      "modules": []
     }
   ]
 }

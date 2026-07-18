@@ -1,6 +1,7 @@
 """Scaffolding functions for gavel oneshot create command."""
 
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
@@ -567,45 +568,78 @@ Provide a short, clear, accurate answer.
 def _generate_external_templates(eval_root: Path, eval_name: str, protocol: str = "http") -> None:
     """Generate eval_config.json and scenarios.json for an external SUT evaluation.
 
+    Scaffolds *both* transport variants as named test subjects so the builder can
+    pick whichever works for their system: ``sut-script`` (protocol="script") is
+    placed first and is therefore the active subject, since the engine only reads
+    ``test_subjects[0]`` for SUT execution; ``sut-http`` (protocol="http") is
+    scaffolded alongside it as an inert placeholder. Reorder the list in the
+    generated config to switch which variant runs.
+
     Args:
         eval_root: Root directory for evaluations.
         eval_name: Name of the evaluation.
-        protocol: External transport protocol — "http" or "script".
+        protocol: Which variant to place first (active). "script" (default) or "http".
+
+    Note:
+        The script subject's ``command`` uses an absolute path to the materialized
+        scaffold. ``ScriptInputProcessor`` launches the subprocess with a fresh
+        per-scenario temp directory as ``cwd``, so a relative path like
+        ``scripts/sut_script_scaffold.py`` would not resolve.
+
+        Only the active (index-0) subject carries the ``judges`` list.
+        ``JudgeRunnerStep`` pools judges across *every* entry in ``test_subjects``
+        (not just index 0), so giving the inert alternate its own judges would
+        make it fire a second time against the same records. Switching the active
+        variant means moving both the subject order *and* the judges list.
     """
+    script_path = (eval_root / eval_name / "scripts" / "sut_script_scaffold.py").resolve()
+
+    judges = [
+        {
+            "name": "quality",
+            "type": "deepeval.geval",
+            "config": {
+                "model": "gpt-5-mini",
+                "criteria": "Evaluate the quality and accuracy of the response",
+                "evaluation_steps": [
+                    "Check if the response is accurate",
+                    "Verify completeness of answer",
+                    "Assess clarity and usefulness",
+                ],
+            },
+        }
+    ]
+
+    script_subject: Dict[str, Any] = {
+        "system_id": "sut-script",
+        "protocol": "script",
+        "config": {"command": [sys.executable, str(script_path)]},
+        "judges": judges if protocol == "script" else [],
+    }
+    http_subject: Dict[str, Any] = {
+        "system_id": "sut-http",
+        "protocol": "http",
+        "config": {"endpoint": "http://localhost:8080/evaluate"},
+        "judges": judges if protocol == "http" else [],
+    }
+    ordered_subjects = (
+        [script_subject, http_subject] if protocol == "script" else [http_subject, script_subject]
+    )
+
     eval_config: Dict[str, Any] = {
         "eval_type": "oneshot",
         "test_subject_type": "external",
         "eval_name": eval_name,
-        "description": "External SUT evaluation scaffolded by gavel oneshot create",
-        "test_subjects": [
-            {
-                "system_id": "my-external-system",
-                "protocol": protocol,
-                "config": {
-                    "endpoint": "http://localhost:8080/evaluate"
-                    if protocol == "http"
-                    else "",
-                    "command": ["python", f"scripts/sut_scaffold.py"]
-                    if protocol == "script"
-                    else [],
-                },
-                "judges": [
-                    {
-                        "name": "quality",
-                        "type": "deepeval.geval",
-                        "config": {
-                            "model": "gpt-5-mini",
-                            "criteria": "Evaluate the quality and accuracy of the response",
-                            "evaluation_steps": [
-                                "Check if the response is accurate",
-                                "Verify completeness of answer",
-                                "Assess clarity and usefulness",
-                            ],
-                        },
-                    }
-                ],
-            }
-        ],
+        "description": (
+            "External SUT evaluation scaffolded by gavel oneshot create. "
+            f"Both script and http variants are scaffolded — the engine runs "
+            f"test_subjects[0] ('{ordered_subjects[0]['system_id']}'); to switch "
+            "which variant is active, reorder this list AND move the 'judges' "
+            "list to the new test_subjects[0] entry (judges are pooled across "
+            "every test_subjects entry, so the inactive alternate is scaffolded "
+            "with judges=[] to avoid double-judging)."
+        ),
+        "test_subjects": ordered_subjects,
         "variants": ["claude_haiku"],
         "scenarios": {
             "source": "file.local",
@@ -668,7 +702,10 @@ def generate_all_templates(
             - ``regression``: Regression metric with arithmetic example scenarios.
             - ``conversational``: Multi-turn eval with conversation_completeness and conversational_geval.
             Note: ``--type in-situ`` skips prompt generation and uses remote endpoint structure.
-            Note: ``--type external`` generates an external SUT scaffold (HTTP or script transport).
+            Note: ``--type external`` generates an external SUT scaffold with both script and
+            HTTP transport variants (``scripts/sut_script_scaffold.py`` active as
+            ``test_subjects[0]``, ``scripts/sut_http_scaffold.py`` scaffolded as an inert
+            alternative) — reorder ``test_subjects`` in the generated config to switch.
 
     Raises:
         ConfigError: If template name is not recognized.
@@ -677,11 +714,12 @@ def generate_all_templates(
     generate_agents_config(eval_root, eval_name)
 
     if eval_type == "external":
-        # External SUT eval — use HTTP as the default protocol for the template.
-        _generate_external_templates(eval_root, eval_name, protocol="http")
-        # Materialize the HTTP scaffold into eval_dir/scripts/
+        # External SUT eval — script protocol is active (test_subjects[0]) by
+        # default; both variants are scaffolded so the builder can pick either.
+        _generate_external_templates(eval_root, eval_name, protocol="script")
         eval_dir = eval_root / eval_name
-        _materialize(eval_dir, protocol="http", name="sut")
+        _materialize(eval_dir, protocol="script", name="sut_script")
+        _materialize(eval_dir, protocol="http", name="sut_http")
     elif template == "classification":
         _generate_classification_templates(eval_root, eval_name, eval_type)
     elif template == "regression":

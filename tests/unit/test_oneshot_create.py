@@ -242,6 +242,25 @@ class TestOneshotCreateCommand:
             )
             assert result.exit_code == 0, f"Failed for valid name: {valid_name}"
 
+    def test_create_rejects_unknown_type(self, tmp_path: Path) -> None:
+        """Test that create command rejects an unrecognized --type value cleanly."""
+        result = runner.invoke(
+            app,
+            [
+                "oneshot",
+                "create",
+                "--eval",
+                "bad_type_eval",
+                "--type",
+                "nonexistent-type",
+                "--eval-root",
+                str(tmp_path),
+            ],
+        )
+        assert result.exit_code != 0
+        output = (result.stdout + result.stderr).lower()
+        assert "unknown evaluation type" in output
+
     def test_create_uses_default_eval_root(self) -> None:
         """Test that create command uses default eval root if not specified."""
         with tempfile.TemporaryDirectory() as tmp_dir:

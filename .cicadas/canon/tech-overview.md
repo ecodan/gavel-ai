@@ -211,7 +211,7 @@ class AutotuneRunSummary(BaseModel):
 
 ```
 gavel init [--eval-root DIR] [--force]
-gavel oneshot <create|run|judge|report|list|milestone>
+gavel oneshot <create|run|judge|analyze|report|list|milestone>
 gavel conv <create|generate>
 gavel autotune <create|run>
 ```
@@ -219,8 +219,16 @@ gavel autotune <create|run>
 `gavel init` initializes the project by writing `.gavel/config.json` with the chosen eval root. Idempotent; `--force` overwrites. All eval-touching commands emit a soft yellow warning to stderr if `.gavel/config.json` is absent (suppress-able by running `gavel init` first).
 
 `gavel oneshot create` accepts:
-- `--type local|in-situ` — eval type; in-situ skips prompt generation
-- `--template default|classification|regression` — scaffold template; classification/regression wire deterministic judges
+- `--type local|in-situ|external` — eval type; in-situ skips prompt generation; `external` scaffolds a closed-box eval targeting an out-of-process system under test
+- `--template default|classification|regression|conversational` — scaffold template; classification/regression wire deterministic judges
+
+**`--type external`** scaffolds *both* transport variants so the builder can pick whichever fits, rather than a separate `closed-box` command group (config-driven target inside `oneshot`, not a distinct workflow):
+- `scripts/sut_script_scaffold.py` (subclasses `ScriptSystemUnderTest`) — active, `test_subjects[0]`, `system_id: "sut-script"`, `command` is an **absolute path** (`ScriptInputProcessor` runs the subprocess with a fresh per-scenario temp dir as `cwd`, so a relative path never resolves).
+- `scripts/sut_http_scaffold.py` (subclasses `RemoteSystemUnderTest`) — inert placeholder, `system_id: "sut-http"`, `judges: []`.
+
+**Judge pooling caveat**: `JudgeRunnerStep` sums `subject.judges` across *every* entry in `eval_config.test_subjects`, not just index 0 (only SUT *execution* reads index 0 exclusively). The inactive scaffolded subject is given `judges: []` for this reason — a non-empty judges list on a dormant subject still executes and double-judges every run. Switching the active variant means moving both the subject's position and its `judges` list.
+
+`gavel oneshot analyze --run RUN_ID [--eval NAME] [--eval-root DIR]` computes performance metrics from `results_raw.jsonl` — success/error counts and error rate, latency avg/p50/p95, throughput, token totals — via `core/run_metrics.py::compute_run_metrics()` (pure function, transport-agnostic; reads `OutputRecord.timing_ms`/`tokens_prompt`/`tokens_completion`/`error`/`timestamp` directly, not from `metadata`).
 
 `gavel autotune create --eval NAME [--eval-root DIR] [--force]` scaffolds an autotune eval directory: `eval_config.json` (`workflow_type: "autotune"` + a `tuning` block), `agents.json` (registers a test-subject model and, by convention, a separate-provider judge model — see Common Mistakes), `config/prompts/<name>.toml` (v1 seed prompt), and `data/scenarios.json` pre-populated with working sample scenarios (mirrors the `oneshot create` scaffold convention so `gavel autotune run` works immediately without edits). Uses `--eval` (not a positional eval-name arg) to match the rest of the CLI's option-based pattern.
 
@@ -281,6 +289,8 @@ gavel autotune <create|run>
 | `"script"` | `ScriptInputProcessor` | `asyncio` subprocess; request written to `{tmpdir}/{request_filename}` (default `request.json`) before launch; response read from `{tmpdir}/{response_filename}` (default `response.json`) after exit |
 
 Both transports share the same `ExternalTaskRequest` / `ExternalJudgeRequest` request models and the `ExternalResponseEnvelope` response model.
+
+`ScenarioProcessorStep` builds the outbound payload for both transports as a dict satisfying `ExternalTaskRequest`: `scenario_id`, `scenario_input` (the scenario's raw `input`), `rendered_prompt` (falls back to `str(scenario.input)` — external subjects have no prompt template to render), `custom_config` (the subject's `config` dict, passed through), and `metadata` when present. All four required/used fields must be present or the scaffold SDK's `_BaseSystemUnderTest._parse_and_validate` rejects the request before `handle()` ever runs.
 
 ### Two-Tier Failure Model (ADR-3)
 

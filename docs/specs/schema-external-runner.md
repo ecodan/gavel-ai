@@ -284,3 +284,23 @@ Same as task response transport notes.
 - **Outputs:** How `metadata["trace_id"]` appears on `OutputRecord`/`JudgedRecord` entries
   and links to `telemetry.jsonl` → [schema-outputs.md](schema-outputs.md)
 - **Generated schemas:** `docs/specs/schemas/` (JSON Schema Draft 2020-12)
+
+## CLI Scaffolding
+
+`gavel oneshot create --eval <name> --type external` scaffolds a runnable external SUT
+evaluation with **both** transport variants, so you can pick whichever fits your system:
+
+- `scripts/sut_script_scaffold.py` — subclasses `ScriptSystemUnderTest` (`gavel_ai.scaffolds`),
+  materialized as the active subject (`test_subjects[0]`, `system_id: "sut-script"`,
+  `protocol: "script"`). Implement `handle()`; the commented block in the generated file
+  shows wrapping a remote API call from inside the script.
+- `scripts/sut_http_scaffold.py` — subclasses `RemoteSystemUnderTest`, scaffolded as an
+  inert alternate (`system_id: "sut-http"`, `protocol: "http"`).
+
+To switch the active variant, reorder `test_subjects` in the generated `eval_config.json`
+**and** move the `judges` list to the new `test_subjects[0]` entry — see the note on judge
+pooling in [schema-configs.md](schema-configs.md#testsubject).
+
+`gavel oneshot analyze --run <run_id>` computes performance metrics (success/error counts,
+error rate, latency avg/p50/p95, throughput, token totals) from `results_raw.jsonl`. It is
+transport-agnostic — the same command works for prompt-based, script, and HTTP runs.

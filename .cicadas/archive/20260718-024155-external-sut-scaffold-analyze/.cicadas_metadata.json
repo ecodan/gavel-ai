@@ -1,0 +1,25 @@
+{
+  "name": "external-sut-scaffold-analyze",
+  "type": "initiative",
+  "registry_entry": {
+    "intent": "Scaffold dual-variant external SUT (script + http) in oneshot create, add oneshot analyze perf-metrics command",
+    "owner": "unknown",
+    "signals": [],
+    "created_at": "2026-07-16T02:10:17.406986+00:00"
+  },
+  "timestamp": "20260718-024155",
+  "associated_branches": {
+    "tweak/external-sut-scaffold-analyze": {
+      "intent": "Scaffold dual-variant external SUT (script + http) in oneshot create, add oneshot analyze perf-metrics command",
+      "modules": [
+        "scaffolds/templates",
+        "scaffolds/_materialize.py",
+        "cli/scaffolding.py",
+        "cli/commands/oneshot.py"
+      ],
+      "owner": "unknown",
+      "created_at": "2026-07-16T02:10:26.782227+00:00",
+      "initiative": "external-sut-scaffold-analyze"
+    }
+  }
+}
