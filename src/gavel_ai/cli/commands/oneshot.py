@@ -259,6 +259,7 @@ def _print_run_metrics(run_id: str, metrics: RunMetrics) -> None:
 
     table.add_row("Scenarios", str(metrics.scenario_count))
     table.add_row("Success", str(metrics.success_count))
+    table.add_row("Warnings", str(metrics.warning_count))
     table.add_row("Errors", str(metrics.error_count))
     table.add_row("Error rate", f"{metrics.error_rate * 100:.1f}%")
     table.add_row("Latency avg", _fmt(metrics.latency_avg_ms, " ms"))

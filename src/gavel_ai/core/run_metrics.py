@@ -8,7 +8,7 @@ Transport-agnostic: works identically for prompt-based and external
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from gavel_ai.core.exceptions import ValidationError
@@ -21,6 +21,7 @@ class RunMetrics:
 
     scenario_count: int
     success_count: int
+    warning_count: int
     error_count: int
     error_rate: float
     latency_avg_ms: Optional[float]
@@ -58,8 +59,13 @@ def compute_run_metrics(records: List[OutputRecord]) -> RunMetrics:
         raise ValidationError("Cannot compute metrics for an empty result set")
 
     scenario_count = len(records)
-    error_count = sum(1 for r in records if r.error)
-    success_count = scenario_count - error_count
+    warning_count = sum(
+        1 for r in records if r.error and r.metadata.get("external_tier") == "WARNING"
+    )
+    error_count = sum(
+        1 for r in records if r.error and r.metadata.get("external_tier") != "WARNING"
+    )
+    success_count = scenario_count - error_count - warning_count
     error_rate = error_count / scenario_count
 
     latencies = sorted(r.timing_ms for r in records if r.timing_ms is not None)
@@ -75,6 +81,7 @@ def compute_run_metrics(records: List[OutputRecord]) -> RunMetrics:
     return RunMetrics(
         scenario_count=scenario_count,
         success_count=success_count,
+        warning_count=warning_count,
         error_count=error_count,
         error_rate=error_rate,
         latency_avg_ms=latency_avg_ms,
@@ -87,19 +94,33 @@ def compute_run_metrics(records: List[OutputRecord]) -> RunMetrics:
 
 
 def _compute_throughput(records: List[OutputRecord]) -> Optional[float]:
-    """Records per second across the observed timestamp span, or None if unavailable."""
-    timestamps: List[datetime] = []
+    """Records per second across the observed execution window, or None if unavailable.
+
+    Records execute concurrently and are spooled to results_raw.jsonl within
+    milliseconds of each other once the whole batch finishes, so the spread of
+    ``timestamp`` values alone is not a usable proxy for wall-clock duration —
+    it reflects write-time clustering, not execution time. Each record's own
+    ``timing_ms`` is used to reconstruct that scenario's start time (completion
+    ``timestamp`` minus its duration), and the window from the earliest
+    reconstructed start to the latest completion approximates the batch's real
+    wall-clock span under concurrent execution.
+    """
+    windows: List[tuple[datetime, datetime]] = []
     for r in records:
         try:
-            timestamps.append(datetime.fromisoformat(r.timestamp))
+            end = datetime.fromisoformat(r.timestamp)
         except (ValueError, TypeError):
             continue
+        start = end - timedelta(milliseconds=r.timing_ms)
+        windows.append((start, end))
 
-    if len(timestamps) < 2:
+    if len(windows) < 2:
         return None
 
-    span_sec = (max(timestamps) - min(timestamps)).total_seconds()
+    window_start = min(start for start, _ in windows)
+    window_end = max(end for _, end in windows)
+    span_sec = (window_end - window_start).total_seconds()
     if span_sec <= 0:
         return None
 
-    return len(timestamps) / span_sec
+    return len(windows) / span_sec
